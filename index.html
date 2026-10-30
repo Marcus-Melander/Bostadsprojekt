@@ -100,8 +100,16 @@ main { padding-block: 32px 64px; }
 .field label { font-size: 14px; }
 .field small { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
 .num { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--control); border-radius: var(--r-control); padding: 0 8px; height: 32px; }
-.num input { width: 7.5em; border: 0; background: transparent; color: var(--text); font: 500 14px var(--f-body); font-variant-numeric: tabular-nums; text-align: right; padding: 0 2px; height: 30px; }
+.num input, .num input[type="text"] { border: 0; border-radius: 0; background: transparent; min-width: 0; width: 7.5em; border: 0; background: transparent; color: var(--text); font: 500 14px var(--f-body); font-variant-numeric: tabular-nums; text-align: right; padding: 0 2px; height: 30px; }
 .num input:focus { outline: none; }
+.num input[data-custom] { color: var(--data); }
+.field .slider { grid-column: 1 / -1; width: 100%; height: 20px; margin: 2px 0 0; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--active); }
+.slider::-moz-range-track { height: 4px; border-radius: 2px; background: var(--active); }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--text); }
+.slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--text); }
+.slider:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
+@media (min-width: 901px) { #out-money, #out-bid, #out-value { position: sticky; top: 112px; } }
 .num:focus-within { border-color: var(--text); }
 .num span { color: var(--muted); font-size: var(--fs-small); padding-left: 4px; }
 input[type="text"], input[type="url"], select { font: 14px var(--f-body); color: var(--text); background: var(--surface); border: 1px solid var(--control); border-radius: var(--r-control); height: 32px; padding: 0 8px; min-width: 0; }
@@ -346,7 +354,7 @@ const STEPS = [
 
 /* ---------- State ---------- */
 const DEFAULT = () => ({
-  v: 2,
+  v: 3,
   tab: "overview",
   example: true,
   fin: {
@@ -364,9 +372,11 @@ const DEFAULT = () => ({
     incomeMult: 5.5,
     kalpDeduction: false,
     bankOffer: null,
+    netAuto: true,
+    church: false,
   },
   rates: { binding: "m3", mode: "list", offer: 2.75, sort: "rate" },
-  search: { area: "1", minRooms: 2, minArea: 40, maxAvgift: 5000, headroom: 8 },
+  search: { area: "115341", minRooms: 2, minArea: 40, maxAvgift: 5000, headroom: 8 },
   apts: [
     { id: "a1", example: true, address: "Example: Ringvägen 42, Södermalm", price: 3150000, bid: 3350000, avgift: 3600, kvm: 44, rooms: 2, debtKvm: 6200, link: "", status: "Viewing booked" },
     { id: "a2", example: true, address: "Example: Sankt Göransgatan 9, Kungsholmen", price: 2795000, bid: 2950000, avgift: 2900, kvm: 37, rooms: 1.5, debtKvm: 14800, link: "", status: "Watching" },
@@ -390,10 +400,17 @@ let S = DEFAULT();
 
 // Plans saved before v2 kept the stricter stress-test defaults; move them to the new ones unless the user changed them
 function migrate() {
-  if (S.v >= 2) return;
-  if (S.fin.living === 11500) S.fin.living = 9000;
-  if (S.fin.stress === 7) S.fin.stress = 6.5;
-  S.v = 2;
+  if (!(S.v >= 2)) {
+    if (S.fin.living === 11500) S.fin.living = 9000;
+    if (S.fin.stress === 7) S.fin.stress = 6.5;
+  }
+  if (!(S.v >= 3)) {
+    // v3: net salary is calculated from gross, and only inner-city areas remain
+    S.fin.netAuto = true;
+    if (S.search.area === "1" || S.search.area === "2") S.search.area = "115341";
+  }
+  if (!AREAS[S.value.area]) S.value.area = "centrala-stockholm";
+  S.v = 3;
 }
 function merge(base, saved) {
   if (!saved || typeof saved !== "object") return base;
@@ -494,11 +511,40 @@ function furnitureTotal(tierOverride) {
   for (const x of f.extra) { if (x.have) continue; total += (+x.price || 0) * (+x.qty || 1); count++; }
   return { total, have, count };
 }
+// Preliminary tax as Skatteverket's 2026 monthly tables compute it (SKV 433, teknisk beskrivning 2025-12-10):
+// Stockholm's 30,55 % plus 0,07 % begravningsavgift, rounded to the table's whole percent.
+const TAX = { kommun: 30.55, burial: 0.07, church: 1.0, skikt: 643000, publicMax: 1184 };
+function monthlyTax(gross, church) {
+  if (!(gross > 0)) return 0;
+  const T = Math.round(TAX.kommun + TAX.burial + (church ? TAX.church : 0)); // the table number, e.g. 31
+  const step = gross <= 20000 ? 100 : gross <= 80000 ? 200 : 1;               // the table's income intervals
+  const FFI = Math.floor(Math.ceil(gross / step) * step * 12 / 100) * 100;
+  let ga;
+  if (FFI <= 0.99 * PBB) ga = 0.423 * PBB;
+  else if (FFI <= 2.72 * PBB) ga = 0.423 * PBB + 0.2 * (FFI - 0.99 * PBB);
+  else if (FFI <= 3.11 * PBB) ga = 0.77 * PBB;
+  else if (FFI <= 7.88 * PBB) ga = 0.77 * PBB - 0.1 * (FFI - 3.11 * PBB);
+  else ga = 0.293 * PBB;
+  ga = Math.min(FFI, Math.ceil(ga / 100) * 100);
+  const BFI = FFI - ga, KI = (T - 1.16) / 100;
+  const municipal = Math.floor(BFI * KI), fees = Math.floor(BFI * 0.0116);
+  const state = BFI - TAX.skikt >= 200 ? Math.floor(0.2 * (BFI - TAX.skikt)) : 0;
+  let jsa; // jobbskatteavdrag, under 66
+  if (FFI <= 0.91 * PBB) jsa = (FFI - ga) * KI;
+  else if (FFI <= 3.24 * PBB) jsa = (0.91 * PBB + 0.3874 * (FFI - 0.91 * PBB) - ga) * KI;
+  else if (FFI <= 8.08 * PBB) jsa = (1.813 * PBB + 0.251 * (FFI - 3.24 * PBB) - ga) * KI;
+  else jsa = (3.027 * PBB - ga) * KI;
+  const srf = BFI <= 40000 ? 0 : BFI <= 240000 ? Math.floor(0.0075 * (BFI - 40000)) : 1500; // skattereduktion för förvärvsinkomst
+  const muni = Math.max(0, municipal - Math.max(0, Math.floor(jsa)) - srf);
+  const pub = Math.min(TAX.publicMax, Math.floor(BFI * 0.01));
+  return Math.round((muni + fees + state + pub) / 12);
+}
+function netOf(gross) { return Math.max(0, (+gross || 0) - monthlyTax(+gross || 0, S.fin.church)); }
 function household() {
   const f = S.fin, two = f.buyers === 2;
   return {
     gross: (+f.gross1 || 0) + (two ? +f.gross2 || 0 : 0),
-    net: (+f.net1 || 0) + (two ? +f.net2 || 0 : 0),
+    net: f.netAuto ? netOf(f.gross1) + (two ? netOf(f.gross2) : 0) : (+f.net1 || 0) + (two ? +f.net2 || 0 : 0),
   };
 }
 function closingFees() { return FEE_TRANSFER + FEE_PLEDGE; }
@@ -560,25 +606,18 @@ function monthlyCost(price, avgift, rate, cashIn) {
 // Yearly average kr/kvm for bostadsrätter, Svensk Mäklarstatistik (årshistorik, fetched 30 Oct 2026)
 const PRICE_SOURCE = "https://www.maklarstatistik.se/omrade/riket/stockholms-lan/stockholm/";
 const AREAS = {
-  stockholm: { name: "Stockholms kommun (all)", from: 1996, v: [11124,12818,15767,19686,23794,24748,26021,24585,25804,30405,36357,41694,38996,39966,43689,44763,45692,50234,55873,66513,71413,73031,69405,71131,75842,81908,82103,80911,84288,86267] },
-  "centrala-stockholm": { name: "Centrala Stockholm", from: 2005, v: [38397,44867,52377,50011,51348,56381,57957,59179,64243,71205,84465,89645,92442,87291,89225,95218,104868,107183,103673,107725,111823] },
-  sodermalm: { name: "Södermalm", from: 2005, v: [36351,42665,49361,46870,47757,53100,54275,55711,60645,68080,81216,86169,88410,82437,83917,89200,99161,100802,97021,100972,106286] },
-  kungsholmen: { name: "Kungsholmen", from: 2005, v: [37897,43530,51980,49680,49989,54965,56866,58188,63369,70161,82394,87819,90184,84437,86901,91477,99694,102374,99228,102843,105041] },
-  "vasastan-norrmalm": { name: "Vasastan-Norrmalm", from: 2005, v: [39705,46704,54390,51703,54107,59000,61039,62774,68074,74944,89322,94980,98713,93168,95579,102700,113849,116685,112229,117329,122290] },
-  ostermalm: { name: "Östermalm", from: 2005, v: [41102,48270,55741,54130,56105,60923,62911,63928,68007,74319,89044,93772,97274,93024,95043,102354,112186,115806,112144,116589,120781] },
-  essingen: { name: "Essingen", from: 2005, v: [33086,38889,46363,44283,44687,48524,51005,50437,54334,61281,71702,77573,79291,74794,74194,80501,85725,86980,83830,85173,87151] },
-  "hagersten-liljeholmen": { name: "Hägersten-Liljeholmen", from: 2005, v: [23700,29300,33980,33633,32690,37191,38428,40146,44279,50870,60811,66632,68368,64157,65058,68959,75372,76431,72212,74197,75401] },
-  "bromma-vasterled": { name: "Bromma-Västerled", from: 2005, v: [23326,28302,32154,31879,31890,34061,36040,36132,40012,43455,52526,56587,58521,54689,55828,58601,63077,63781,61565,62829,63309] },
-  "enskede-skarpnack": { name: "Enskede-Skarpnäck", from: 2005, v: [20562,25395,30568,28811,29315,32566,33926,35458,38593,45659,54204,58107,60286,55861,57271,59825,65579,65722,62941,63609,63684] },
-  "brannkyrka-skarholmen": { name: "Brännkyrka-Skärholmen", from: 2005, v: [15536,18664,22862,21333,22595,24484,25526,25973,29143,34480,43325,46105,48244,44399,44773,46780,49971,49929,48136,48226,47188] },
-  "farsta-vantor": { name: "Farsta-Vantör", from: 2005, v: [15045,17982,21268,20460,21103,22928,24190,26330,29347,34317,42664,46211,47842,43510,44626,46312,48756,49247,47480,48231,46524] },
-  "hasselby-vallingby": { name: "Hässelby-Vällingby", from: 2005, v: [15933,16551,19335,19993,19975,22754,22452,23594,26249,30005,36455,43236,43493,40162,41727,41657,43089,44367,40322,38932,37445] },
-  "spanga-kista": { name: "Spånga-Kista", from: 2005, v: [11163,13655,17201,17205,17867,18646,19131,20566,23104,25967,34119,37200,36477,34710,33749,34913,35483,35271,33449,31700,30453] },
+  "centrala-stockholm": { name: "Hela innerstan", from: 2005, now: 121933, v: [38397,44867,52377,50011,51348,56381,57957,59179,64243,71205,84465,89645,92442,87291,89225,95218,104868,107183,103673,107725,111823] },
+  sodermalm: { name: "Södermalm", from: 2005, now: 116680, v: [36351,42665,49361,46870,47757,53100,54275,55711,60645,68080,81216,86169,88410,82437,83917,89200,99161,100802,97021,100972,106286] },
+  kungsholmen: { name: "Kungsholmen", from: 2005, now: 112452, v: [37897,43530,51980,49680,49989,54965,56866,58188,63369,70161,82394,87819,90184,84437,86901,91477,99694,102374,99228,102843,105041] },
+  "vasastan-norrmalm": { name: "Vasastan-Norrmalm", from: 2005, now: 135782, v: [39705,46704,54390,51703,54107,59000,61039,62774,68074,74944,89322,94980,98713,93168,95579,102700,113849,116685,112229,117329,122290] },
+  ostermalm: { name: "Östermalm", from: 2005, now: 129172, v: [41102,48270,55741,54130,56105,60923,62911,63928,68007,74319,89044,93772,97274,93024,95043,102354,112186,115806,112144,116589,120781] },
 };
 const BUY_YEAR = 2026;
+// Booli area ids, checked on booli.se (30 Oct 2026)
+const BOOLI_AREAS = [["115341", "Södermalm"], ["1", "All of Stockholms kommun"]];
 // Log-linear least squares: ln(kr/kvm) = a + b·year, over the last `win` years (0 = all)
 function regress(key, win) {
-  const A = AREAS[key] || AREAS.stockholm;
+  const A = AREAS[key] || AREAS["centrala-stockholm"];
   let pts = A.v.map((v, i) => [A.from + i, v]);
   if (win > 0) pts = pts.slice(-win);
   const n = pts.length, xs = pts.map((p) => p[0]), ys = pts.map((p) => Math.log(p[1]));
@@ -631,9 +670,33 @@ function projectFive(sc) {
 
 /* ---------- Rendering ---------- */
 const app = document.getElementById("app");
-function numField(path, label, unit = "kr", hint = "", step = "1000") {
-  const v = get(path);
-  return `<div class="field"><label for="f-${path}">${label}</label><span class="num"><input id="f-${path}" type="number" inputmode="decimal" step="${step}" data-path="${path}" value="${v ?? ""}"><span>${unit}</span></span>${hint ? `<small>${hint}</small>` : ""}</div>`;
+// Slider ranges: [min, max, step]. Typed values may go outside them.
+const RANGES = {
+  "fin.gross1": [0, 120000, 500], "fin.gross2": [0, 120000, 500], "fin.net1": [0, 90000, 500], "fin.net2": [0, 90000, 500],
+  "fin.savings": [0, 5000000, 10000], "fin.buffer": [0, 300000, 5000], "fin.monthlySave": [0, 40000, 500],
+  "fin.living": [4000, 25000, 250], "fin.targetAvgift": [0, 10000, 100], "fin.stress": [3, 10, 0.25], "fin.incomeMult": [3, 8, 0.25],
+  "fin.targetPrice": [1000000, 12000000, 25000], "fin.bankOffer": [0, 10000000, 50000],
+  "bid.ask": [1000000, 12000000, 25000], "bid.walk": [1000000, 12000000, 25000], "bid.step": [5000, 100000, 5000],
+  "five.avgiftExtra": [0, 5, 0.25], "rates.offer": [1, 6, 0.01], "value.manual": [-5, 10, 0.5],
+  "search.minRooms": [1, 6, 0.5], "search.minArea": [15, 150, 5], "search.maxAvgift": [1000, 10000, 250], "search.headroom": [0, 25, 1],
+};
+const nfIn = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
+function fmtIn(v) { return v == null || v === "" || !isFinite(+v) ? "" : nfIn.format(+v); }
+// Reads "2 500 000", "6,5" or "-1"; returns undefined while the text is not a number yet
+function parseNum(str) {
+  const t = String(str).replace(/[\s\u00a0\u202f]/g, "").replace(/kr$/i, "").replace(",", ".").replace("−", "-");
+  if (t === "") return null;
+  if (t === "-" || t.endsWith(".")) return undefined;
+  const n = Number(t);
+  return isFinite(n) ? n : undefined;
+}
+function numInput(attrs, v, width) {
+  return `<input type="text" inputmode="decimal" autocomplete="off" data-num ${attrs} value="${fmtIn(v)}"${width ? ` style="width:${width}"` : ""}>`;
+}
+function numField(path, label, unit = "kr", hint = "") {
+  const v = get(path), r = RANGES[path];
+  const slider = r ? `<input class="slider" type="range" min="${r[0]}" max="${r[1]}" step="${r[2]}" value="${Math.min(r[1], Math.max(r[0], +v || 0))}" data-path="${path}" aria-label="${esc(label)}">` : "";
+  return `<div class="field"><label for="f-${path}">${label}</label><span class="num">${numInput(`id="f-${path}" data-path="${path}"`, v)}<span>${unit}</span></span>${slider}${hint ? `<small>${hint}</small>` : ""}</div>`;
 }
 function get(path) { return path.split(".").reduce((o, k) => (o == null ? o : o[k]), S); }
 function set(path, val) {
@@ -642,8 +705,9 @@ function set(path, val) {
   o[ks.at(-1)] = val;
 }
 function exampleBanner(text) {
-  if (!S.example) return "";
-  return `<div class="banner-ex"><span class="chip ex">Example</span><span>${text}</span><button class="btn" data-act="clear-example">Start with my own numbers</button></div>`;
+  // Always one slot, so the page keeps its shape when the banner goes away mid-typing
+  if (!S.example) return `<div class="ex-slot"></div>`;
+  return `<div class="ex-slot"><div class="banner-ex"><span class="chip ex">Example</span><span>${text}</span><button class="btn" data-act="clear-example">Start with my own numbers</button></div></div>`;
 }
 
 const VIEWS = {
@@ -710,8 +774,11 @@ const VIEWS = {
               <button data-set="fin.buyers" data-val="1" aria-pressed="${!two}">Alone</button>
               <button data-set="fin.buyers" data-val="2" aria-pressed="${two}">Together</button></div></div>
             ${numField("fin.gross1", two ? "Your gross salary / month" : "Gross salary / month", "kr", "Before tax (bruttolön).")}
-            ${numField("fin.net1", two ? "Your net salary / month" : "Net salary / month", "kr", "What lands in your account (nettolön).")}
-            ${two ? numField("fin.gross2", "Partner's gross / month") + numField("fin.net2", "Partner's net / month") : ""}
+            ${f.netAuto ? "" : numField("fin.net1", two ? "Your net salary / month" : "Net salary / month", "kr", "What lands in your account (nettolön).")}
+            ${two ? numField("fin.gross2", "Partner's gross / month") + (f.netAuto ? "" : numField("fin.net2", "Partner's net / month")) : ""}
+            <div id="out-net">${VIEWS.netOut()}</div>
+            <div class="field"><label for="f-netauto">Calculate net salary from gross</label><input id="f-netauto" type="checkbox" data-check="fin.netAuto" ${f.netAuto ? "checked" : ""}></div>
+            ${f.netAuto ? `<div class="field"><label for="f-church">Member of Svenska kyrkan</label><input id="f-church" type="checkbox" data-check="fin.church" ${f.church ? "checked" : ""}><small>Adds kyrkoavgift, about 1 % in Stockholm.</small></div>` : ""}
           </section>
           <section class="panel"><h3>Savings and debts</h3>
             ${numField("fin.savings", "Savings available", "kr", "Cash, ISK and funds you'll sell for the purchase.", "10000")}
@@ -734,6 +801,16 @@ const VIEWS = {
         </div>
         <div class="stack" id="out-money">${VIEWS.moneyOut()}</div>
       </div>`;
+  },
+  netOut() {
+    const f = S.fin, two = f.buyers === 2;
+    if (!f.netAuto) return "";
+    const row = (label, g) => `<dt>${label}</dt><dd>${kr(netOf(g))}</dd>`;
+    return `<div class="field" style="display:block"><dl class="kv">
+      ${row(two ? "Your net salary / month" : "Net salary / month", f.gross1)}
+      ${two ? row("Partner's net / month", f.gross2) : ""}
+      <dt>Tax / month</dt><dd>${kr(monthlyTax(+f.gross1 || 0, f.church) + (two ? monthlyTax(+f.gross2 || 0, f.church) : 0))}</dd>
+    </dl><small style="display:block;margin-top:6px">From Skatteverket's 2026 tax table for Stockholm (${String(TAX.kommun).replace(".", ",")} % plus begravningsavgift), with grundavdrag and jobbskatteavdrag.</small></div>`;
   },
   moneyOut() {
     const a = affordability(), h = household(), f = S.fin, cr = chosenRate();
@@ -841,7 +918,7 @@ const VIEWS = {
 
   five() {
     const F = S.five, cr = chosenRate();
-    const cell = (k, y) => `<td><span class="num"><input type="number" step="0.25" aria-label="${esc(F.scen[k].name)} year ${y + 1}" data-five="${k}" data-y="${y}" value="${F.scen[k].dr[y]}" style="width:4.2em"><span>pp</span></span></td>`;
+    const cell = (k, y) => `<td><span class="num">${numInput(`aria-label="${esc(F.scen[k].name)} year ${y + 1}" data-five="${k}" data-y="${y}"`, F.scen[k].dr[y], "4.2em")}<span>pp</span></span></td>`;
     return `
       <div class="lead"><h1>5-year budget</h1>
       <p>Starts from your wage, your target apartment and today's plan rate of ${pct(cr.rate)}. Everything is in today's money: your wage and everyday costs are assumed to rise together with inflation, so only the mortgage rate and the avgift change.</p></div>
@@ -849,7 +926,7 @@ const VIEWS = {
       <div class="bench">
         <div class="stack">
           <section class="panel"><h3>Your assumptions</h3>
-            ${numField("fin.net1", S.fin.buyers === 2 ? "Your net wage / month" : "Net wage / month", "kr", "Edit gross and partner's wage in My finances.", "500")}
+            ${S.fin.netAuto ? numField("fin.gross1", S.fin.buyers === 2 ? "Your gross salary / month" : "Gross salary / month", "kr", "Net after tax: " + kr(household().net) + " a month" + (S.fin.buyers === 2 ? " for both of you" : "") + ".", "500") : numField("fin.net1", S.fin.buyers === 2 ? "Your net wage / month" : "Net wage / month", "kr", "Edit gross and partner's wage in My finances.", "500")}
             ${numField("fin.living", "Living costs / month", "kr", "", "500")}
             ${numField("fin.targetPrice", "Apartment price", "kr", "", "50000")}
             ${numField("fin.targetAvgift", "Avgift today", "kr/mån", "", "100")}
@@ -920,7 +997,7 @@ const VIEWS = {
     const V = S.value;
     return `
       <div class="lead"><h1>Area prices</h1>
-      <p>Yearly average price per kvm for bostadsrätter, from <a href="${PRICE_SOURCE}" target="_blank" rel="noopener">Svensk Mäklarstatistik</a> (to 2025). A log-linear regression gives the average yearly growth over the period you pick and a 95 % range for the next five years. A trend describes the past: Stockholm prices fell about 10 % in 2017–18 and again in 2022–23.</p></div>
+      <p>Inner-city areas only, innanför tullarna. Yearly average price per kvm for bostadsrätter, from <a href="${PRICE_SOURCE}" target="_blank" rel="noopener">Svensk Mäklarstatistik</a> (to 2025). A log-linear regression gives the average yearly growth over the period you pick and a 95 % range for the next five years. A trend describes the past: Stockholm prices fell about 10 % in 2017–18 and again in 2022–23.</p></div>
       <div class="bench">
         <div class="stack"><section class="panel"><h3>Area and method</h3>
           <div class="field"><label for="f-varea">Area</label><select id="f-varea" data-path="value.area">${Object.entries(AREAS).map(([k, a]) => `<option value="${k}" ${V.area === k ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
@@ -975,8 +1052,9 @@ const VIEWS = {
         <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="eyebrow">${esc(A.name)} · kr/kvm</span><span class="dim" style="font-size:.78rem">Dots: actual · line: fitted trend · dashed: projection with 95 % range</span></div>
         <div style="overflow-x:auto">${svg}</div>
       </section>
-      <div class="tiles">
+      <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
         <div class="tile" style="cursor:default"><span class="eyebrow">Trend growth</span><span class="v">${pct(R.g * 100, 1)}</span><span class="s">a year, ${R.pts[0][0]}–${R.pts.at(-1)[0]} · R² ${R.r2.toFixed(2).replace(".", ",")}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Last 3 months</span><span class="v">${nf.format(A.now)}</span><span class="s">kr/kvm, to 8 Oct 2026</span></div>
         <div class="tile" style="cursor:default"><span class="eyebrow">Area in ${x1}</span><span class="v">${nf.format(pR.mid)}</span><span class="s">kr/kvm, range ${nf.format(pR.lo)}–${nf.format(pR.hi)}</span></div>
         <div class="tile" style="cursor:default"><span class="eyebrow">Your ${mkr(price)} apartment in ${x1}</span><span class="v">${mkr(v5.mid)}</span><span class="s">range ${mkr(v5.lo)}–${mkr(v5.hi)}</span></div>
       </div>
@@ -1074,9 +1152,9 @@ const VIEWS = {
       <div class="bench">
         <section class="panel"><h3>Booli search</h3>
           <div class="field"><label for="f-area">Area</label><select id="f-area" data-path="search.area">
-            ${[["1", "Stockholms kommun"], ["2", "Stockholms län"]].map(([v, l]) => `<option value="${v}" ${s.area === v ? "selected" : ""}>${l}</option>`).join("")}
-            ${!["1", "2"].includes(s.area) ? `<option value="${esc(s.area)}" selected>Area id ${esc(s.area)}</option>` : ""}
-          </select><small>For a single district, open Booli, pick the area, and copy the number after <span class="mono">areaIds=</span> in the address into the field below.</small></div>
+            ${BOOLI_AREAS.map(([v, l]) => `<option value="${v}" ${s.area === v ? "selected" : ""}>${l}</option>`).join("")}
+            ${!BOOLI_AREAS.some(([v]) => v === s.area) ? `<option value="${esc(s.area)}" selected>Area id ${esc(s.area)}</option>` : ""}
+          </select><small>For Kungsholmen, Vasastan or Östermalm, pick the area on Booli and copy the number after <span class="mono">areaIds=</span> in the address into the field below.</small></div>
           <div class="field"><label for="f-areaid">Booli area id</label><input id="f-areaid" type="text" inputmode="numeric" data-path="search.area" value="${esc(s.area)}" style="width:7em"></div>
           ${numField("search.minRooms", "Min rooms", "rok", "", "0.5")}
           ${numField("search.minArea", "Min size", "kvm", "", "5")}
@@ -1130,8 +1208,8 @@ const VIEWS = {
             return `<div class="item ${st.have ? "have" : ""}">
               <input type="checkbox" title="I already have this" aria-label="Already have ${esc(name)}" data-have="${id}" ${st.have ? "checked" : ""}>
               <span class="nm">${esc(name)} ${ess ? '<span class="ess">Essential</span>' : ""}</span>
-              <span class="num" title="Quantity"><input type="number" min="0" step="1" aria-label="Quantity" data-qty="${id}" value="${st.qty ?? qty0}" style="width:2.6em"><span>st</span></span>
-              <span class="num"><input type="number" step="100" aria-label="Price each" data-price="${id}" value="${st.price ?? prices[ti]}" ${st.price != null ? 'style="color:var(--accent)"' : ""}><span>kr</span></span>
+              <span class="num" title="Quantity">${numInput(`aria-label="Quantity" data-qty="${id}"`, st.qty ?? qty0, "2.6em")}<span>st</span></span>
+              <span class="num">${numInput(`aria-label="Price each" data-price="${id}"${st.price != null ? ' data-custom' : ""}`, st.price ?? prices[ti])}<span>kr</span></span>
             </div>`;
           }).join("")}
         </section>`;
@@ -1140,7 +1218,7 @@ const VIEWS = {
           ${f.extra.map((x) => `<div class="item ${x.have ? "have" : ""}">
             <input type="checkbox" aria-label="Already have" data-xhave="${x.id}" ${x.have ? "checked" : ""}>
             <input type="text" aria-label="Item name" data-xname="${x.id}" value="${esc(x.name)}" placeholder="Item">
-            <span class="num"><input type="number" aria-label="Price" step="100" data-xprice="${x.id}" value="${x.price ?? ""}"><span>kr</span></span>
+            <span class="num">${numInput(`aria-label="Price" data-xprice="${x.id}"`, x.price)}<span>kr</span></span>
             <button class="btn ghost" data-act="del-extra" data-id="${x.id}" >Remove</button>
           </div>`).join("")}
           <button class="btn" style="margin-top:8px" data-act="add-extra">Add item</button>
@@ -1180,7 +1258,7 @@ function roomTotal(room) {
 }
 
 function aptCard(p) {
-  const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num"><input type="number" step="${step}" data-apt="${p.id}" data-k="${k}" value="${p[k] ?? ""}"><span>${unit}</span></span></label>`;
+  const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num">${numInput(`data-apt="${p.id}" data-k="${k}" aria-label="${esc(label)}"`, p[k])}<span>${unit}</span></span></label>`;
   return `<article class="apt">
     <div class="apt-head">
       ${p.example ? '<span class="chip ex">Example</span>' : ""}
@@ -1233,16 +1311,30 @@ function render() {
   app.innerHTML = VIEWS[S.tab]();
 }
 // Update live outputs without rebuilding inputs (keeps focus while typing)
+// Update the page in place: only what changed is touched, and the field being edited is left alone
+function morph(from, to) {
+  if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) { from.replaceWith(to.cloneNode(true)); return; }
+  if (from.nodeType === 3 || from.nodeType === 8) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
+  if (from === document.activeElement && (from.tagName === "INPUT" || from.tagName === "SELECT")) return;
+  for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
+  for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
+  if (from.tagName === "INPUT") {
+    if (from.type === "checkbox") from.checked = to.hasAttribute("checked");
+    else if (from.value !== (to.getAttribute("value") ?? "")) from.value = to.getAttribute("value") ?? "";
+    return;
+  }
+  morphChildren(from, to);
+  if (from.tagName === "SELECT") from.value = to.value;
+}
+function morphChildren(from, to) {
+  const f = [...from.childNodes], t = [...to.childNodes];
+  t.forEach((node, i) => (f[i] ? morph(f[i], node) : from.appendChild(node.cloneNode(true))));
+  for (let i = t.length; i < f.length; i++) f[i].remove();
+}
 function refresh() {
-  if (S.tab === "money") document.getElementById("out-money").innerHTML = VIEWS.moneyOut();
-  else if (S.tab === "five") { document.getElementById("out-five").innerHTML = VIEWS.fiveOut(); document.getElementById("out-five-table").innerHTML = VIEWS.fiveTable(); }
-  else if (S.tab === "value") { document.getElementById("out-value").innerHTML = VIEWS.valueOut(); document.getElementById("out-growth").innerHTML = VIEWS.growthOut(); }
-  else if (S.tab === "bid") document.getElementById("out-bid").innerHTML = VIEWS.bidOut();
-  else if (S.tab === "furnish") {
-    document.getElementById("out-furn").innerHTML = VIEWS.furnOut();
-    document.querySelectorAll("[data-room]").forEach((el) => (el.textContent = kr(roomTotal(el.dataset.room))));
-  } else if (S.tab === "search") S.apts.forEach((p) => { const el = document.getElementById("out-" + p.id); if (el) el.innerHTML = aptOut(p); });
-  else { const ae = document.activeElement, id = ae && ae.id, pos = ae && ae.selectionStart; render(); if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } } }
+  const next = document.createElement("main");
+  next.innerHTML = VIEWS[S.tab]();
+  morphChildren(app, next);
 }
 function changed(full) { if (full) render(); else refresh(); scheduleSave(); }
 function clearExample() {
@@ -1257,7 +1349,9 @@ document.getElementById("tabs").addEventListener("click", (e) => {
   S.tab = b.dataset.tab; render(); window.scrollTo(0, 0); scheduleSave();
 });
 app.addEventListener("input", (e) => {
-  const t = e.target, val = t.type === "number" ? (t.value === "" ? null : +t.value) : t.value;
+  const t = e.target;
+  const val = t.type === "range" ? +t.value : t.hasAttribute("data-num") ? parseNum(t.value) : t.value;
+  if (val === undefined) return; // half-typed number such as "6," or "-"
   if (t.dataset.path) {
     set(t.dataset.path, val);
     if (S.example && t.dataset.path.startsWith("fin.")) S.example = false;
@@ -1285,6 +1379,13 @@ app.addEventListener("change", (e) => {
   if (t.dataset.xhave) { const x = S.furn.extra.find((i) => i.id === t.dataset.xhave); if (x) x.have = t.checked; return changed(true); }
   if (t.dataset.step) { S.steps[t.dataset.step] = t.checked; return changed(true); }
   if (t.dataset.xprice || t.dataset.price || t.dataset.qty) return changed(true);
+});
+// Tidy a number field when you leave it: "2500000" becomes "2 500 000"
+app.addEventListener("focusout", (e) => {
+  const t = e.target;
+  if (!t.hasAttribute || !t.hasAttribute("data-num")) return;
+  const v = parseNum(t.value);
+  if (v !== undefined) t.value = fmtIn(v);
 });
 app.addEventListener("click", (e) => {
   const g = e.target.closest("[data-goto]"); if (g) { S.tab = g.dataset.goto; render(); window.scrollTo(0, 0); return; }
