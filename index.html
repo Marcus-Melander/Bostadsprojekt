@@ -346,7 +346,7 @@ const STEPS = [
 
 /* ---------- State ---------- */
 const DEFAULT = () => ({
-  v: 1,
+  v: 2,
   tab: "overview",
   example: true,
   fin: {
@@ -356,11 +356,14 @@ const DEFAULT = () => ({
     savings: 420000, buffer: 50000,
     monthlySave: 9000,
     otherDebt: 0, otherDebtMonthly: 0,
-    living: 11500,
+    living: 9000,
     targetAvgift: 3800,
     targetPrice: 2500000,
-    stress: 7,
+    stress: 6.5,
     reserveFurniture: true,
+    incomeMult: 5.5,
+    kalpDeduction: false,
+    bankOffer: null,
   },
   rates: { binding: "m3", mode: "list", offer: 2.75, sort: "rate" },
   search: { area: "1", minRooms: 2, minArea: 40, maxAvgift: 5000, headroom: 8 },
@@ -385,6 +388,13 @@ const DEFAULT = () => ({
 });
 let S = DEFAULT();
 
+// Plans saved before v2 kept the stricter stress-test defaults; move them to the new ones unless the user changed them
+function migrate() {
+  if (S.v >= 2) return;
+  if (S.fin.living === 11500) S.fin.living = 9000;
+  if (S.fin.stress === 7) S.fin.stress = 6.5;
+  S.v = 2;
+}
 function merge(base, saved) {
   if (!saved || typeof saved !== "object") return base;
   if (Array.isArray(base)) return Array.isArray(saved) ? saved : base;
@@ -423,7 +433,7 @@ async function flush() {
 }
 async function initStore() {
   const local = lsRead();
-  if (local) { S = merge(DEFAULT(), local); render(); }
+  if (local) { S = merge(DEFAULT(), local); migrate(); render(); }
   setSaveState(local ? "Saved in this browser" : "Example plan", !!local);
   try {
     const [db, user] = await Promise.all([window.claude?.use?.("db"), window.claude?.use?.("user")]);
@@ -434,7 +444,7 @@ async function initStore() {
     const snap = await Promise.race([docRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
     if (snap.exists) {
       const d = snap.data();
-      try { S = merge(DEFAULT(), JSON.parse(d.plan)); render(); } catch (e) {}
+      try { S = merge(DEFAULT(), JSON.parse(d.plan)); migrate(); render(); } catch (e) {}
       setSaveState("Saved to your account", true);
     } else {
       setSaveState(local ? "Saved in this browser" : "Example plan, saves to your account when you edit", !!local);
@@ -502,12 +512,15 @@ function kalpSurplus(loan, price) {
   const f = S.fin, h = household();
   const ltv = price > 0 ? loan / price : 0;
   const housing = (+f.targetAvgift || 0) + 900; // + el, insurance, broadband
-  return h.net - (+f.living || 0) - (+f.otherDebtMonthly || 0) - housing - loan * (f.stress / 100) / 12 - loan * amortRate(ltv) / 12;
+  const interest = loan * (+f.stress || 0) / 100;
+  const interestCost = f.kalpDeduction ? interestAfterDeduction(interest) : interest;
+  return h.net - (+f.living || 0) - (+f.otherDebtMonthly || 0) - housing - interestCost / 12 - loan * amortRate(ltv) / 12;
 }
 function affordability() {
   const f = S.fin, h = household();
   const cash = Math.max(0, cashAvailable());
-  const incomeCap = Math.max(0, 5.5 * h.gross * 12 - (+f.otherDebt || 0));
+  const mult = +f.incomeMult || 5.5, offer = +f.bankOffer || 0;
+  const incomeCap = Math.max(0, mult * h.gross * 12 - (+f.otherDebt || 0));
   const byCash = cash / 0.10;
   const byIncome = cash + incomeCap;
   // largest price where KALP surplus >= 0 (loan = price - cash)
@@ -517,13 +530,19 @@ function affordability() {
     if (kalpSurplus(loan, mid) >= 0) lo = mid; else hi = mid;
   }
   const byKalp = kalpSurplus(0, 0) < 0 ? 0 : lo;
-  const max = Math.max(0, Math.min(byCash, byIncome, byKalp));
+  const multTxt = String(mult).replace(".", ",");
   const limits = [
     { key: "cash", label: "Cash (10 % insats)", value: byCash, hint: "Your savings after buffer, fees" + (f.reserveFurniture ? " and furniture" : "") + " must cover 10 % of the price." },
-    { key: "income", label: "Income (5.5× gross)", value: byIncome, hint: "Most banks lend at most about 5.5 times your yearly gross income, minus other debt." },
-    { key: "kalp", label: "Bank stress test", value: byKalp, hint: "The bank's KALP check: at a " + f.stress + " % stress rate, your net income must still cover loan, avgift and living costs." },
   ];
-  const binding = limits.reduce((a, b) => (b.value < a.value ? b : a));
+  // A real lånelöfte replaces the two estimates; they stay visible for comparison
+  if (offer) limits.push({ key: "offer", label: "Your lånelöfte", value: cash + offer, hint: "Your bank offered to lend " + kr(offer) + ", so that sets the loan." });
+  limits.push(
+    { key: "income", label: (offer ? "Estimate: " : "") + "Income (" + multTxt + "× gross)", value: byIncome, unused: !!offer, hint: "Banks lend up to about " + multTxt + " times your yearly gross income, minus other debt. Some go higher." },
+    { key: "kalp", label: (offer ? "Estimate: " : "") + "Bank stress test", value: byKalp, unused: !!offer, hint: "The bank's KALP check: at a " + String(f.stress).replace(".", ",") + " % stress rate" + (f.kalpDeduction ? " after ränteavdrag" : "") + ", your net income must still cover loan, avgift and living costs." },
+  );
+  const used = limits.filter((l) => !l.unused);
+  const binding = used.reduce((a, b) => (b.value < a.value ? b : a));
+  const max = Math.max(0, binding.value);
   return { cash, incomeCap, max, limits, binding };
 }
 function monthlyCost(price, avgift, rate, cashIn) {
@@ -641,7 +660,7 @@ const VIEWS = {
     const searchTo = Math.floor(maxShown * (1 - S.search.headroom / 100) / 50000) * 50000;
     return `
       <div class="lead"><h1>Overview</h1>
-      <p>${({ cash: "Your cash", income: "Your income", kalp: "The bank's stress test" })[a.binding.key]} sets the limit: you can likely bid up to <strong>${mkr(a.max)}</strong>, and a ${mkr(target)} apartment costs <strong>${kr(mc.total)}</strong> a month.</p></div>
+      <p>${({ cash: "Your cash", offer: "Your lånelöfte", income: "Your income", kalp: "The bank's stress test" })[a.binding.key]} sets the limit: you can likely bid up to <strong>${mkr(a.max)}</strong>, and a ${mkr(target)} apartment costs <strong>${kr(mc.total)}</strong> a month.</p></div>
       ${exampleBanner("These are sample figures so you can see how the plan works. Replace them with your own.")}
       <div class="hero">
         <section class="panel">
@@ -703,9 +722,14 @@ const VIEWS = {
             <div class="field"><label for="f-resf">Reserve furniture budget from savings</label><input id="f-resf" type="checkbox" data-check="fin.reserveFurniture" ${f.reserveFurniture ? "checked" : ""}></div>
           </section>
           <section class="panel"><h3>Bank's budget assumptions</h3>
-            ${numField("fin.living", "Living costs / month", "kr", "Food, transport, clothes, phone. Banks typically use about 10–12 000 kr per adult; " + (two ? "use roughly 20 000 kr for two." : "adjust to your life."), "500")}
+            ${numField("fin.living", "Living costs / month", "kr", "Food, transport, clothes, phone. Banks use standard amounts of about 8–10 000 kr per adult" + (two ? ", so roughly 18 000 kr for two." : "."), "500")}
             ${numField("fin.targetAvgift", "Expected avgift", "kr/mån", "Monthly fee to the förening.", "100")}
-            ${numField("fin.stress", "Stress-test rate", "%", "Banks test at a higher rate than you'll pay, often 6–7 %.", "0.5")}
+            ${numField("fin.stress", "Stress-test rate", "%", "Banks test at a higher rate than you'll pay, usually 6–7 %.", "0.5")}
+            ${numField("fin.incomeMult", "Max loan, times yearly gross", "×", "Many banks stop near 5.5×; some lend 6× or more.", "0.25")}
+            <div class="field"><label for="f-kded">Count ränteavdrag in the stress test</label><input id="f-kded" type="checkbox" data-check="fin.kalpDeduction" ${f.kalpDeduction ? "checked" : ""}><small>Banks differ. Off is the stricter test.</small></div>
+          </section>
+          <section class="panel"><h3>Your bank's answer</h3>
+            ${numField("fin.bankOffer", "A bank offered to lend me", "kr", "Enter the amount in your lånelöfte. It replaces the income and stress-test estimates. Leave empty to use the estimates.", "50000")}
           </section>
         </div>
         <div class="stack" id="out-money">${VIEWS.moneyOut()}</div>
