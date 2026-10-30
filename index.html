@@ -173,6 +173,10 @@ input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent);
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .spacer { flex: 1; }
 a { color: var(--accent); }
+.evid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.evid > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.evid p { margin: 0; font-size: .88rem; }
+.evid a { font-size: .8rem; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 @media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
 </style>
@@ -190,6 +194,7 @@ a { color: var(--accent); }
       <button role="tab" data-tab="five">5-year budget</button>
       <button role="tab" data-tab="value">Area prices</button>
       <button role="tab" data-tab="search">Apartments</button>
+      <button role="tab" data-tab="bid">Bidding</button>
       <button role="tab" data-tab="furnish">Furnishing</button>
       <button role="tab" data-tab="steps">Buying steps</button>
     </nav>
@@ -340,6 +345,7 @@ const DEFAULT = () => ({
     },
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
+  bid: { ask: 2395000, walk: 2600000, step: 25000 },
 });
 let S = DEFAULT();
 
@@ -894,6 +900,78 @@ const VIEWS = {
       </section>`;
   },
 
+  bid() {
+    const B = S.bid;
+    return `
+      <div class="lead"><span class="eyebrow">Bidding</span><h2>Small steps or one big jump?</h2>
+      <p>Research on Swedish and Norwegian bidding gives a mixed answer. A big jump bid can scare off rivals and win you the apartment, but auctions with jump bids also tend to end at a higher price. The bigger risk is psychological: getting carried away and bidding past what you can afford.</p></div>
+      <div class="bench">
+        <div class="stack">
+          <section class="panel"><h3>Your bidding plan</h3>
+            ${numField("bid.ask", "Asking price (utgångspris)", "kr", "", "25000")}
+            ${numField("bid.walk", "Your walk-away price", "kr", "The most you'll pay. Decide it before bidding starts and don't change it during the bidding.", "25000")}
+            ${numField("bid.step", "Normal increment", "kr", "Stockholm brokers usually expect at least 10 000–25 000 kr per bid.", "5000")}
+            ${numField("fin.targetAvgift", "Avgift", "kr/mån", "", "100")}
+            <div class="row" style="margin-top:10px"><button class="btn" data-act="walk-max">Set walk-away to my max</button></div>
+          </section>
+          <section class="panel"><h3>Before you place the first bid</h3>
+            <ul style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.9rem">
+              <li>Write your walk-away price down, and tell it to someone who will hold you to it.</li>
+              <li>Look up what similar apartments in the förening and nearby actually sold for on Booli's slutpriser. Ignore the asking price: it is often set low to draw bidders.</li>
+              <li>Ask the broker how the bidding works: deadlines, whether they take bids before the viewing, and when the seller decides.</li>
+              <li>Have your lånelöfte ready and check that it covers your walk-away price.</li>
+              <li>Check the förening's årsredovisning before bidding, not after you've won.</li>
+            </ul>
+          </section>
+        </div>
+        <div class="stack" id="out-bid">${VIEWS.bidOut()}</div>
+      </div>
+      <section class="panel" style="margin-top:20px"><h3>What the research says</h3>
+        <div class="evid">
+          <div><span class="chip warn">Stockholm apartments</span><p><strong>Large jumps reduce competition</strong>, but a higher average bid increment goes with a higher final price. A low asking price did not attract more bidders or raise the price. 629 inner-city sales, 2010–11.</p><a href="https://www.emerald.com/jerer/article-abstract/11/2/202/215521/An-analysis-of-auction-strategies-in-apartment" target="_blank" rel="noopener">Hungria-Gunnelin, Journal of European Real Estate Research, 2018 ↗</a></div>
+          <div><span class="chip warn">Norway</span><p>Auctions with jump bids ended <strong>about 2.8–9.3 % higher</strong> than auctions with only small steps. Bidders said they jump to intimidate and to signal, and some rivals dropped out because they felt intimidated. Data from 1 142 bid logs and a survey of 1 803 bidders.</p><a href="https://ntnuopen.ntnu.no/ntnu-xmlui/handle/11250/2675844" target="_blank" rel="noopener">Khazal, Sønstebø, Olaussen &amp; Oust, Journal of Property Research, 2020 ↗</a></div>
+          <div><span class="chip info">Swedish houses</span><p>A jump bid during the auction raised both the price and <strong>the jump bidder's chance of winning</strong>, but it rarely ended the auction.</p><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4517555" target="_blank" rel="noopener">Gunnelin, Hungria-Gunnelin, MacGregor &amp; Wersing, SSRN working paper ↗</a></div>
+          <div><span class="chip bad">Psychology</span><p><strong>Auction fever</strong>: rivalry, time pressure and other people watching all push people to bid more than they planned. That describes a Stockholm bidding round, with SMS updates arriving one after another until a deadline.</p><span class="dim" style="font-size:.82rem">Ku, Malhotra &amp; Murnighan, Organizational Behavior and Human Decision Processes 96, 2005</span></div>
+        </div>
+        <p class="note" style="margin:14px 0 0"><strong>The rules:</strong> in Sweden a bid binds nobody. Only a written contract signed by both sides makes the sale binding (bostadsrättslagen 6 kap. 4 §). You can withdraw, and the seller can pick any bidder or stop the sale. The broker must keep a budlista and hand it to the buyer and seller, so ask for it. See <a href="https://seb.se/privat/bolan/bostadsguide/budgivning-och-kontrakt" target="_blank" rel="noopener">SEB's guide to bidding and contracts</a> and <a href="https://www.hemnet.se/guider/dolt-bud" target="_blank" rel="noopener">Hemnet on hidden bids</a>.</p>
+      </section>`;
+  },
+  bidOut() {
+    const B = S.bid, cr = chosenRate();
+    const ask = +B.ask || 0, walk = +B.walk || affordability().max, step = Math.max(1000, +B.step || 25000);
+    const base = monthlyCost(ask, S.fin.targetAvgift, cr.rate);
+    const over = walk - ask;
+    const steps = [25000, 50000, 100000, 250000].map((d) => {
+      const m = monthlyCost(ask + d, S.fin.targetAvgift, cr.rate);
+      return { d, month: m.total - base.total, cash: d * 0.10, five: (m.interestNet - base.interestNet) * 60 };
+    });
+    // Suggested plan: open near asking, small steps through the middle, one firm jump to around 90 % of the walk-away price, then stop at the walk-away price
+    const jumpTo = Math.floor((ask + over * 0.9) / 5000) * 5000;
+    const plan = over <= 0 ? [] : [
+      ["Opening", "Bid at or just above the asking price, if bidding hasn't started.", ask],
+      ["Middle", `Raise by about ${kr(step)} at a time. Don't answer within seconds: waiting a few minutes before each bid stops you reacting on impulse, and doesn't show how eager you are.`, Math.min(walk, ask + step * 4)],
+      ["Late jump (optional)", "If only one or two rivals are left, one firm jump can signal you'll go further. Research suggests it can help you win, but it raises the price.", Math.max(ask, jumpTo)],
+      ["Walk-away", "Stop here. A bid binds nobody, so the seller may still come back to you if the winner drops out.", walk],
+    ];
+    return `
+      <section class="panel">
+        <span class="eyebrow">Room between asking and walk-away</span>
+        <div class="bigfig" style="color:${over < 0 ? "var(--bad)" : "var(--ink)"}">${over >= 0 ? "+" : ""}${kr(over).replace(" kr", "")}<small> kr</small></div>
+        <p class="dim" style="margin:4px 0 0">${ask ? pct(over / ask * 100, 1) + " above asking. " : ""}${over < 0 ? "The asking price is already above your walk-away price. Skip this one, or wait and see if it doesn't sell." : `Monthly cost at your walk-away price: <strong style="color:var(--ink)">${kr(monthlyCost(walk, S.fin.targetAvgift, cr.rate).total)}</strong>.`}</p>
+      </section>
+      ${plan.length ? `<section class="panel"><h3>A suggested bidding plan</h3>
+        <ol class="steps">${plan.map(([t, d, v], i) => `<li class="step" style="grid-template-columns:2.2em 1fr auto"><span class="n">${String(i + 1).padStart(2, "0")}</span><div><h4>${t}</h4><p>${d}</p></div><span class="mono" style="font-weight:500">${kr(v)}</span></li>`).join("")}</ol>
+      </section>` : ""}
+      <section class="panel"><h3>What each extra bid really costs</h3>
+        <p class="dim" style="margin:-6px 0 10px;font-size:.86rem">During the bidding, 50 000 kr can feel like a small step. Here is what it adds at your plan rate of ${pct(cr.rate)}.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Bid higher by</th><th>Per month</th><th>Interest over 5 years</th><th>More cash at contract</th></tr></thead>
+          <tbody>${steps.map((r) => `<tr><td class="mono">+${kr(r.d)}</td><td class="mono">+${kr(r.month)}</td><td class="mono">+${kr(r.five)}</td><td class="mono">+${kr(r.cash)}</td></tr>`).join("")}</tbody>
+        </table></div>
+        <p class="dim" style="font-size:.8rem;margin:8px 0 0">The monthly cost includes interest after ränteavdrag and amortering. The 5-year column counts interest only, since amortering goes back into your own equity.</p>
+      </section>`;
+  },
+
   search() {
     const s = S.search, a = affordability();
     const searchTo = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
@@ -1074,6 +1152,7 @@ function refresh() {
   if (S.tab === "money") document.getElementById("out-money").innerHTML = VIEWS.moneyOut();
   else if (S.tab === "five") document.getElementById("out-five").innerHTML = VIEWS.fiveOut();
   else if (S.tab === "value") document.getElementById("out-value").innerHTML = VIEWS.valueOut();
+  else if (S.tab === "bid") document.getElementById("out-bid").innerHTML = VIEWS.bidOut();
   else if (S.tab === "furnish") {
     document.getElementById("out-furn").innerHTML = VIEWS.furnOut();
     document.querySelectorAll("[data-room]").forEach((el) => (el.textContent = kr(roomTotal(el.dataset.room))));
@@ -1131,6 +1210,7 @@ app.addEventListener("click", (e) => {
   const id = () => Math.random().toString(36).slice(2, 9);
   switch (a.dataset.act) {
     case "clear-example": clearExample(); break;
+    case "walk-max": S.bid.walk = Math.floor(affordability().max / 5000) * 5000; break;
     case "add-apt": S.apts.unshift({ id: id(), address: "", price: null, bid: null, avgift: null, kvm: null, rooms: null, debtKvm: null, link: "", status: "Watching" }); break;
     case "del-apt": S.apts = S.apts.filter((x) => x.id !== a.dataset.id); break;
     case "add-extra": S.furn.extra.push({ id: id(), name: "", price: null, qty: 1, have: false }); break;

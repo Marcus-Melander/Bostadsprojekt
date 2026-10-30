@@ -10,6 +10,7 @@ A single-page planner for buying a bostadsrätt in Stockholm. Open `index.html` 
 - **5-year budget:** editable rate scenarios (steady, rising, falling, 2022-style shock) in today's money, showing money left each month, loan, apartment value and equity.
 - **Area prices:** yearly kr/kvm for 13 Stockholm districts, with a log-linear regression trend and a 95 % prediction range.
 - **Apartments:** Booli search links built from your budget, plus tracked apartments with monthly cost and checks on the förening.
+- **Bidding:** a bidding plan between asking price and your walk-away price, what each extra bid costs per month, and what Swedish and Norwegian research says about jump bidding.
 - **Furnishing:** a room-by-room furniture budget at three price levels.
 - **Buying steps:** a checklist from saving the kontantinsats to getting the keys.
 
