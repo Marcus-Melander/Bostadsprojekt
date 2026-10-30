@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Stockholm Bostadsplan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky header + tab rail; each tab is a two-column workbench (inputs left, live results right) that stacks on phones. */
+:root {
+  --bg: #EEF2F1;          /* cool grey with a patina bias */
+  --surface: #FFFFFF;
+  --sunk: #E3E9E7;
+  --ink: #13201E;
+  --muted: #5B6B68;
+  --line: #CFD9D6;
+  --accent: #23705F;      /* verdigris, like the copper roofs of Gamla stan */
+  --accent-ink: #FFFFFF;
+  --accent-soft: #D5EAE4;
+  --good: #2C7A48; --good-soft: #DCEFE2;
+  --warn: #9A6410; --warn-soft: #F6EAD2;
+  --bad:  #B03A3A; --bad-soft: #F6DEDC;
+  --example: #7A5AA6; --example-soft: #ECE4F5;
+  --s1: #23705F; --s2: #C2410C; --s3: #2563EB; --s4: #9D174D;   /* scenario lines */
+  --f-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1514; --surface: #162120; --sunk: #1D2928; --ink: #E3ECEA; --muted: #93A6A2; --line: #2A3937;
+  --accent: #5CC0A8; --accent-ink: #062019; --accent-soft: #1B3B34;
+  --good: #6FCB8E; --good-soft: #1C3426; --warn: #E2B05A; --warn-soft: #3A2E17; --bad: #EE8A84; --bad-soft: #3D2120;
+  --example: #BDA2E6; --example-soft: #2D2440; --s1: #5CC0A8; --s2: #F59E5B; --s3: #7FA8FA; --s4: #F07DB0; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E1514; --surface: #162120; --sunk: #1D2928; --ink: #E3ECEA; --muted: #93A6A2; --line: #2A3937;
+  --accent: #5CC0A8; --accent-ink: #062019; --accent-soft: #1B3B34;
+  --good: #6FCB8E; --good-soft: #1C3426; --warn: #E2B05A; --warn-soft: #3A2E17; --bad: #EE8A84; --bad-soft: #3D2120;
+  --example: #BDA2E6; --example-soft: #2D2440; --s1: #5CC0A8; --s2: #F59E5B; --s3: #7FA8FA; --s4: #F07DB0; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-block: 14px 8px; }
+.brand h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.45rem; letter-spacing: -0.02em; margin: 0; }
+.brand h1 span { color: var(--accent); }
+.save-state { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.save-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.save-state.ok i { background: var(--good); }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 0; }
+nav.tabs::-webkit-scrollbar { display: none; }
+nav.tabs button { flex: none; font: 500 0.92rem var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2.5px solid transparent; padding: 10px 12px 9px; cursor: pointer; }
+nav.tabs button:hover { color: var(--ink); }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+main { padding-block: 24px 64px; }
+.lead { display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px; }
+.lead h2 { font-family: var(--f-display); font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.lead p { margin: 0; color: var(--muted); max-width: 68ch; }
+.bench { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; }
+.panel h3 { font-family: var(--f-display); font-size: 1.02rem; margin: 0 0 12px; font-weight: 600; }
+.stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+.field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; padding-block: 7px; border-bottom: 1px dashed var(--line); }
+.field:last-child { border-bottom: 0; }
+.field label { font-size: 0.9rem; }
+.field small { grid-column: 1 / -1; color: var(--muted); font-size: 0.78rem; margin-top: -4px; }
+.num { display: inline-flex; align-items: center; background: var(--sunk); border: 1px solid var(--line); border-radius: 7px; padding: 0 8px; }
+.num input { width: 7.5em; border: 0; background: transparent; color: var(--ink); font: 500 0.92rem var(--f-mono); text-align: right; padding: 6px 2px; font-variant-numeric: tabular-nums; }
+.num input:focus { outline: none; }
+.num:focus-within { border-color: var(--accent); }
+.num span { color: var(--muted); font: 0.8rem var(--f-mono); padding-left: 4px; }
+input[type="text"], input[type="url"], select { font: 0.92rem var(--f-body); color: var(--ink); background: var(--sunk); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; min-width: 0; }
+select { cursor: pointer; }
+.seg { display: inline-flex; background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: none; font: 500 0.85rem var(--f-body); color: var(--muted); padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+.btn { font: 600 0.88rem var(--f-body); border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.ghost { border-color: transparent; background: none; color: var(--muted); padding: 4px 8px; }
+.btn.ghost:hover { color: var(--bad); }
+
+.mono, .money { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 860px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.bigfig { font-family: var(--f-mono); font-weight: 500; font-size: clamp(2rem, 6vw, 3.1rem); letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.bigfig small { font-size: 0.42em; color: var(--muted); letter-spacing: 0; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 0.92rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.kv .total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 600; color: var(--ink); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.tile:hover { border-color: var(--accent); }
+.tile .v { font: 500 1.35rem var(--f-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.tile .s { font-size: 0.8rem; color: var(--muted); }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.good { background: var(--good-soft); color: var(--good); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.ex { background: var(--example-soft); color: var(--example); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+
+.limits { display: flex; flex-direction: column; gap: 10px; }
+.limit { display: grid; grid-template-columns: 9.5em 1fr auto; align-items: center; gap: 10px; font-size: 0.85rem; }
+.bar { height: 10px; background: var(--sunk); border-radius: 5px; overflow: hidden; }
+.bar b { display: block; height: 100%; background: var(--muted); border-radius: 5px; }
+.limit.binding .bar b { background: var(--accent); }
+.limit.binding { font-weight: 600; }
+@media (max-width: 480px) { .limit { grid-template-columns: 1fr auto; } .limit .bar { grid-column: 1 / -1; grid-row: 2; } }
+
+.note { font-size: 0.82rem; color: var(--muted); background: var(--sunk); border-radius: 8px; padding: 10px 12px; }
+.note strong { color: var(--ink); }
+.banner-ex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--example-soft); color: var(--example); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; font-weight: 500; margin-bottom: 16px; }
+.banner-ex button { margin-left: auto; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { padding: 9px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--sunk); cursor: pointer; user-select: none; }
+thead th[aria-sort] { color: var(--accent); }
+tbody tr:last-child td { border-bottom: 0; }
+td.mono { font-family: var(--f-mono); }
+tr.best td { background: var(--accent-soft); }
+td a { color: var(--ink); }
+.dim { color: var(--muted); }
+
+.apts { display: flex; flex-direction: column; gap: 14px; }
+.apt { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 16px; }
+@media (max-width: 760px) { .apt { grid-template-columns: minmax(0, 1fr); } }
+.apt-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; grid-column: 1 / -1; }
+.apt-head input[type="text"] { flex: 1 1 220px; font-weight: 600; font-size: 1rem; }
+.apt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.apt-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 0.76rem; color: var(--muted); }
+.apt-grid .num input { width: 100%; }
+.apt-grid .num { width: 100%; }
+.apt-out { background: var(--sunk); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.apt-out .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.room h4 { margin: 0 0 6px; display: flex; justify-content: space-between; font-size: 0.95rem; }
+.room h4 span { font-family: var(--f-mono); font-weight: 500; color: var(--muted); font-size: 0.85rem; }
+.item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding-block: 5px; border-bottom: 1px dashed var(--line); font-size: 0.88rem; }
+.item:last-child { border-bottom: 0; }
+.item.have .nm { text-decoration: line-through; color: var(--muted); }
+.item .num input { width: 5.2em; }
+.item .ess { font-size: 0.68rem; color: var(--accent); font-weight: 700; letter-spacing: .04em; }
+input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.step { display: grid; grid-template-columns: 2.2em auto 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.step .n { font: 500 0.85rem var(--f-mono); color: var(--muted); padding-top: 2px; }
+.step h4 { margin: 0; font-size: 0.98rem; }
+.step p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; max-width: 70ch; }
+.step.done h4 { color: var(--muted); text-decoration: line-through; }
+.progress { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; }
+.progress b { display: block; height: 100%; background: var(--accent); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+a { color: var(--accent); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+@media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Stockholm <span>Bostadsplan</span></h1>
+      <div class="save-state" id="saveState"><i></i><span>Loading…</span></div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="overview">Overview</button>
+      <button role="tab" data-tab="money">My finances</button>
+      <button role="tab" data-tab="rates">Mortgage rates</button>
+      <button role="tab" data-tab="five">5-year budget</button>
+      <button role="tab" data-tab="value">Area prices</button>
+      <button role="tab" data-tab="search">Apartments</button>
+      <button role="tab" data-tab="furnish">Furnishing</button>
+      <button role="tab" data-tab="steps">Buying steps</button>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+
+<script>
+/* ---------- Reference data ---------- */
+const PBB = 59200;                 // prisbasbelopp 2026
+const FEE_TRANSFER = Math.round(PBB * 0.025); // överlåtelseavgift (buyer usually pays)
+const FEE_PLEDGE = Math.round(PBB * 0.01);    // pantsättningsavgift
+const RATES_UPDATED = "29 Oct 2026";
+const RATES_SOURCE = "https://www.lanupplysningen.se/bolan/bolanerantor/";
+// list rates (%) per binding period + latest 3-month average rate (snittränta, Oct 2026)
+const BANKS = [
+  { name: "Stabelo", url: "https://www.stabelo.se", r: { m3: 2.66, y1: 3.18, y2: 3.57, y3: 3.68, y5: 3.95 }, snitt: 2.74, note: "Sold via partners and brokers" },
+  { name: "Landshypotek", url: "https://www.landshypotek.se", r: { m3: 3.04, y1: 3.24, y2: 3.49, y3: 3.60, y5: 3.85 }, snitt: 2.59 },
+  { name: "SBAB", url: "https://www.sbab.se", r: { m3: 3.15, y1: 3.72, y2: 4.09, y3: 4.19, y5: 4.39 }, snitt: 2.73 },
+  { name: "Hypoteket", url: "https://www.hypoteket.com", r: { m3: 3.31, y1: 3.99, y2: 4.30, y3: 4.39, y5: 4.48 }, snitt: null },
+  { name: "ICA Banken", url: "https://www.icabanken.se", r: { m3: 3.48, y1: 4.19, y2: 4.69, y3: 4.90, y5: 5.27 }, snitt: 2.76 },
+  { name: "Skandia", url: "https://www.skandia.se", r: { m3: 3.50, y1: 3.68, y2: 3.87, y3: 3.99, y5: 4.28 }, snitt: null },
+  { name: "JAK Medlemsbank", url: "https://www.jak.se", r: { m3: 3.58, y1: 3.30, y2: null, y3: null, y5: null }, snitt: null },
+  { name: "Ikano Bank", url: "https://www.ikanobank.se", r: { m3: 3.63, y1: 3.90, y2: 4.42, y3: 4.62, y5: 4.97 }, snitt: 2.91 },
+  { name: "Danske Bank", url: "https://danskebank.se", r: { m3: 3.84, y1: 3.54, y2: 3.89, y3: 4.04, y5: 4.19 }, snitt: null },
+  { name: "Nordea", url: "https://www.nordea.se", r: { m3: 3.84, y1: 3.43, y2: 3.49, y3: 3.59, y5: 3.89 }, snitt: null },
+  { name: "Swedbank", url: "https://www.swedbank.se", r: { m3: 3.89, y1: 3.62, y2: 3.89, y3: 3.99, y5: 4.19 }, snitt: 2.69 },
+  { name: "Handelsbanken", url: "https://www.handelsbanken.se", r: { m3: 3.94, y1: 3.69, y2: 3.94, y3: 3.99, y5: 4.19 }, snitt: 2.70 },
+  { name: "Länsförsäkringar", url: "https://www.lansforsakringar.se", r: { m3: 3.94, y1: 3.74, y2: 3.99, y3: 4.10, y5: 4.29 }, snitt: 2.71 },
+  { name: "SEB", url: "https://seb.se", r: { m3: 3.94, y1: 3.64, y2: 3.89, y3: 3.99, y5: 4.19 }, snitt: 2.66 },
+  { name: "Ålandsbanken", url: "https://www.alandsbanken.se", r: { m3: 4.00, y1: 4.30, y2: 4.60, y3: 4.70, y5: 4.75 }, snitt: null },
+];
+const BINDINGS = [["m3", "3 months"], ["y1", "1 year"], ["y2", "2 years"], ["y3", "3 years"], ["y5", "5 years"]];
+
+const FURNITURE = [
+  ["Kitchen", [
+    ["pots", "Pots, pans & lids", [600, 1800, 5000], 1, true],
+    ["knives", "Knives & cutting board", [300, 900, 2500], 1, true],
+    ["plates", "Plates, bowls & glasses (6 people)", [500, 1500, 4000], 1, true],
+    ["cutlery", "Cutlery set", [200, 600, 1800], 1, true],
+    ["kettle", "Kettle & toaster", [400, 1200, 3000], 1, true],
+    ["coffee", "Coffee maker", [300, 1500, 6000], 1, false],
+    ["micro", "Microwave", [700, 1500, 3000], 1, false],
+    ["table", "Dining table", [1500, 4000, 12000], 1, true],
+    ["chairs", "Dining chairs", [300, 900, 2500], 2, true],
+    ["kstore", "Jars, storage & tea towels", [300, 800, 2000], 1, false],
+  ]],
+  ["Living room", [
+    ["sofa", "Sofa", [4500, 12000, 35000], 1, true],
+    ["ctable", "Coffee table", [600, 2500, 8000], 1, false],
+    ["rug", "Rug", [800, 3000, 10000], 1, false],
+    ["tv", "TV", [3500, 8000, 20000], 1, false],
+    ["tvbench", "TV bench", [900, 2500, 7000], 1, false],
+    ["shelf", "Bookshelf", [700, 2000, 6000], 1, false],
+    ["lamp", "Floor & ceiling lamps", [400, 1500, 5000], 2, true],
+    ["curtains", "Curtains & rods", [400, 1200, 4000], 1, true],
+  ]],
+  ["Bedroom", [
+    ["bed", "Bed frame", [2000, 6000, 15000], 1, true],
+    ["mattress", "Mattress & top mattress", [3000, 8000, 25000], 1, true],
+    ["duvet", "Duvet & pillows", [600, 1800, 5000], 1, true],
+    ["sheets", "Bed linen (2 sets)", [400, 1200, 3000], 1, true],
+    ["wardrobe", "Wardrobe", [2000, 5000, 15000], 1, true],
+    ["night", "Bedside tables", [300, 1000, 3000], 2, false],
+    ["blackout", "Blackout blinds (for June nights)", [300, 1000, 3000], 1, true],
+  ]],
+  ["Bathroom", [
+    ["towels", "Towels", [300, 900, 2500], 1, true],
+    ["bathmat", "Shower curtain & bath mat", [200, 500, 1500], 1, true],
+    ["bstore", "Bathroom storage", [300, 800, 2500], 1, false],
+    ["basics", "Toiletries starter kit", [300, 600, 1200], 1, true],
+  ]],
+  ["Hallway", [
+    ["shoes", "Shoe rack", [300, 1000, 3000], 1, true],
+    ["hooks", "Coat hooks & hangers", [200, 700, 2000], 1, true],
+    ["mirror", "Mirror", [300, 1000, 3500], 1, false],
+    ["doormat", "Doormat", [150, 400, 1000], 1, true],
+  ]],
+  ["Home office", [
+    ["desk", "Desk", [800, 3000, 9000], 1, false],
+    ["chair", "Office chair", [1000, 3500, 10000], 1, false],
+    ["screen", "Monitor", [1500, 3000, 7000], 1, false],
+  ]],
+  ["Home basics", [
+    ["vacuum", "Vacuum cleaner", [1000, 3000, 7000], 1, true],
+    ["clean", "Mop, bucket & cleaning supplies", [300, 600, 1200], 1, true],
+    ["safety", "Smoke alarm & fire extinguisher", [300, 600, 1000], 1, true],
+    ["tools", "Drill/driver & basic tools", [600, 1500, 3500], 1, true],
+    ["bulbs", "Light bulbs & power strips", [300, 600, 1200], 1, true],
+    ["laundry", "Laundry basket & drying rack", [300, 800, 2000], 1, false],
+  ]],
+  ["Moving", [
+    ["movers", "Moving company or van hire", [3000, 9000, 18000], 1, true],
+    ["boxes", "Moving boxes & tape", [400, 800, 1500], 1, true],
+  ]],
+];
+const TIERS = [["budget", "Budget"], ["mid", "Mid-range"], ["premium", "Premium"]];
+
+const STEPS = [
+  ["credit", "Check your credit and clean up debts", "Pay off or close small loans and unused credit cards. Banks count your total debt against your income, and CSN counts too."],
+  ["save", "Save the kontantinsats plus a buffer", "At least 10 % of the price in cash (since 1 April 2026), plus fees, moving and furniture."],
+  ["promise", "Get a lånelöfte from two or three banks", "A loan commitment shows brokers you can pay. It is usually valid 3–6 months. Rate shopping within a short window counts as one inquiry in practice, but ask each bank whether they use UC."],
+  ["watch", "Watch Booli and Hemnet, study sold prices", "Use Booli's slutpriser to see what similar apartments in your area actually sold for, not just the asking price."],
+  ["view", "Go to viewings and ask for documents", "Ask the broker for the förening's årsredovisning, stadgar, planned renovations (stambyte, fönster, tak) and the energy declaration."],
+  ["forening", "Review the bostadsrättsförening", "Look at debt per kvm, whether the avgift was recently raised or is about to be, whether it is an äkta förening, and if the land is owned or leased (tomträtt)."],
+  ["bid", "Bid", "Bids are not legally binding in Sweden until the contract is signed. Decide your walk-away price before bidding starts."],
+  ["contract", "Sign the contract and pay the handpenning", "Usually 10 % of the price, paid to the broker within a few days of signing. This is where the kontantinsats goes."],
+  ["member", "Get approved as a member of the förening", "The board approves new members. The purchase depends on this."],
+  ["rate", "Negotiate and lock your rate", "Use your best competing offer. Compare against each bank's snittränta, which shows what customers actually pay."],
+  ["access", "Tillträde: pay the rest and get the keys", "The bank pays the seller. You pay the överlåtelseavgift and pantsättningsavgift to the förening."],
+  ["after", "Move in and set things up", "Change address at Skatteverket within a week, sign up for electricity and broadband, and add a bostadsrättstillägg to your home insurance."],
+];
+
+/* ---------- State ---------- */
+const DEFAULT = () => ({
+  v: 1,
+  tab: "overview",
+  example: true,
+  fin: {
+    buyers: 1,
+    gross1: 46000, gross2: 0,
+    net1: 34500, net2: 0,
+    savings: 420000, buffer: 50000,
+    monthlySave: 9000,
+    otherDebt: 0, otherDebtMonthly: 0,
+    living: 11500,
+    targetAvgift: 3800,
+    targetPrice: 2500000,
+    stress: 7,
+    reserveFurniture: true,
+  },
+  rates: { binding: "m3", mode: "list", offer: 2.75, sort: "rate" },
+  search: { area: "1", minRooms: 2, minArea: 40, maxAvgift: 5000, headroom: 8 },
+  apts: [
+    { id: "a1", example: true, address: "Example: Ringvägen 42, Södermalm", price: 3150000, bid: 3350000, avgift: 3600, kvm: 44, rooms: 2, debtKvm: 6200, link: "", status: "Viewing booked" },
+    { id: "a2", example: true, address: "Example: Sankt Göransgatan 9, Kungsholmen", price: 2795000, bid: 2950000, avgift: 2900, kvm: 37, rooms: 1.5, debtKvm: 14800, link: "", status: "Watching" },
+  ],
+  furn: { tier: "mid", essentialsOnly: false, items: {}, extra: [] },
+  steps: {},
+  five: {
+    avgiftExtra: 1, pick: "rising",
+    // rate change vs today's plan rate, in percentage points, for years 1–5
+    scen: {
+      stable:  { name: "Steady",           dr: [0, 0, 0, 0, 0] },
+      rising:  { name: "Rates rise",       dr: [0, 1, 1.75, 2, 2] },
+      falling: { name: "Rates fall",       dr: [0, -0.5, -0.75, -1, -1] },
+      shock:   { name: "2022-style shock", dr: [0, 3, 3, 2, 1.5] },
+    },
+  },
+  value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
+});
+let S = DEFAULT();
+
+function merge(base, saved) {
+  if (!saved || typeof saved !== "object") return base;
+  if (Array.isArray(base)) return Array.isArray(saved) ? saved : base;
+  const out = { ...base };
+  for (const k of Object.keys(saved)) {
+    const b = base[k], s = saved[k];
+    out[k] = b && typeof b === "object" && !Array.isArray(b) && s && typeof s === "object" && !Array.isArray(s) ? merge(b, s) : s;
+  }
+  return out;
+}
+
+/* ---------- Persistence: private per-person doc in db, browser storage as fallback ---------- */
+const LS_KEY = "sthlm-bostadsplan-v1";
+let docRef = null, saveTimer = null, saving = false, pending = false;
+function setSaveState(text, ok) {
+  const el = document.getElementById("saveState");
+  el.className = "save-state" + (ok ? " ok" : "");
+  el.querySelector("span").textContent = text;
+}
+function lsRead() { try { const t = localStorage.getItem(LS_KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+function lsWrite() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  setSaveState("Unsaved changes", false);
+  saveTimer = setTimeout(flush, 1200);
+}
+async function flush() {
+  const local = lsWrite();
+  if (!docRef) { setSaveState(local ? "Saved in this browser" : "Not saved (storage blocked)", local); return; }
+  if (saving) { pending = true; return; }
+  saving = true;
+  try { await docRef.set({ plan: JSON.stringify(S), savedAt: new Date().toISOString() }); setSaveState("Saved to your account", true); }
+  catch (e) { setSaveState(local ? "Saved in this browser" : "Not saved", local); }
+  saving = false;
+  if (pending) { pending = false; flush(); }
+}
+async function initStore() {
+  const local = lsRead();
+  if (local) { S = merge(DEFAULT(), local); render(); }
+  setSaveState(local ? "Saved in this browser" : "Example plan", !!local);
+  try {
+    const [db, user] = await Promise.all([window.claude?.use?.("db"), window.claude?.use?.("user")]);
+    if (!db || !user) return;
+    const id = await user.id();
+    if (!id) return;
+    docRef = db.collection("data/users/" + id).doc("plan");
+    const snap = await Promise.race([docRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
+    if (snap.exists) {
+      const d = snap.data();
+      try { S = merge(DEFAULT(), JSON.parse(d.plan)); render(); } catch (e) {}
+      setSaveState("Saved to your account", true);
+    } else {
+      setSaveState(local ? "Saved in this browser" : "Example plan, saves to your account when you edit", !!local);
+    }
+  } catch (e) { docRef = docRef || null; }
+}
+
+/* ---------- Formatting ---------- */
+const nf = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 0 });
+const kr = (n) => (isFinite(n) ? nf.format(Math.round(n)) : "–") + " kr";
+const pct = (n, d = 2) => (n == null || !isFinite(n) ? "–" : n.toFixed(d).replace(".", ",") + " %");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mkr = (n) => (n / 1e6).toFixed(2).replace(".", ",") + " Mkr";
+
+/* ---------- Calculations ---------- */
+function amortRate(ltv) { return ltv > 0.7 ? 0.02 : ltv > 0.5 ? 0.01 : 0; }
+function interestAfterDeduction(annualInterest) {
+  const ded = Math.min(annualInterest, 100000) * 0.30 + Math.max(0, annualInterest - 100000) * 0.21;
+  return annualInterest - ded;
+}
+function bestRate(binding) {
+  const vals = BANKS.map((b) => b.r[binding]).filter((v) => v != null);
+  return Math.min(...vals);
+}
+function chosenRate() {
+  const r = S.rates;
+  if (r.mode === "offer" && r.offer > 0) return { rate: r.offer, label: "your offer" };
+  if (r.mode === "snitt") {
+    const big = BANKS.filter((b) => b.snitt != null && ["SBAB", "Swedbank", "Handelsbanken", "SEB", "Länsförsäkringar"].includes(b.name));
+    const avg = big.reduce((a, b) => a + b.snitt, 0) / big.length;
+    return { rate: avg, label: "big-bank average rate (snittränta)" };
+  }
+  const b = BINDINGS.find((x) => x[0] === r.binding)[1];
+  return { rate: bestRate(r.binding), label: "best list rate, " + b };
+}
+function furnitureTotal(tierOverride) {
+  const f = S.furn, ti = TIERS.findIndex((t) => t[0] === (tierOverride || f.tier));
+  let total = 0, have = 0, count = 0;
+  for (const [, items] of FURNITURE) for (const [id, , prices, qty0, ess] of items) {
+    const st = f.items[id] || {};
+    if (f.essentialsOnly && !ess) continue;
+    const qty = st.qty ?? qty0;
+    const price = (st.price ?? prices[ti]) * qty;
+    if (st.have) { have += price; continue; }
+    total += price; count++;
+  }
+  for (const x of f.extra) { if (x.have) continue; total += (+x.price || 0) * (+x.qty || 1); count++; }
+  return { total, have, count };
+}
+function household() {
+  const f = S.fin, two = f.buyers === 2;
+  return {
+    gross: (+f.gross1 || 0) + (two ? +f.gross2 || 0 : 0),
+    net: (+f.net1 || 0) + (two ? +f.net2 || 0 : 0),
+  };
+}
+function closingFees() { return FEE_TRANSFER + FEE_PLEDGE; }
+function cashAvailable() {
+  const f = S.fin;
+  const furn = f.reserveFurniture ? furnitureTotal().total : 0;
+  return (+f.savings || 0) - (+f.buffer || 0) - closingFees() - furn;
+}
+// Monthly KALP surplus at a given loan size and price
+function kalpSurplus(loan, price) {
+  const f = S.fin, h = household();
+  const ltv = price > 0 ? loan / price : 0;
+  const housing = (+f.targetAvgift || 0) + 900; // + el, insurance, broadband
+  return h.net - (+f.living || 0) - (+f.otherDebtMonthly || 0) - housing - loan * (f.stress / 100) / 12 - loan * amortRate(ltv) / 12;
+}
+function affordability() {
+  const f = S.fin, h = household();
+  const cash = Math.max(0, cashAvailable());
+  const incomeCap = Math.max(0, 5.5 * h.gross * 12 - (+f.otherDebt || 0));
+  const byCash = cash / 0.10;
+  const byIncome = cash + incomeCap;
+  // largest price where KALP surplus >= 0 (loan = price - cash)
+  let lo = 0, hi = 30e6;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2, loan = Math.max(0, mid - cash);
+    if (kalpSurplus(loan, mid) >= 0) lo = mid; else hi = mid;
+  }
+  const byKalp = kalpSurplus(0, 0) < 0 ? 0 : lo;
+  const max = Math.max(0, Math.min(byCash, byIncome, byKalp));
+  const limits = [
+    { key: "cash", label: "Cash (10 % insats)", value: byCash, hint: "Your savings after buffer, fees" + (f.reserveFurniture ? " and furniture" : "") + " must cover 10 % of the price." },
+    { key: "income", label: "Income (5.5× gross)", value: byIncome, hint: "Most banks lend at most about 5.5 times your yearly gross income, minus other debt." },
+    { key: "kalp", label: "Bank stress test", value: byKalp, hint: "The bank's KALP check: at a " + f.stress + " % stress rate, your net income must still cover loan, avgift and living costs." },
+  ];
+  const binding = limits.reduce((a, b) => (b.value < a.value ? b : a));
+  return { cash, incomeCap, max, limits, binding };
+}
+function monthlyCost(price, avgift, rate, cashIn) {
+  const cash = cashIn ?? Math.max(0, cashAvailable());
+  const insats = Math.min(price, Math.max(price * 0.10, cash));
+  const loan = Math.max(0, price - insats);
+  const ltv = price > 0 ? loan / price : 0;
+  const interest = loan * rate / 100;
+  const interestNet = interestAfterDeduction(interest) / 12;
+  const amort = loan * amortRate(ltv) / 12;
+  const running = 900;
+  return { loan, insats, ltv, interestGross: interest / 12, interestNet, amort, avgift: +avgift || 0, running, total: interestNet + amort + (+avgift || 0) + running, cashShort: price * 0.10 > cash };
+}
+
+// Yearly average kr/kvm for bostadsrätter, Svensk Mäklarstatistik (årshistorik, fetched 30 Oct 2026)
+const PRICE_SOURCE = "https://www.maklarstatistik.se/omrade/riket/stockholms-lan/stockholm/";
+const AREAS = {
+  stockholm: { name: "Stockholms kommun (all)", from: 1996, v: [11124,12818,15767,19686,23794,24748,26021,24585,25804,30405,36357,41694,38996,39966,43689,44763,45692,50234,55873,66513,71413,73031,69405,71131,75842,81908,82103,80911,84288,86267] },
+  "centrala-stockholm": { name: "Centrala Stockholm", from: 2005, v: [38397,44867,52377,50011,51348,56381,57957,59179,64243,71205,84465,89645,92442,87291,89225,95218,104868,107183,103673,107725,111823] },
+  sodermalm: { name: "Södermalm", from: 2005, v: [36351,42665,49361,46870,47757,53100,54275,55711,60645,68080,81216,86169,88410,82437,83917,89200,99161,100802,97021,100972,106286] },
+  kungsholmen: { name: "Kungsholmen", from: 2005, v: [37897,43530,51980,49680,49989,54965,56866,58188,63369,70161,82394,87819,90184,84437,86901,91477,99694,102374,99228,102843,105041] },
+  "vasastan-norrmalm": { name: "Vasastan-Norrmalm", from: 2005, v: [39705,46704,54390,51703,54107,59000,61039,62774,68074,74944,89322,94980,98713,93168,95579,102700,113849,116685,112229,117329,122290] },
+  ostermalm: { name: "Östermalm", from: 2005, v: [41102,48270,55741,54130,56105,60923,62911,63928,68007,74319,89044,93772,97274,93024,95043,102354,112186,115806,112144,116589,120781] },
+  essingen: { name: "Essingen", from: 2005, v: [33086,38889,46363,44283,44687,48524,51005,50437,54334,61281,71702,77573,79291,74794,74194,80501,85725,86980,83830,85173,87151] },
+  "hagersten-liljeholmen": { name: "Hägersten-Liljeholmen", from: 2005, v: [23700,29300,33980,33633,32690,37191,38428,40146,44279,50870,60811,66632,68368,64157,65058,68959,75372,76431,72212,74197,75401] },
+  "bromma-vasterled": { name: "Bromma-Västerled", from: 2005, v: [23326,28302,32154,31879,31890,34061,36040,36132,40012,43455,52526,56587,58521,54689,55828,58601,63077,63781,61565,62829,63309] },
+  "enskede-skarpnack": { name: "Enskede-Skarpnäck", from: 2005, v: [20562,25395,30568,28811,29315,32566,33926,35458,38593,45659,54204,58107,60286,55861,57271,59825,65579,65722,62941,63609,63684] },
+  "brannkyrka-skarholmen": { name: "Brännkyrka-Skärholmen", from: 2005, v: [15536,18664,22862,21333,22595,24484,25526,25973,29143,34480,43325,46105,48244,44399,44773,46780,49971,49929,48136,48226,47188] },
+  "farsta-vantor": { name: "Farsta-Vantör", from: 2005, v: [15045,17982,21268,20460,21103,22928,24190,26330,29347,34317,42664,46211,47842,43510,44626,46312,48756,49247,47480,48231,46524] },
+  "hasselby-vallingby": { name: "Hässelby-Vällingby", from: 2005, v: [15933,16551,19335,19993,19975,22754,22452,23594,26249,30005,36455,43236,43493,40162,41727,41657,43089,44367,40322,38932,37445] },
+  "spanga-kista": { name: "Spånga-Kista", from: 2005, v: [11163,13655,17201,17205,17867,18646,19131,20566,23104,25967,34119,37200,36477,34710,33749,34913,35483,35271,33449,31700,30453] },
+};
+const BUY_YEAR = 2026;
+// Log-linear least squares: ln(kr/kvm) = a + b·year, over the last `win` years (0 = all)
+function regress(key, win) {
+  const A = AREAS[key] || AREAS.stockholm;
+  let pts = A.v.map((v, i) => [A.from + i, v]);
+  if (win > 0) pts = pts.slice(-win);
+  const n = pts.length, xs = pts.map((p) => p[0]), ys = pts.map((p) => Math.log(p[1]));
+  const xbar = xs.reduce((a, b) => a + b, 0) / n, ybar = ys.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0, sxy = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxx += (xs[i] - xbar) ** 2; sxy += (xs[i] - xbar) * (ys[i] - ybar); syy += (ys[i] - ybar) ** 2; }
+  const b = sxy / sxx, a = ybar - b * xbar;
+  const sse = ys.reduce((s, y, i) => s + (y - a - b * xs[i]) ** 2, 0);
+  const s = Math.sqrt(sse / Math.max(1, n - 2));
+  const r2 = syy ? 1 - sse / syy : 0;
+  const pred = (x) => {
+    const m = a + b * x, w = 1.96 * s * Math.sqrt(1 + 1 / n + (x - xbar) ** 2 / sxx);
+    return { mid: Math.exp(m), lo: Math.exp(m - w), hi: Math.exp(m + w) };
+  };
+  return { A, pts, n, a, b, s, r2, g: Math.exp(b) - 1, pred };
+}
+function valueGrowth() {
+  const V = S.value;
+  return V.mode === "manual" ? (+V.manual || 0) / 100 : regress(V.area, +V.win).g;
+}
+// Apartment value t years after purchase: central trend plus 95 % prediction band
+function valueAt(price, t) {
+  const V = S.value;
+  if (V.mode === "manual") { const v = price * Math.pow(1 + valueGrowth(), t); return { mid: v, lo: v, hi: v }; }
+  const R = regress(V.area, +V.win), base = R.pred(BUY_YEAR).mid, p = R.pred(BUY_YEAR + t);
+  return { mid: price * p.mid / base, lo: price * p.lo / base, hi: price * p.hi / base };
+}
+
+// Five-year projection for one rate scenario, in today's money (wage and costs assumed to move together)
+function projectFive(sc) {
+  const f = S.fin, F = S.five, h = household(), cr = chosenRate();
+  const price = +f.targetPrice || affordability().max;
+  const start = monthlyCost(price, f.targetAvgift, cr.rate);
+  let loan = start.loan, saved = +f.buffer || 0;
+  const years = [];
+  for (let y = 0; y < 5; y++) {
+    const rate = Math.max(0, cr.rate + (+sc.dr[y] || 0));
+    const avgift = (+f.targetAvgift || 0) * Math.pow(1 + (+F.avgiftExtra || 0) / 100, y);
+    const interestNet = interestAfterDeduction(loan * rate / 100) / 12;
+    const amort = Math.min(loan, start.loan * amortRate(loan / price)) / 12;
+    const housing = interestNet + amort + avgift + 900;
+    const left = h.net - (+f.living || 0) - (+f.otherDebtMonthly || 0) - housing;
+    saved += left * 12;
+    loan -= amort * 12;
+    const val = valueAt(price, y + 1);
+    years.push({ y: y + 1, rate, avgift, interestNet, amort, housing, left, saved, loan, value: val.mid, valueLo: val.lo, valueHi: val.hi, equity: val.mid - loan });
+  }
+  return years;
+}
+
+/* ---------- Rendering ---------- */
+const app = document.getElementById("app");
+function numField(path, label, unit = "kr", hint = "", step = "1000") {
+  const v = get(path);
+  return `<div class="field"><label for="f-${path}">${label}</label><span class="num"><input id="f-${path}" type="number" inputmode="decimal" step="${step}" data-path="${path}" value="${v ?? ""}"><span>${unit}</span></span>${hint ? `<small>${hint}</small>` : ""}</div>`;
+}
+function get(path) { return path.split(".").reduce((o, k) => (o == null ? o : o[k]), S); }
+function set(path, val) {
+  const ks = path.split("."); let o = S;
+  for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]];
+  o[ks.at(-1)] = val;
+}
+function exampleBanner(text) {
+  if (!S.example) return "";
+  return `<div class="banner-ex"><span class="chip ex">Example</span><span>${text}</span><button class="btn" data-act="clear-example">Start with my own numbers</button></div>`;
+}
+
+const VIEWS = {
+  overview() {
+    const a = affordability(), cr = chosenRate();
+    const target = +S.fin.targetPrice || 0;
+    const mc = monthlyCost(target, S.fin.targetAvgift, cr.rate);
+    const furn = furnitureTotal();
+    const needCash = target * 0.10 + closingFees() + furn.total + (+S.fin.buffer || 0);
+    const gap = needCash - (+S.fin.savings || 0);
+    const months = gap > 0 && S.fin.monthlySave > 0 ? Math.ceil(gap / S.fin.monthlySave) : 0;
+    const doneSteps = STEPS.filter((s) => S.steps[s[0]]).length;
+    const maxShown = a.max;
+    const searchTo = Math.floor(maxShown * (1 - S.search.headroom / 100) / 50000) * 50000;
+    return `
+      <div class="lead"><span class="eyebrow">Your plan</span><h2>What you can buy, and what it costs to live there</h2>
+      <p>Everything here updates as you change your finances, compare rates, track apartments and plan furniture.</p></div>
+      ${exampleBanner("These are sample figures so you can see how the plan works. Replace them with your own.")}
+      <div class="hero">
+        <section class="panel">
+          <span class="eyebrow">Highest price you can likely bid</span>
+          <div class="bigfig" data-out="max">${kr(maxShown).replace(" kr", "")}<small> kr</small></div>
+          <p class="dim" style="margin:6px 0 16px">Limited by <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>. ${esc(a.binding.hint)}</p>
+          <div class="limits">${a.limits.map((l) => `
+            <div class="limit ${l === a.binding ? "binding" : ""}"><span>${l.label}</span><div class="bar"><b style="width:${Math.min(100, (a.max / Math.max(l.value, 1)) * 100).toFixed(1)}%"></b></div><span class="mono">${l.value > 25e6 ? "25+ Mkr" : mkr(l.value)}</span></div>`).join("")}
+          </div>
+          <p class="note" style="margin:16px 0 0">The shortest bar's limit decides your max. A bank makes the real decision in your <strong>lånelöfte</strong>, so treat this as a planning estimate.</p>
+        </section>
+        <section class="panel">
+          <span class="eyebrow">Target apartment</span>
+          <div class="row" style="margin:6px 0 10px">${numField("fin.targetPrice", "Price you're aiming for", "kr", "", "50000")}</div>
+          <dl class="kv">
+            <dt>Cash needed (10 % + fees + furniture + buffer)</dt><dd>${kr(needCash)}</dd>
+            <dt>Your savings</dt><dd>${kr(S.fin.savings)}</dd>
+            <dt class="total">${gap > 0 ? "Still to save" : "Ahead of target by"}</dt><dd class="total" style="color:${gap > 0 ? "var(--warn)" : "var(--good)"}">${kr(Math.abs(gap))}</dd>
+          </dl>
+          <p class="dim" style="margin:10px 0 0;font-size:.86rem">${gap > 0 ? (months ? `At ${kr(S.fin.monthlySave)} a month you reach it in about <strong style="color:var(--ink)">${months} months</strong>.` : "Set a monthly savings amount in My finances to see when you get there.") : "You have the cash for this target."} ${target > a.max ? `<span class="chip bad">Above your max</span>` : `<span class="chip good">Within your max</span>`}</p>
+        </section>
+      </div>
+      <div class="tiles" style="margin-top:20px">
+        <button class="tile" data-goto="rates"><span class="eyebrow">Monthly cost at target</span><span class="v">${kr(mc.total)}</span><span class="s">After ränteavdrag, at ${pct(cr.rate)} (${esc(cr.label)})</span></button>
+        <button class="tile" data-goto="rates"><span class="eyebrow">Best 3-month list rate</span><span class="v">${pct(bestRate("m3"))}</span><span class="s">${esc(BANKS.find((b) => b.r.m3 === bestRate("m3")).name)}, updated ${RATES_UPDATED}</span></button>
+        <button class="tile" data-goto="five"><span class="eyebrow">Tightest month in 5 years</span><span class="v">${kr(Math.min(...Object.values(S.five.scen).flatMap((sc) => projectFive(sc).map((r) => r.left))))}</span><span class="s">Left over in the worst scenario</span></button>
+        <button class="tile" data-goto="search"><span class="eyebrow">Search Booli up to</span><span class="v">${mkr(searchTo)}</span><span class="s">${S.apts.length} apartment${S.apts.length === 1 ? "" : "s"} tracked</span></button>
+        <button class="tile" data-goto="furnish"><span class="eyebrow">Furnishing budget</span><span class="v">${kr(furn.total)}</span><span class="s">${furn.count} items to buy, ${TIERS.find((t) => t[0] === S.furn.tier)[1].toLowerCase()}</span></button>
+        <button class="tile" data-goto="steps"><span class="eyebrow">Buying steps</span><span class="v">${doneSteps} / ${STEPS.length}</span><span class="s">${doneSteps < STEPS.length ? "Next: " + esc(STEPS.find((s) => !S.steps[s[0]])[1]) : "All done. Welcome home."}</span></button>
+      </div>`;
+  },
+
+  money() {
+    const f = S.fin, two = f.buyers === 2;
+    return `
+      <div class="lead"><span class="eyebrow">My finances</span><h2>How much a bank will lend you</h2>
+      <p>Banks check three things: your cash for the kontantinsats, your income against total debt, and a stress test (KALP) of your monthly budget at a higher rate.</p></div>
+      ${exampleBanner("Sample finances. Enter your own salary and savings.")}
+      <div class="bench">
+        <div class="stack">
+          <section class="panel"><h3>Income</h3>
+            <div class="field"><label>Buying</label><div class="seg">
+              <button data-set="fin.buyers" data-val="1" aria-pressed="${!two}">Alone</button>
+              <button data-set="fin.buyers" data-val="2" aria-pressed="${two}">Together</button></div></div>
+            ${numField("fin.gross1", two ? "Your gross salary / month" : "Gross salary / month", "kr", "Before tax (bruttolön).")}
+            ${numField("fin.net1", two ? "Your net salary / month" : "Net salary / month", "kr", "What lands in your account (nettolön).")}
+            ${two ? numField("fin.gross2", "Partner's gross / month") + numField("fin.net2", "Partner's net / month") : ""}
+          </section>
+          <section class="panel"><h3>Savings and debts</h3>
+            ${numField("fin.savings", "Savings available", "kr", "Cash, ISK and funds you'll sell for the purchase.", "10000")}
+            ${numField("fin.buffer", "Buffer to keep", "kr", "Emergency money you won't spend on the apartment.", "5000")}
+            ${numField("fin.monthlySave", "You save each month", "kr", "", "500")}
+            ${numField("fin.otherDebt", "Other debt (CSN, car, loans)", "kr", "", "10000")}
+            ${numField("fin.otherDebtMonthly", "Monthly payments on that debt", "kr", "", "100")}
+            <div class="field"><label for="f-resf">Reserve furniture budget from savings</label><input id="f-resf" type="checkbox" data-check="fin.reserveFurniture" ${f.reserveFurniture ? "checked" : ""}></div>
+          </section>
+          <section class="panel"><h3>Bank's budget assumptions</h3>
+            ${numField("fin.living", "Living costs / month", "kr", "Food, transport, clothes, phone. Banks typically use about 10–12 000 kr per adult; " + (two ? "use roughly 20 000 kr for two." : "adjust to your life."), "500")}
+            ${numField("fin.targetAvgift", "Expected avgift", "kr/mån", "Monthly fee to the förening.", "100")}
+            ${numField("fin.stress", "Stress-test rate", "%", "Banks test at a higher rate than you'll pay, often 6–7 %.", "0.5")}
+          </section>
+        </div>
+        <div class="stack" id="out-money">${VIEWS.moneyOut()}</div>
+      </div>`;
+  },
+  moneyOut() {
+    const a = affordability(), h = household(), f = S.fin, cr = chosenRate();
+    const loanAtMax = Math.max(0, a.max - a.cash);
+    const mc = monthlyCost(a.max, f.targetAvgift, cr.rate);
+    const surplus = kalpSurplus(loanAtMax, a.max);
+    return `
+      <section class="panel">
+        <span class="eyebrow">Your max price</span>
+        <div class="bigfig">${kr(a.max).replace(" kr", "")}<small> kr</small></div>
+        <p class="dim" style="margin:4px 0 14px">Set by <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>.</p>
+        <div class="limits">${a.limits.map((l) => `
+          <div class="limit ${l === a.binding ? "binding" : ""}"><span>${l.label}</span><div class="bar"><b style="width:${Math.min(100, (a.max / Math.max(l.value, 1)) * 100).toFixed(1)}%"></b></div><span class="mono">${l.value > 25e6 ? "25+ Mkr" : mkr(l.value)}</span></div>`).join("")}</div>
+      </section>
+      <section class="panel"><h3>How the money adds up at your max</h3>
+        <dl class="kv">
+          <dt>Savings</dt><dd>${kr(f.savings)}</dd>
+          <dt>− Buffer</dt><dd>${kr(-f.buffer)}</dd>
+          <dt>− Fees to the förening (överlåtelse + pantsättning)</dt><dd>${kr(-closingFees())}</dd>
+          ${f.reserveFurniture ? `<dt>− Furniture &amp; moving</dt><dd>${kr(-furnitureTotal().total)}</dd>` : ""}
+          <dt class="total">Cash for kontantinsats</dt><dd class="total">${kr(a.cash)}</dd>
+          <dt>Mortgage (bolån)</dt><dd>${kr(loanAtMax)}</dd>
+          <dt>Loan-to-value (belåningsgrad)</dt><dd>${pct(a.max ? loanAtMax / a.max * 100 : 0, 1)}</dd>
+          <dt>Debt-to-income (skuldkvot)</dt><dd>${h.gross ? ((loanAtMax + (+f.otherDebt || 0)) / (h.gross * 12)).toFixed(1).replace(".", ",") + "×" : "–"}</dd>
+        </dl>
+      </section>
+      <section class="panel"><h3>Monthly cost at your max</h3>
+        <dl class="kv">
+          <dt>Interest at ${pct(cr.rate)} after 30 % ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
+          <dt>Amortering (${(amortRate(mc.ltv) * 100).toFixed(0)} % a year)</dt><dd>${kr(mc.amort)}</dd>
+          <dt>Avgift</dt><dd>${kr(mc.avgift)}</dd>
+          <dt>Electricity, insurance, broadband</dt><dd>${kr(mc.running)}</dd>
+          <dt class="total">Total per month</dt><dd class="total">${kr(mc.total)}</dd>
+          <dt>Left after housing and living costs</dt><dd style="color:${h.net - mc.total - f.living - f.otherDebtMonthly < 0 ? "var(--bad)" : "var(--good)"}">${kr(h.net - mc.total - f.living - f.otherDebtMonthly)}</dd>
+          <dt>Stress-test margin at ${f.stress} %</dt><dd>${kr(surplus)}</dd>
+        </dl>
+        <p class="note" style="margin:14px 0 0">Rules used: <strong>bolånetak 90 %</strong> (10 % cash) and amortering of 2 % above 70 % LTV and 1 % between 50–70 %, in force since 1 April 2026. Ränteavdrag is 30 % of interest up to 100 000 kr a year, 21 % above that. Banks' own limits vary.</p>
+      </section>`;
+  },
+
+  rates() {
+    const r = S.rates, cr = chosenRate();
+    const a = affordability();
+    const price = +S.fin.targetPrice || a.max;
+    const mc = monthlyCost(price, S.fin.targetAvgift, cr.rate);
+    const loan = mc.loan;
+    const rows = BANKS.map((b) => ({ ...b, rate: b.r[r.binding] })).filter((b) => b.rate != null);
+    rows.sort((x, y) => r.sort === "snitt" ? (x.snitt ?? 99) - (y.snitt ?? 99) : r.sort === "name" ? x.name.localeCompare(y.name, "sv") : x.rate - y.rate);
+    const best = Math.min(...rows.map((b) => b.rate));
+    return `
+      <div class="lead"><span class="eyebrow">Mortgage rates</span><h2>Compare 15 Swedish lenders</h2>
+      <p>List rates (listränta) are the starting price. The average rate (snittränta) is what customers actually paid last month, which tells you how much room there is to negotiate.</p></div>
+      <div class="row" style="margin-bottom:14px">
+        <span class="eyebrow">Binding period</span>
+        <div class="seg">${BINDINGS.map(([k, l]) => `<button data-set="rates.binding" data-val="${k}" aria-pressed="${r.binding === k}">${l}</button>`).join("")}</div>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th data-sort="name" ${r.sort === "name" ? 'aria-sort="ascending"' : ""}>Bank</th>
+            <th data-sort="rate" ${r.sort === "rate" ? 'aria-sort="ascending"' : ""}>List rate</th>
+            <th data-sort="snitt" ${r.sort === "snitt" ? 'aria-sort="ascending"' : ""}>Avg rate 3 mån</th>
+            <th>Interest / month</th>
+            <th>After ränteavdrag</th>
+          </tr></thead>
+          <tbody>${rows.map((b) => `
+            <tr class="${b.rate === best ? "best" : ""}">
+              <td><a href="${b.url}" target="_blank" rel="noopener">${esc(b.name)}</a>${b.note ? ` <span class="dim" style="font-size:.78rem">· ${esc(b.note)}</span>` : ""}</td>
+              <td class="mono">${pct(b.rate)}</td>
+              <td class="mono ${b.snitt == null ? "dim" : ""}">${b.snitt == null ? "–" : pct(b.snitt)}</td>
+              <td class="mono">${kr(loan * b.rate / 100 / 12)}</td>
+              <td class="mono">${kr(interestAfterDeduction(loan * b.rate / 100) / 12)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <p class="dim" style="font-size:.8rem;margin:8px 0 20px">Rates from <a href="${RATES_SOURCE}" target="_blank" rel="noopener">lanupplysningen.se</a>, updated ${RATES_UPDATED}. Interest shown for a ${kr(loan)} loan (your target price minus your cash). Check each bank's own page before you decide. Specialist lenders (Bluestep, Marginalen, Nordax, Svea) are left out.</p>
+      <div class="bench">
+        <section class="panel"><h3>Rate used in your plan</h3>
+          <div class="seg" style="margin-bottom:10px">
+            <button data-set="rates.mode" data-val="list" aria-pressed="${r.mode === "list"}">Best list rate</button>
+            <button data-set="rates.mode" data-val="snitt" aria-pressed="${r.mode === "snitt"}">Avg rate</button>
+            <button data-set="rates.mode" data-val="offer" aria-pressed="${r.mode === "offer"}">My offer</button>
+          </div>
+          ${r.mode === "offer" ? numField("rates.offer", "Rate a bank offered you", "%", "", "0.01") : ""}
+          <p class="dim" style="font-size:.86rem;margin:8px 0 0">Using <strong style="color:var(--ink)">${pct(cr.rate)}</strong>, ${esc(cr.label)}.</p>
+        </section>
+        <section class="panel"><h3>How to get below the list rate</h3>
+          <ul style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.9rem">
+            <li>Get lånelöften from two or three banks, then ask your favourite to beat the best one in writing.</li>
+            <li>The big banks' average rates sit about 1–1,3 points below their list rates. Your first offer should be close to that.</li>
+            <li>Lower loan-to-value usually means a better rate. Some banks have rate steps at 60 % and 50 %.</li>
+            <li>Floating (3 months) has been cheapest. Binding gives a fixed cost but you can't move banks for free during the period.</li>
+            <li>Salary account, insurance and savings in the same bank are common bargaining chips.</li>
+          </ul>
+        </section>
+      </div>`;
+  },
+
+  five() {
+    const F = S.five, cr = chosenRate();
+    const cell = (k, y) => `<td><span class="num"><input type="number" step="0.25" aria-label="${esc(F.scen[k].name)} year ${y + 1}" data-five="${k}" data-y="${y}" value="${F.scen[k].dr[y]}" style="width:3.6em"><span>pp</span></span></td>`;
+    return `
+      <div class="lead"><span class="eyebrow">5-year budget</span><h2>What happens to your money when interest rates move</h2>
+      <p>Starts from your wage, your target apartment and today's plan rate of ${pct(cr.rate)}. Everything is in today's money: your wage and everyday costs are assumed to rise together with inflation, so only the mortgage rate and the avgift change.</p></div>
+      ${exampleBanner("Based on the sample finances. Enter your own wage in My finances.")}
+      <div class="bench">
+        <div class="stack">
+          <section class="panel"><h3>Your assumptions</h3>
+            ${numField("fin.net1", S.fin.buyers === 2 ? "Your net wage / month" : "Net wage / month", "kr", "Edit gross and partner's wage in My finances.", "500")}
+            ${numField("fin.living", "Living costs / month", "kr", "", "500")}
+            ${numField("fin.targetPrice", "Apartment price", "kr", "", "50000")}
+            ${numField("fin.targetAvgift", "Avgift today", "kr/mån", "", "100")}
+            ${numField("five.avgiftExtra", "Avgift rises above your wage by", "% / year", "Föreningar pass their own loan costs on, so avgifter have often risen faster than wages.", "0.25")}
+          </section>
+          <section class="panel"><h3>Apartment value</h3>
+            <p class="dim" style="margin:-4px 0 8px;font-size:.86rem">${S.value.mode === "manual" ? `Fixed growth of ${pct(+S.value.manual, 1)} a year.` : `Trend from ${esc(regress(S.value.area, +S.value.win).A.name)} prices: <strong style="color:var(--ink)">${pct(valueGrowth() * 100, 1)}</strong> a year.`}</p>
+            <button class="btn" data-goto="value">Change area or method</button>
+          </section>
+        </div>
+        <div class="stack" id="out-five">${VIEWS.fiveOut()}</div>
+      </div>
+      <section class="panel" style="margin-top:20px"><h3>Edit the rate scenarios</h3>
+        <p class="dim" style="margin:-6px 0 12px;font-size:.85rem">Change in percentage points compared with today's ${pct(cr.rate)}. The shock row is modelled on 2022–23, when the 3-month rate rose about 3 points in a year.</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Scenario</th>${[1, 2, 3, 4, 5].map((y) => `<th>Year ${y}</th>`).join("")}</tr></thead>
+          <tbody>${Object.keys(F.scen).map((k, i) => `
+            <tr><td><span class="sw" style="background:var(--s${i + 1})"></span>${esc(F.scen[k].name)}</td>${[0, 1, 2, 3, 4].map((y) => cell(k, y)).join("")}</tr>`).join("")}
+          </tbody></table></div>
+      </section>`;
+  },
+  fiveOut() {
+    const F = S.five, keys = Object.keys(F.scen);
+    const all = keys.map((k) => projectFive(F.scen[k]));
+    const pick = keys.includes(F.pick) ? F.pick : keys[0];
+    const P = all[keys.indexOf(pick)];
+    const W = 640, H = 240, L = 64, R = 16, T = 16, B = 30;
+    const vals = all.flat().map((r) => r.left);
+    let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+    const span = hi - lo || 1000, stepRaw = span / 4, mag = Math.pow(10, Math.floor(Math.log10(stepRaw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= stepRaw);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const x = (i) => L + (i * (W - L - R)) / 4, yv = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
+    const ticks = []; for (let v = lo; v <= hi + 1e-6; v += step) ticks.push(v);
+    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Money left each month per scenario" style="width:100%;height:auto;display:block">
+      ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${yv(v)}" y2="${yv(v)}" stroke="${v === 0 ? "var(--muted)" : "var(--line)"}" stroke-width="${v === 0 ? 1.5 : 1}"/><text x="${L - 8}" y="${yv(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${nf.format(v)}</text>`).join("")}
+      ${[0, 1, 2, 3, 4].map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">Year ${i + 1}</text>`).join("")}
+      ${all.map((rows, si) => { const on = keys[si] === pick; return `<polyline fill="none" stroke="var(--s${si + 1})" stroke-width="${on ? 3 : 1.75}" stroke-opacity="${on ? 1 : 0.55}" points="${rows.map((r, i) => `${x(i)},${yv(r.left)}`).join(" ")}"/>${rows.map((r, i) => `<circle cx="${x(i)}" cy="${yv(r.left)}" r="${on ? 4 : 2.5}" fill="var(--s${si + 1})"/>`).join("")}`; }).join("")}
+    </svg>`;
+    const sum = all.map((rows, i) => ({ k: keys[i], min: Math.min(...rows.map((r) => r.left)), end: rows[4] }));
+    return `
+      <section class="panel">
+        <span class="eyebrow">Money left each month after all costs</span>
+        <div class="seg" style="margin:8px 0 10px">${keys.map((k, i) => `<button data-set="five.pick" data-val="${k}" aria-pressed="${k === pick}"><span class="sw" style="background:var(--s${i + 1})"></span>${esc(F.scen[k].name)}</button>`).join("")}</div>
+        <div style="overflow-x:auto">${svg}</div>
+        <div class="tiles" style="margin-top:12px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">${sum.map((w, i) => `
+          <div class="tile" style="cursor:default"><span class="eyebrow"><span class="sw" style="background:var(--s${i + 1})"></span>${esc(F.scen[w.k].name)}</span>
+          <span class="v" style="font-size:1.1rem;color:${w.min < 0 ? "var(--bad)" : w.min < 3000 ? "var(--warn)" : "var(--ink)"}">${kr(w.min)}</span><span class="s">tightest month · ${kr(w.end.saved)} saved by year 5</span></div>`).join("")}</div>
+      </section>
+      <section class="panel"><h3>${esc(F.scen[pick].name)}, year by year</h3>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Year</th><th>Rate</th><th>Interest*/mån</th><th>Amortering/mån</th><th>Avgift/mån</th><th>Left over/mån</th><th>Loan</th><th>Apartment value</th><th>Equity</th></tr></thead>
+          <tbody>${P.map((r) => `<tr><td>${r.y}</td><td class="mono">${pct(r.rate)}</td><td class="mono">${kr(r.interestNet)}</td><td class="mono">${kr(r.amort)}</td><td class="mono">${kr(r.avgift)}</td><td class="mono" style="font-weight:600;color:${r.left < 0 ? "var(--bad)" : "var(--ink)"}">${kr(r.left)}</td><td class="mono">${kr(r.loan)}</td><td class="mono">${kr(r.value)}</td><td class="mono">${kr(r.equity)}</td></tr>`).join("")}</tbody>
+        </table></div>
+        <p class="dim" style="font-size:.8rem;margin:8px 0 0">*After ränteavdrag. Assumes every krona left over goes to savings. ${S.value.mode === "manual" ? "" : `In year 5 the trend's 95 % range for the apartment's value is ${kr(P[4].valueLo)} to ${kr(P[4].valueHi)}.`} Historic prices are in nominal kronor, so in today's money the value growth is roughly 2 points lower.</p>
+      </section>`;
+  },
+
+  value() {
+    const V = S.value;
+    return `
+      <div class="lead"><span class="eyebrow">Area prices</span><h2>How prices in your area have moved, and where the trend points</h2>
+      <p>Yearly average price per kvm for bostadsrätter from Svensk Mäklarstatistik. A log-linear regression gives the average yearly growth over the period you pick, and a 95 % prediction range for the next five years.</p></div>
+      <div class="bench">
+        <section class="panel"><h3>Area and method</h3>
+          <div class="field"><label for="f-varea">Area</label><select id="f-varea" data-path="value.area">${Object.entries(AREAS).map(([k, a]) => `<option value="${k}" ${V.area === k ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
+          <div class="field"><label>Years in the regression</label><div class="seg">${[[0, "All"], [15, "15"], [10, "10"], [5, "5"]].map(([w, l]) => `<button data-set="value.win" data-val="${w}" aria-pressed="${+V.win === w}">${l}</button>`).join("")}</div>
+          <small>Older years include the 2005–2017 boom. Recent years reflect today's higher rates.</small></div>
+          <div class="field"><label>Growth used in your 5-year budget</label><div class="seg">
+            <button data-set="value.mode" data-val="regression" aria-pressed="${V.mode !== "manual"}">Regression</button>
+            <button data-set="value.mode" data-val="manual" aria-pressed="${V.mode === "manual"}">Fixed</button></div></div>
+          ${V.mode === "manual" ? numField("value.manual", "Fixed growth", "% / year", "", "0.5") : ""}
+        </section>
+        <div class="stack" id="out-value">${VIEWS.valueOut()}</div>
+      </div>`;
+  },
+  valueOut() {
+    const V = S.value, R = regress(V.area, +V.win), A = R.A;
+    const allPts = A.v.map((v, i) => [A.from + i, v]);
+    const x0 = A.from, x1 = BUY_YEAR + 5;
+    const proj = []; for (let yr = BUY_YEAR - 1; yr <= x1; yr++) proj.push([yr, R.pred(yr)]);
+    const ymax = Math.max(...allPts.map((p) => p[1]), ...proj.map((p) => p[1].hi));
+    const W = 660, H = 280, L = 62, Rr = 16, T = 14, B = 28;
+    const stepRaw = ymax / 5, mag = Math.pow(10, Math.floor(Math.log10(stepRaw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= stepRaw), top = Math.ceil(ymax / step) * step;
+    const x = (yr) => L + ((yr - x0) / (x1 - x0)) * (W - L - Rr), y = (v) => T + (1 - v / top) * (H - T - B);
+    const ticks = []; for (let v = 0; v <= top + 1e-6; v += step) ticks.push(v);
+    const xt = []; for (let yr = Math.ceil(x0 / 5) * 5; yr <= x1; yr += 5) xt.push(yr);
+    const fitFrom = R.pts[0][0], fit = []; for (let yr = fitFrom; yr <= BUY_YEAR - 1; yr++) fit.push([yr, R.pred(yr).mid]);
+    const band = proj.map(([yr, p]) => `${x(yr)},${y(p.hi)}`).join(" ") + " " + proj.slice().reverse().map(([yr, p]) => `${x(yr)},${y(p.lo)}`).join(" ");
+    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price per kvm history and trend for ${esc(A.name)}" style="width:100%;height:auto;display:block">
+      ${ticks.map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v ? nf.format(v / 1000) + "k" : "0"}</text>`).join("")}
+      ${xt.map((yr) => `<text x="${x(yr)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${yr}</text>`).join("")}
+      <rect x="${x(fitFrom) - 4}" y="${T}" width="${x(BUY_YEAR - 1) - x(fitFrom) + 8}" height="${H - T - B}" fill="var(--accent-soft)" opacity=".5"/>
+      <polygon points="${band}" fill="var(--accent)" opacity=".15"/>
+      <polyline fill="none" stroke="var(--muted)" stroke-width="1.5" points="${allPts.map(([yr, v]) => `${x(yr)},${y(v)}`).join(" ")}"/>
+      ${allPts.map(([yr, v]) => `<circle cx="${x(yr)}" cy="${y(v)}" r="3" fill="${yr >= fitFrom ? "var(--ink)" : "var(--muted)"}"><title>${yr}: ${nf.format(v)} kr/kvm</title></circle>`).join("")}
+      <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${fit.map(([yr, v]) => `${x(yr)},${y(v)}`).join(" ")}"/>
+      <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 5" points="${proj.map(([yr, p]) => `${x(yr)},${y(p.mid)}`).join(" ")}"/>
+      <circle cx="${x(x1)}" cy="${y(proj.at(-1)[1].mid)}" r="4.5" fill="var(--accent)"/>
+    </svg>`;
+    const price = +S.fin.targetPrice || 0;
+    const v5 = valueAt(price, 5), pR = R.pred(x1);
+    const wins = [[0, "All years"], [15, "15 years"], [10, "10 years"], [5, "5 years"]].map(([w, l]) => ({ w, l, r: regress(V.area, w) }));
+    return `
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="eyebrow">${esc(A.name)} · kr/kvm</span><span class="dim" style="font-size:.78rem">Dots: actual · line: fitted trend · dashed: projection with 95 % range</span></div>
+        <div style="overflow-x:auto">${svg}</div>
+      </section>
+      <div class="tiles">
+        <div class="tile" style="cursor:default"><span class="eyebrow">Trend growth</span><span class="v">${pct(R.g * 100, 1)}</span><span class="s">a year, ${R.pts[0][0]}–${R.pts.at(-1)[0]} · R² ${R.r2.toFixed(2).replace(".", ",")}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Area in ${x1}</span><span class="v">${nf.format(pR.mid)}</span><span class="s">kr/kvm, range ${nf.format(pR.lo)}–${nf.format(pR.hi)}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Your ${mkr(price)} apartment in ${x1}</span><span class="v">${mkr(v5.mid)}</span><span class="s">range ${mkr(v5.lo)}–${mkr(v5.hi)}</span></div>
+      </div>
+      <section class="panel"><h3>Growth depends on the period you look at</h3>
+        <dl class="kv">${wins.map((o) => `<dt>${o.l} (${o.r.pts[0][0]}–${o.r.pts.at(-1)[0]})</dt><dd>${pct(o.r.g * 100, 1)} / year</dd>`).join("")}</dl>
+        <p class="note" style="margin:12px 0 0">A trend line describes the past, it does not predict the future. Stockholm prices fell about 10 % in 2017–18 and again in 2022–23. Source: <a href="${PRICE_SOURCE}" target="_blank" rel="noopener">Svensk Mäklarstatistik</a>, yearly averages to 2025. In 2026 the 12-month average for Södermalm was about 112 900 kr/kvm.</p>
+      </section>`;
+  },
+
+  search() {
+    const s = S.search, a = affordability();
+    const searchTo = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
+    const q = (base) => {
+      const p = new URLSearchParams({ areaIds: s.area || "1", objectType: "Lägenhet" });
+      if (base === "till-salu") p.set("maxListPrice", searchTo);
+      if (s.minRooms) p.set("minRooms", s.minRooms);
+      if (s.minArea) p.set("minLivingArea", s.minArea);
+      if (s.maxAvgift) p.set("maxRent", s.maxAvgift);
+      return `https://www.booli.se/sok/${base}?${p.toString()}`;
+    };
+    return `
+      <div class="lead"><span class="eyebrow">Apartments</span><h2>Search Booli with your budget, then track what you find</h2>
+      <p>The search links are built from your max price. Paste in apartments you like to see what each one costs per month and how healthy the förening looks.</p></div>
+      <div class="bench">
+        <section class="panel"><h3>Booli search</h3>
+          <div class="field"><label for="f-area">Area</label><select id="f-area" data-path="search.area">
+            ${[["1", "Stockholms kommun"], ["2", "Stockholms län"]].map(([v, l]) => `<option value="${v}" ${s.area === v ? "selected" : ""}>${l}</option>`).join("")}
+            ${!["1", "2"].includes(s.area) ? `<option value="${esc(s.area)}" selected>Area id ${esc(s.area)}</option>` : ""}
+          </select><small>For a single district, open Booli, pick the area, and copy the number after <span class="mono">areaIds=</span> in the address into the field below.</small></div>
+          <div class="field"><label for="f-areaid">Booli area id</label><input id="f-areaid" type="text" inputmode="numeric" data-path="search.area" value="${esc(s.area)}" style="width:7em"></div>
+          ${numField("search.minRooms", "Min rooms", "rok", "", "0.5")}
+          ${numField("search.minArea", "Min size", "kvm", "", "5")}
+          ${numField("search.maxAvgift", "Max avgift", "kr/mån", "", "250")}
+          ${numField("search.headroom", "Room for bidding above asking", "%", "Stockholm apartments often sell above the asking price, so search below your max.", "1")}
+        </section>
+        <div class="stack">
+          <section class="panel">
+            <span class="eyebrow">Search asking prices up to</span>
+            <div class="bigfig">${kr(searchTo).replace(" kr", "")}<small> kr</small></div>
+            <p class="dim" style="margin:4px 0 14px">${s.headroom} % below your max of ${kr(a.max)}.</p>
+            <div class="row">
+              <a class="btn primary" href="${q("till-salu")}" target="_blank" rel="noopener">Open for-sale on Booli ↗</a>
+              <a class="btn" href="${q("slutpriser")}" target="_blank" rel="noopener">Sold prices (slutpriser) ↗</a>
+              <a class="btn" href="https://www.hemnet.se/bostader" target="_blank" rel="noopener">Hemnet ↗</a>
+            </div>
+          </section>
+          <section class="panel"><h3>What to check in the förening</h3>
+            <dl class="kv" style="font-size:.86rem">
+              <dt>Debt per kvm (belåning/kvm)</dt><dd>&lt; 5 000 good · &gt; 15 000 risky</dd>
+              <dt>Avgift per kvm per year</dt><dd>&lt; 700 kr is low for Stockholm</dd>
+              <dt>Stambyte (pipes)</dt><dd>Done, or planned and paid for?</dd>
+              <dt>Äkta förening</dt><dd>Needed for normal tax rules</dd>
+              <dt>Tomträtt</dt><dd>Leased land can raise the avgift</dd>
+            </dl>
+          </section>
+        </div>
+      </div>
+      <div class="row" style="margin:28px 0 12px"><h3 style="margin:0;font-family:var(--f-display)">Tracked apartments</h3><span class="spacer"></span><button class="btn primary" data-act="add-apt">Add apartment</button></div>
+      <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">No apartments yet. Find one on Booli and add it here to compare monthly costs.</div>`}</div>`;
+  },
+
+  furnish() {
+    const f = S.furn, ft = furnitureTotal();
+    const ti = TIERS.findIndex((t) => t[0] === f.tier);
+    return `
+      <div class="lead"><span class="eyebrow">Furnishing</span><h2>Budget your first home, room by room</h2>
+      <p>Prices are typical Swedish 2026 prices for each level. Tick what you already own, change quantities, or type your own price. ${S.fin.reserveFurniture ? "This total is set aside from your savings in your max-price calculation." : ""}</p></div>
+      <div class="row" style="margin-bottom:16px">
+        <div class="seg">${TIERS.map(([k, l]) => `<button data-set="furn.tier" data-val="${k}" aria-pressed="${f.tier === k}">${l}</button>`).join("")}</div>
+        <label class="row" style="gap:6px;font-size:.9rem"><input type="checkbox" data-check="furn.essentialsOnly" ${f.essentialsOnly ? "checked" : ""}> Essentials only</label>
+        <span class="spacer"></span>
+        <div id="out-furn" class="row">${VIEWS.furnOut()}</div>
+      </div>
+      <div class="rooms">${FURNITURE.map(([room, items]) => {
+        const shown = items.filter((it) => !f.essentialsOnly || it[4]);
+        if (!shown.length) return "";
+        return `<section class="panel room"><h4>${room}<span data-room="${esc(room)}">${kr(roomTotal(room))}</span></h4>
+          ${shown.map(([id, name, prices, qty0, ess]) => {
+            const st = f.items[id] || {};
+            return `<div class="item ${st.have ? "have" : ""}">
+              <input type="checkbox" title="I already have this" aria-label="Already have ${esc(name)}" data-have="${id}" ${st.have ? "checked" : ""}>
+              <span class="nm">${esc(name)} ${ess ? '<span class="ess">ESSENTIAL</span>' : ""}</span>
+              <span class="num" title="Quantity"><input type="number" min="0" step="1" aria-label="Quantity" data-qty="${id}" value="${st.qty ?? qty0}" style="width:2.6em"><span>st</span></span>
+              <span class="num"><input type="number" step="100" aria-label="Price each" data-price="${id}" value="${st.price ?? prices[ti]}" ${st.price != null ? 'style="color:var(--accent)"' : ""}><span>kr</span></span>
+            </div>`;
+          }).join("")}
+        </section>`;
+      }).join("")}
+        <section class="panel room"><h4>Your own items<span>${kr(f.extra.reduce((a, x) => a + (x.have ? 0 : (+x.price || 0) * (+x.qty || 1)), 0))}</span></h4>
+          ${f.extra.map((x) => `<div class="item ${x.have ? "have" : ""}">
+            <input type="checkbox" aria-label="Already have" data-xhave="${x.id}" ${x.have ? "checked" : ""}>
+            <input type="text" aria-label="Item name" data-xname="${x.id}" value="${esc(x.name)}" placeholder="Item">
+            <span class="num"><input type="number" aria-label="Price" step="100" data-xprice="${x.id}" value="${x.price ?? ""}"><span>kr</span></span>
+            <button class="btn ghost" data-act="del-extra" data-id="${x.id}" aria-label="Remove">✕</button>
+          </div>`).join("")}
+          <button class="btn" style="margin-top:8px" data-act="add-extra">Add item</button>
+        </section>
+      </div>
+      <p class="dim" style="font-size:.8rem;margin-top:14px">Tip: Blocket, Sellpy and Facebook Marketplace often sell solid furniture for a third of the new price. IKEA delivery in Stockholm costs extra, so plan for it in moving.</p>`;
+  },
+  furnOut() {
+    const ft = furnitureTotal();
+    const byTier = TIERS.map(([k, l]) => `${l}: ${kr(furnitureTotal(k).total)}`).join(" · ");
+    return `<div style="text-align:right"><div class="eyebrow">To buy</div><div class="mono" style="font-size:1.5rem;font-weight:500">${kr(ft.total)}</div><div class="dim" style="font-size:.78rem">${byTier}${ft.have ? " · you already own " + kr(ft.have) : ""}</div></div>`;
+  },
+
+  steps() {
+    const done = STEPS.filter((s) => S.steps[s[0]]).length;
+    return `
+      <div class="lead"><span class="eyebrow">Buying steps</span><h2>From saving to getting the keys</h2>
+      <p>The order a bostadsrätt purchase in Stockholm usually follows. Tick each step as you go.</p></div>
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px"><span class="mono">${done} of ${STEPS.length} done</span></div>
+        <div class="progress"><b style="width:${(done / STEPS.length * 100).toFixed(0)}%"></b></div>
+        <ol class="steps" style="margin-top:8px">${STEPS.map(([id, t, d], i) => `
+          <li class="step ${S.steps[id] ? "done" : ""}"><span class="n">${String(i + 1).padStart(2, "0")}</span><input type="checkbox" aria-label="${esc(t)}" data-step="${id}" ${S.steps[id] ? "checked" : ""}><div><h4>${esc(t)}</h4><p>${esc(d)}</p></div></li>`).join("")}
+        </ol>
+      </div>`;
+  },
+};
+
+function roomTotal(room) {
+  const f = S.furn, ti = TIERS.findIndex((t) => t[0] === f.tier);
+  const items = FURNITURE.find((r) => r[0] === room)[1];
+  return items.reduce((a, [id, , prices, qty0, ess]) => {
+    if (f.essentialsOnly && !ess) return a;
+    const st = f.items[id] || {};
+    return st.have ? a : a + (st.price ?? prices[ti]) * (st.qty ?? qty0);
+  }, 0);
+}
+
+function aptCard(p) {
+  const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num"><input type="number" step="${step}" data-apt="${p.id}" data-k="${k}" value="${p[k] ?? ""}"><span>${unit}</span></span></label>`;
+  return `<article class="apt">
+    <div class="apt-head">
+      ${p.example ? '<span class="chip ex">Example</span>' : ""}
+      <input type="text" aria-label="Address" data-apt="${p.id}" data-k="address" value="${esc(p.address)}" placeholder="Address, area">
+      <select aria-label="Status" data-apt="${p.id}" data-k="status">${["Watching", "Viewing booked", "Viewed", "Bidding", "Passed", "Won"].map((s) => `<option ${p.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <button class="btn ghost" data-act="del-apt" data-id="${p.id}">Remove</button>
+    </div>
+    <div class="stack" style="gap:10px">
+      <div class="apt-grid">
+        ${f("price", "Asking price", "kr", "25000")}
+        ${f("bid", "Your expected final price", "kr", "25000")}
+        ${f("avgift", "Avgift", "kr/mån", "100")}
+        ${f("kvm", "Living area", "kvm", "1")}
+        ${f("rooms", "Rooms", "rok", "0.5")}
+        ${f("debtKvm", "Förening debt per kvm", "kr", "500")}
+      </div>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Listing link<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="https://www.booli.se/annons/…"></label>
+    </div>
+    <div class="apt-out" id="out-${p.id}">${aptOut(p)}</div>
+  </article>`;
+}
+function aptOut(p) {
+  const a = affordability(), cr = chosenRate();
+  const price = +p.bid || +p.price || 0;
+  const mc = monthlyCost(price, p.avgift, cr.rate);
+  const chips = [];
+  if (!price) chips.push(`<span class="chip info">Add a price</span>`);
+  else if (price <= a.max) chips.push(`<span class="chip good">Within budget</span>`);
+  else chips.push(`<span class="chip bad">${kr(price - a.max)} over max</span>`);
+  const d = +p.debtKvm;
+  if (d) chips.push(d < 5000 ? `<span class="chip good">Low förening debt</span>` : d <= 15000 ? `<span class="chip warn">Moderate förening debt</span>` : `<span class="chip bad">High förening debt</span>`);
+  const avgKvm = p.kvm ? (p.avgift * 12) / p.kvm : 0;
+  if (avgKvm) chips.push(avgKvm < 700 ? `<span class="chip good">Low avgift/kvm</span>` : avgKvm < 1000 ? `<span class="chip warn">Average avgift/kvm</span>` : `<span class="chip bad">High avgift/kvm</span>`);
+  return `<div class="row" style="justify-content:space-between"><span class="eyebrow">Per month</span><span class="mono" style="font-size:1.3rem;font-weight:500">${kr(mc.total)}</span></div>
+    <dl class="kv" style="font-size:.82rem">
+      <dt>Interest after avdrag</dt><dd>${kr(mc.interestNet)}</dd>
+      <dt>Amortering</dt><dd>${kr(mc.amort)}</dd>
+      <dt>Avgift + running costs</dt><dd>${kr(mc.avgift + mc.running)}</dd>
+      <dt>Price per kvm</dt><dd>${p.kvm && price ? kr(price / p.kvm) : "–"}</dd>
+      <dt>Avgift per kvm/year</dt><dd>${avgKvm ? kr(avgKvm) : "–"}</dd>
+      <dt>Cash at contract (10 %)</dt><dd>${kr(price * 0.1)}</dd>
+      <dt>Value in 5 years (area trend)</dt><dd>${price ? kr(valueAt(price, 5).mid) : "–"}</dd>
+    </dl>
+    <div class="chips">${chips.join("")}</div>
+    ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:.85rem">Open listing ↗</a>` : ""}`;
+}
+
+function render() {
+  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === S.tab));
+  app.innerHTML = VIEWS[S.tab]();
+}
+// Update live outputs without rebuilding inputs (keeps focus while typing)
+function refresh() {
+  if (S.tab === "money") document.getElementById("out-money").innerHTML = VIEWS.moneyOut();
+  else if (S.tab === "five") document.getElementById("out-five").innerHTML = VIEWS.fiveOut();
+  else if (S.tab === "value") document.getElementById("out-value").innerHTML = VIEWS.valueOut();
+  else if (S.tab === "furnish") {
+    document.getElementById("out-furn").innerHTML = VIEWS.furnOut();
+    document.querySelectorAll("[data-room]").forEach((el) => (el.textContent = kr(roomTotal(el.dataset.room))));
+  } else if (S.tab === "search") S.apts.forEach((p) => { const el = document.getElementById("out-" + p.id); if (el) el.innerHTML = aptOut(p); });
+  else { const ae = document.activeElement, id = ae && ae.id, pos = ae && ae.selectionStart; render(); if (id) { const el = document.getElementById(id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} } } }
+}
+function changed(full) { if (full) render(); else refresh(); scheduleSave(); }
+function clearExample() {
+  S.example = false;
+  S.apts = S.apts.filter((a) => !a.example);
+  Object.assign(S.fin, { gross1: 0, gross2: 0, net1: 0, net2: 0, savings: 0, monthlySave: 0, targetPrice: 0 });
+}
+
+/* ---------- Events ---------- */
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]"); if (!b) return;
+  S.tab = b.dataset.tab; render(); window.scrollTo(0, 0); scheduleSave();
+});
+app.addEventListener("input", (e) => {
+  const t = e.target, val = t.type === "number" ? (t.value === "" ? null : +t.value) : t.value;
+  if (t.dataset.path) {
+    set(t.dataset.path, val);
+    if (S.example && t.dataset.path.startsWith("fin.")) S.example = false;
+    if (t.tagName === "SELECT" || t.id === "f-areaid") return changed(true);
+    return changed(false);
+  }
+  if (t.dataset.apt) {
+    const p = S.apts.find((x) => x.id === t.dataset.apt); if (!p) return;
+    p[t.dataset.k] = val; if (p.example && t.dataset.k !== "status") p.example = false;
+    return changed(false);
+  }
+  if (t.dataset.five) { S.five.scen[t.dataset.five].dr[+t.dataset.y] = val ?? 0; return changed(false); }
+  const f = S.furn;
+  for (const k of ["qty", "price"]) if (t.dataset[k]) {
+    f.items[t.dataset[k]] = { ...(f.items[t.dataset[k]] || {}), [k]: val };
+    return changed(false);
+  }
+  const xid = t.dataset.xname || t.dataset.xprice;
+  if (xid) { const x = f.extra.find((i) => i.id === xid); if (x) x[t.dataset.xname ? "name" : "price"] = val; return changed(false); }
+});
+app.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.dataset.check) { set(t.dataset.check, t.checked); return changed(true); }
+  if (t.dataset.have) { S.furn.items[t.dataset.have] = { ...(S.furn.items[t.dataset.have] || {}), have: t.checked }; return changed(true); }
+  if (t.dataset.xhave) { const x = S.furn.extra.find((i) => i.id === t.dataset.xhave); if (x) x.have = t.checked; return changed(true); }
+  if (t.dataset.step) { S.steps[t.dataset.step] = t.checked; return changed(true); }
+  if (t.dataset.xprice || t.dataset.price || t.dataset.qty) return changed(true);
+});
+app.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-goto]"); if (g) { S.tab = g.dataset.goto; render(); window.scrollTo(0, 0); return; }
+  const s = e.target.closest("[data-set]");
+  if (s) { const v = s.dataset.val; set(s.dataset.set, /^\d+$/.test(v) && ["fin.buyers", "value.win"].includes(s.dataset.set) ? +v : v); return changed(true); }
+  const th = e.target.closest("th[data-sort]"); if (th) { S.rates.sort = th.dataset.sort; return changed(true); }
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  const id = () => Math.random().toString(36).slice(2, 9);
+  switch (a.dataset.act) {
+    case "clear-example": clearExample(); break;
+    case "add-apt": S.apts.unshift({ id: id(), address: "", price: null, bid: null, avgift: null, kvm: null, rooms: null, debtKvm: null, link: "", status: "Watching" }); break;
+    case "del-apt": S.apts = S.apts.filter((x) => x.id !== a.dataset.id); break;
+    case "add-extra": S.furn.extra.push({ id: id(), name: "", price: null, qty: 1, have: false }); break;
+    case "del-extra": S.furn.extra = S.furn.extra.filter((x) => x.id !== a.dataset.id); break;
+  }
+  changed(true);
+});
+
+render();
+initStore();
+</script>
+</body>
+</html>
