@@ -14,6 +14,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 - **Collect price history for predictions.** Save as much as we can about every apartment the finder reads: its details, its agent and area, and each day's asking price, state, highest bid, number of bids and final price. The data goes into a SQLite database (`data/history.sqlite`), with CSV exports after every run (`data/apartments.csv`, `data/readings.csv`). Apartments that leave an agent's list are followed for up to 30 days, to catch the final price. This is the base for predicting final prices: how each agent prices compared with what apartments sell for, and how much prices rise in each area.
 
+
 ## Next
 
 - **Predict the final price.** Once there's enough history: for each agent and area, how far final prices land above asking and how many bids it usually takes. That gives a guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
@@ -29,6 +30,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 ## Done
 
+- **Real area boundaries on the map.** The 15 inner-city districts are drawn with Stockholm's official borders, from OpenStreetMap (`areas.geojson`, built by `scripts/build_areas.py`). Neighbourhoods have no official borders, so each covers the part of its district within about 500 m of its point and nearer to it than to any other; the rest keeps the district's name. Each area is coloured by your rating.
 - **A faster planner.** Galleries and descriptions are built only when opened, Showings draws 30 apartments at a time with "Show more", typing redraws once you pause, nothing is redrawn when nothing changed, and a running finder reloads the list every 30 seconds instead of every 5.
 - **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.
 - **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here). Stadia Maps' quiet grey "Alidade Smooth" map, light and dark, which needs no key for a page on localhost.

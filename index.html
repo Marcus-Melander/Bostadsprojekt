@@ -1702,7 +1702,9 @@ function showCard(p, s, a, cr) {
   </article>`;
 }
 /* ---------- The map: apartments as dots, each area drawn around its apartments in its rating's colour ---------- */
-const MAP = { map: null, el: null, layer: null, sig: "", fitted: false };
+const MAP = { map: null, el: null, layer: null, sig: "", fitted: false, areas: null };
+// Districts' official outlines and the neighbourhoods inside them (areas.geojson, built from OpenStreetMap)
+fetch("/areas.geojson").then((r) => (r.ok ? r.json() : null)).then((g) => { MAP.areas = g; MAP.sig = ""; drawMap(); }).catch(() => {});
 function ratingColour(r) {
   const c = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   return r === "never" ? c("--negative") : r === "" ? c("--muted") : +r >= 4 ? c("--positive") : +r === 3 ? c("--data") : c("--warning");
@@ -1732,18 +1734,27 @@ function drawMap() {
     MAP.dark = dark; MAP.sig = ""; // redraw the areas in this theme's colours
   }
   const list = apartments().filter((p) => p.lat && (!S.show.hideNever || !isNever(p)));
-  const sig = list.map((p) => p.url).join() + JSON.stringify(S.show.ratings);
+  const sig = list.map((p) => p.url).join() + JSON.stringify(S.show.ratings) + !!MAP.areas;
   if (sig === MAP.sig) return;
   MAP.sig = sig;
   MAP.layer.clearLayers();
-  const areas = {};
-  for (const p of list) (areas[p.area || p.group] = areas[p.area || p.group] || []).push(p);
-  for (const [name, ps] of Object.entries(areas)) {
-    const c = [ps.reduce((a, p) => a + p.lat, 0) / ps.length, ps.reduce((a, p) => a + p.lon, 0) / ps.length];
-    const radius = Math.max(220, ...ps.map((p) => metres(c, [p.lat, p.lon]) + 120));
-    const r = rating(name) || rating(ps[0].group), col = ratingColour(r);
-    L.circle(c, { radius, stroke: !!r, color: col, weight: 1, opacity: 0.6, fillColor: col, fillOpacity: r ? 0.2 : 0.07 })
-      .bindTooltip(`${esc(name)} · ${ratingLabel(r)} · ${ps.length} apartment${ps.length > 1 ? "s" : ""}`, { sticky: true }).addTo(MAP.layer);
+  const counts = {};
+  for (const p of list) counts[p.area || p.group] = (counts[p.area || p.group] || 0) + 1;
+  if (MAP.areas) {
+    const text = getComputedStyle(document.documentElement).getPropertyValue("--text").trim();
+    L.geoJSON(MAP.areas, {
+      filter: (f) => f.properties.kind === "area",
+      style: (f) => {
+        const r = rating(f.properties.name) || rating(f.properties.group);
+        return { stroke: true, color: text, weight: 0.4, opacity: 0.25, fillColor: ratingColour(r), fillOpacity: r ? 0.28 : 0.03 };
+      },
+      onEachFeature: (f, l) => {
+        const n = f.properties.name, r = rating(n) || rating(f.properties.group), c = counts[n] || 0;
+        l.bindTooltip(`<strong>${esc(n)}</strong>${n !== f.properties.district ? " · " + esc(f.properties.district) : ""}<br>${ratingLabel(r)} · ${c} apartment${c === 1 ? "" : "s"}`, { sticky: true });
+      },
+    }).addTo(MAP.layer);
+    L.geoJSON(MAP.areas, { filter: (f) => f.properties.kind === "district", interactive: false,
+      style: { color: text, weight: 1.4, opacity: 0.55, fill: false } }).addTo(MAP.layer);
   }
   for (const p of list) {
     const r = rating(p.area) || rating(p.group);
@@ -1759,7 +1770,7 @@ function mapPanel() {
   const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Never here"], ["", "Not rated"]];
   return `<section class="panel map-panel">
     <div id="map" role="img" aria-label="Map of the apartments and your rated areas"></div>
-    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Each area is drawn around the apartments found in it.</span></div>
+    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Districts follow Stockholm's official borders. Neighbourhoods have none, so each covers the part of its district nearest its name on OpenStreetMap.</span></div>
   </section>`;
 }
 // Gallery photos and descriptions are built when you open them, not for every card up front

@@ -61,6 +61,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
             return self.send(200, read(ROOT / "index.html", b""), "text/html; charset=utf-8")
+        if path == "/areas.geojson":
+            return self.send(200, read(ROOT / "areas.geojson", b"{}"), "application/geo+json")
         if path == "/api/plan":
             body = read(DATA / "plan.json")
             return self.send(200, body) if body else self.json(404, {"error": "no plan yet"})
