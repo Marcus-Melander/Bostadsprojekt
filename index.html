@@ -279,7 +279,12 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 @keyframes pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .crawl .dot.running { animation: none; } }
 #tabs button.busy::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--data); margin-left: 6px; vertical-align: middle; }
-.hood-group h4 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 2px; }
+.hood-group { border-top: 1px solid var(--rule); }
+.hood-group > summary { display: flex; align-items: center; gap: 8px; padding: 10px 0; cursor: pointer; font-weight: 600; font-size: 14px; }
+.hood-group > summary .dim { font-weight: 400; font-size: 12px; }
+.hood-row.parent > span:first-child { font-weight: 600; }
+.hood-row.child > span:first-child { padding-left: 14px; }
+.hood-row small { font-size: 11px; }
 .hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
 .hood-row label { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .hood-row input[type="text"] { grid-column: 1 / -1; }
@@ -1516,7 +1521,7 @@ let LIST = { items: {}, lastRun: null };
 const LOCAL = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 async function loadList() {
   if (!LOCAL) return;
-  try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) LIST = { items: {}, ...(await r.json()) }; } catch (e) {}
+  try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) { LIST = { items: {}, ...(await r.json()) }; placeAll(); } } catch (e) {}
   if (S.tab === "show") refresh();
 }
 // What the finder reads: your filter
@@ -1643,23 +1648,34 @@ function areaGroups(list) {
   }
   return g;
 }
-function areaRow(name, count) {
-  const r = S.show.ratings[name] || {};
-  return `<div class="hood-row ${r.r === "never" ? "never" : ""}">
-    <span>${esc(name)}</span><span class="dim" title="Apartments">${count || ""}</span>
+function areaRow(name, count, label, district) {
+  const r = S.show.ratings[name] || {}, inherit = district && !r.r ? rating(district) : "";
+  return `<div class="hood-row ${r.r === "never" || inherit === "never" ? "never" : ""} ${district ? "child" : "parent"}">
+    <span>${esc(label || name)}${inherit ? `<small class="dim"> · uses ${esc(district)}'s ${inherit === "never" ? "Never here" : inherit + "/5"}</small>` : ""}</span>
+    <span class="dim" title="Apartments">${count || ""}</span>
     ${ratingSelect(`data-hood-r="${esc(name)}" aria-label="Rating for ${esc(name)}"`, r.r ?? "")}
     ${r.r || r.note ? `<input type="text" data-hood-note="${esc(name)}" value="${esc(r.note || "")}" placeholder="Note about ${esc(name)}">` : ""}
   </div>`;
 }
+// Two levels: a district (Södermalm) and its neighbourhoods. Every neighbourhood on the map is listed,
+// so you can rate one before any apartment there has been found.
 function areasPanel(list) {
-  const groups = areaGroups(list);
-  if (!Object.keys(groups).length) return "";
+  const counts = {}, tree = {};
+  for (const p of list) if (p.group) { counts[p.area] = (counts[p.area] || 0) + 1; counts[p.group] = (counts[p.group] || 0) + (p.area === p.group ? 0 : 1); }
+  if (MAP.areas) for (const f of MAP.areas.features) if (f.properties.kind === "area") (tree[f.properties.district] = tree[f.properties.district] || new Set()).add(f.properties.name);
+  for (const p of list) if (p.group) (tree[p.group] = tree[p.group] || new Set()).add(p.area || p.group);
+  if (!Object.keys(tree).length) return "";
+  const busy = (d) => [d, ...tree[d]].some((n) => (S.show.ratings[n] || {}).r || (S.show.ratings[n] || {}).note);
   return `<section class="panel">
     <h3>Areas</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">The neighbourhoods the apartments are in, from OpenStreetMap. <strong>Never here</strong> hides every apartment in that area; rate a whole district to cover all of it.</p>
-    ${Object.entries(groups).sort().map(([g, areas]) => `<div class="hood-group"><h4>${esc(g)}</h4>
-      ${areaRow(g, Object.values(areas).reduce((a, b) => a + b, 0))}
-      ${Object.entries(areas).filter(([n]) => n !== g).sort().map(([n, c]) => areaRow(n, c)).join("")}</div>`).join("")}
+    <p class="dim" style="font-size:13px;margin:0 0 4px">Rate a whole district, then any neighbourhood in it that differs; one you haven't rated takes its district's rating. <strong>Never here</strong> hides every apartment there.</p>
+    ${Object.keys(tree).sort((a, b) => a.localeCompare(b, "sv")).map((d) => {
+      const total = list.filter((p) => p.group === d).length;
+      return `<details class="hood-group" ${busy(d) ? "open" : ""}><summary><span>${esc(d)}</span><span class="dim">${total || ""}</span>${rating(d) ? `<span class="chip ${rating(d) === "never" ? "bad" : +rating(d) >= 4 ? "good" : +rating(d) <= 2 ? "warn" : ""}">${ratingLabel(rating(d))}</span>` : ""}</summary>
+        ${areaRow(d, total, `All of ${d}`)}
+        ${[...tree[d]].filter((n) => n !== d).sort((a, b) => a.localeCompare(b, "sv")).map((n) => areaRow(n, list.filter((p) => p.area === n).length, n, d)).join("")}
+      </details>`;
+    }).join("")}
   </section>`;
 }
 function myAreasPanel() {
@@ -1704,7 +1720,29 @@ function showCard(p, s, a, cr) {
 /* ---------- The map: apartments as dots, each area drawn around its apartments in its rating's colour ---------- */
 const MAP = { map: null, el: null, layer: null, sig: "", fitted: false, areas: null };
 // Districts' official outlines and the neighbourhoods inside them (areas.geojson, built from OpenStreetMap)
-fetch("/areas.geojson").then((r) => (r.ok ? r.json() : null)).then((g) => { MAP.areas = g; MAP.sig = ""; drawMap(); }).catch(() => {});
+fetch("/areas.geojson").then((r) => (r.ok ? r.json() : null)).then((g) => { MAP.areas = g; MAP.sig = ""; placeAll(); refresh(); }).catch(() => {});
+function inRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function inGeometry(x, y, g) {
+  const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+  return polys.some(([outer, ...holes]) => inRing(x, y, outer) && !holes.some((h) => inRing(x, y, h)));
+}
+// The map and the cards use the same names: each apartment is named by the neighbourhood it lies in
+function placeAll() {
+  if (!MAP.areas) return;
+  const hoods = MAP.areas.features.filter((f) => f.properties.kind === "area");
+  for (const p of Object.values(LIST.items)) {
+    if (!p.lat || p.outside) continue;
+    const f = hoods.find((h) => inGeometry(p.lon, p.lat, h.geometry));
+    if (f) { p.area = f.properties.name; p.group = f.properties.district; }
+  }
+}
 function ratingColour(r) {
   const c = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   return r === "never" ? c("--negative") : r === "" ? c("--muted") : +r >= 4 ? c("--positive") : +r === 3 ? c("--data") : c("--warning");
@@ -1770,7 +1808,7 @@ function mapPanel() {
   const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Never here"], ["", "Not rated"]];
   return `<section class="panel map-panel">
     <div id="map" role="img" aria-label="Map of the apartments and your rated areas"></div>
-    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Districts follow Stockholm's official borders. Neighbourhoods have none, so each covers the part of its district nearest its name on OpenStreetMap.</span></div>
+    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Districts follow Stockholm's official borders, shore included. Neighbourhoods have no official borders, so each covers the part of its district nearest its centre (Nytorget for SoFo, the square for Mariatorget). A neighbourhood you haven't rated takes its district's rating.</span></div>
   </section>`;
 }
 // Gallery photos and descriptions are built when you open them, not for every card up front

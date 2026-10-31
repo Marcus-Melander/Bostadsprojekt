@@ -15,13 +15,14 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 - **Collect price history for predictions.** Save as much as we can about every apartment the finder reads: its details, its agent and area, and each day's asking price, state, highest bid, number of bids and final price. The data goes into a SQLite database (`data/history.sqlite`), with CSV exports after every run (`data/apartments.csv`, `data/readings.csv`). Apartments that leave an agent's list are followed for up to 30 days, to catch the final price. This is the base for predicting final prices: how each agent prices compared with what apartments sell for, and how much prices rise in each area.
 
 
+
 ## Next
 
+- **Erik Olsson's endless list:** one run found 111 apartments, the next 81, so scrolling doesn't always load the whole list. Scroll more patiently, or read each district's list in smaller parts.
 - **Predict the final price.** Once there's enough history: for each agent and area, how far final prices land above asking and how many bids it usually takes. That gives a guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
-- **Cover Erik Olsson.** Their list covers all of Sweden in one endlessly scrolling page and needs a way to filter to Stockholm.
 - **More agents,** such as Fastighetsbyrån, SkandiaMäklarna, LF, Living and Svensk Fastighetsförmedling, until the answer key matches.
 - **Commute, grocery store and gym.**
   - Distance to the nearest grocery store and gym from OpenStreetMap.
@@ -30,6 +31,9 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 ## Done
 
+- **More and better neighbourhoods, rated at two levels.** 56 neighbourhoods across seven districts, including SoFo (centred on Nytorget), Mariatorget, Mariaberget, Högalid, Tanto, Katarina, Sofia and Slussen on Södermalm, and Fridhemsplan, Rålambshov, Thorildsplan and Kungsholms strand on Kungsholmen. Districts follow the shore, with 11 bays and channels cut out. Each apartment is named by the neighbourhood it lies in. You rate a district and any neighbourhood in it; an unrated neighbourhood takes its district's rating.
+- **Erik Olsson:** read through its own area search, one page per inner-city district (`/homes?areaIds=467` Södermalm, `667` Kungsholmen, `387` Vasastan, `528` Östermalm, `898` Norrmalm/City, `1961` Gamla stan, `668` Gärdet), scrolling until each list ends. About 111 apartments.
+- **More of Notar's list:** the finder reads Notar's 25 newest apartments plus the 12 newest from each of its six inner-city offices, about 48 inner-city apartments instead of 5. Notar has no complete list per office, so a few older ones may still be missing.
 - **Real area boundaries on the map.** The 15 inner-city districts are drawn with Stockholm's official borders, from OpenStreetMap (`areas.geojson`, built by `scripts/build_areas.py`). Neighbourhoods have no official borders, so each covers the part of its district within about 500 m of its point and nearer to it than to any other; the rest keeps the district's name. Each area is coloured by your rating.
 - **A faster planner.** Galleries and descriptions are built only when opened, Showings draws 30 apartments at a time with "Show more", typing redraws once you pause, nothing is redrawn when nothing changed, and a running finder reloads the list every 30 seconds instead of every 5.
 - **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.

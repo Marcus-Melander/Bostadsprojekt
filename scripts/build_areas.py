@@ -1,15 +1,17 @@
 """Builds areas.geojson: the inner city's districts and neighbourhoods, for the planner's map.
 
-Districts (stadsdelar such as Södermalm, Vasastaden, Kungsholmen) are Stockholm's official
-boundaries, as mapped in OpenStreetMap. Neighbourhoods (Skanstull, Sibirien, Hornstull…)
-have no official borders: OpenStreetMap marks each with a point. So each neighbourhood is
-drawn as the part of its district within about 500 m of its point, nearer to it than to any
-other neighbourhood; the rest of a district keeps the district's name. That is roughly how
-Nominatim names an address's neighbourhood, so the drawn areas agree with the names on the
-apartments (a central Södermalm address is just "Södermalm").
+Two levels:
+  district       Södermalm, Kungsholmen, Vasastan, Östermalm, Norrmalm, Gamla stan, Gärdet.
+                 Their outlines are Stockholm's official stadsdel boundaries from OpenStreetMap,
+                 with the water cut out, so they follow the shore.
+  neighbourhood  SoFo, Mariatorget, Hornstull, Fridhemsplan, Sibirien… These have no official
+                 borders. Each is given a centre at a place that defines it (Nytorget for SoFo,
+                 the square for Mariatorget), looked up on OpenStreetMap, and each district is
+                 split between its centres: every spot belongs to the nearest one.
 
-Run it again only when the list of areas should change; it asks Nominatim about 60 questions,
-one a second.
+The finder names each apartment by the neighbourhood it lies in, so the map and the cards agree.
+Run it again when the list of neighbourhoods changes; it asks Nominatim about 90 questions, one
+a second.
 
     .venv/bin/python scripts/build_areas.py
 """
@@ -19,30 +21,61 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from shapely.geometry import MultiPoint, Point, mapping, shape
 from shapely import affinity
+from shapely.geometry import MultiPoint, Point, mapping, shape
 from shapely.ops import unary_union, voronoi_diagram
 
 ROOT = Path(__file__).resolve().parent.parent
 UA = {"User-Agent": "Bostadsplan/1.0 (personal apartment planner)"}
+BOX = (17.97, 59.30, 18.13, 59.36)  # lon/lat box around the inner city; anything found outside it is wrong
 
-# Stockholm's districts inside the tolls, and the plain name each is grouped under in the planner
+# District -> the official stadsdelar it is made of
 DISTRICTS = {
-    "Södermalm": "Södermalm", "Långholmen": "Södermalm", "Reimersholme": "Södermalm",
-    "Gamla stan": "Gamla stan", "Riddarholmen": "Gamla stan",
-    "Kungsholmen": "Kungsholmen", "Marieberg": "Kungsholmen", "Fredhäll": "Kungsholmen",
-    "Stadshagen": "Kungsholmen", "Kristineberg": "Kungsholmen",
-    "Vasastaden": "Vasastan", "Norrmalm": "Norrmalm", "Skeppsholmen": "Norrmalm",
-    "Östermalm": "Östermalm", "Ladugårdsgärdet": "Gärdet",
+    "Södermalm": ["Södermalm", "Långholmen", "Reimersholme"],
+    "Gamla stan": ["Gamla stan", "Riddarholmen"],
+    "Kungsholmen": ["Kungsholmen", "Marieberg", "Fredhäll", "Stadshagen", "Kristineberg"],
+    "Vasastan": ["Vasastaden"],
+    "Norrmalm": ["Norrmalm", "Skeppsholmen"],
+    "Östermalm": ["Östermalm"],
+    "Gärdet": ["Ladugårdsgärdet"],
 }
-# Neighbourhood names to place, beyond those the finder has already met
-EXTRA_NEIGHBOURHOODS = [
-    "SoFo", "Mariatorget", "Mariaberget", "Högalid", "Tanto", "Slussen", "Medborgarplatsen", "Skanstull",
-    "Zinkensdamm", "Hornstull", "Danvikstull", "Bergsund", "Sibirien", "Birkastaden", "Röda bergen", "Rörstrand",
-    "Atlasområdet", "Sabbatsberg", "Hagastaden", "Torsplan", "Odenplan", "Lärkstaden", "Villastaden", "Eriksberg",
-    "Gärdeshöjden", "Hornsberg", "Rålambshov", "Fridhemsplan",
-]
-REACH_M = 500   # how far a neighbourhood reaches from its point
+# District -> its neighbourhoods, as (name, the place on OpenStreetMap that marks its centre)
+NEIGHBOURHOODS = {
+    "Södermalm": [
+        ("Hornstull", "Hornstull"), ("Högalid", "Högalidskyrkan"), ("Zinkensdamm", "Zinkensdamm"),
+        ("Tanto", "Tantolunden"), ("Mariatorget", "Mariatorget"), ("Mariaberget", "Mariaberget"),
+        ("Slussen", "Slussen"), ("Medborgarplatsen", "Medborgarplatsen"), ("Katarina", "Katarina kyrka"),
+        ("SoFo", "Nytorget"), ("Sofia", "Sofia kyrka"), ("Skanstull", "Skanstull"), ("Danvikstull", "Danvikstull"),
+        ("Bergsund", "Bergsunds strand"), ("Långholmen", "Långholmen"), ("Reimersholme", "Reimersholme"),
+    ],
+    "Kungsholmen": [
+        ("Fridhemsplan", "Fridhemsplan"), ("Rålambshov", "Rålambshovsparken"), ("Thorildsplan", "Thorildsplan"),
+        ("Kungsholms strand", "Kungsholms strand"), ("Kungsholmstorg", "Kungsholmstorg"), ("Rådhuset", "Rådhusets tunnelbanestation"),
+        ("Stadshagen", "Stadshagen"), ("Hornsberg", "Hornsberg"), ("Kristineberg", "Kristineberg"),
+        ("Fredhäll", "Fredhäll"), ("Marieberg", "Marieberg"),
+    ],
+    "Vasastan": [
+        ("Odenplan", "Odenplan"), ("Sibirien", "Sibirien"), ("Birkastan", "Birkastaden"), ("Röda bergen", "Röda bergen"),
+        ("Rörstrand", "Rörstrand"), ("Atlasområdet", "Atlasområdet"), ("Sabbatsberg", "Sabbatsberg"),
+        ("Hagastaden", "Hagastaden"), ("Torsplan", "Torsplan"), ("Vasaparken", "Vasaparken"),
+        ("Observatorielunden", "Observatorielunden"), ("Tegnérlunden", "Tegnérlunden"),
+    ],
+    "Östermalm": [
+        ("Stureplan", "Stureplan"), ("Östermalmstorg", "Östermalmstorg"), ("Karlaplan", "Karlaplan"),
+        ("Lärkstaden", "Lärkstaden"), ("Villastaden", "Villastaden"), ("Eriksberg", "Eriksberg"),
+        ("Strandvägen", "Strandvägen"), ("Diplomatstaden", "Diplomatstaden"),
+    ],
+    "Norrmalm": [
+        ("Hötorget", "Hötorget"), ("Klara", "Klara kyrka"), ("Norrmalmstorg", "Norrmalmstorg"),
+        ("Kungsträdgården", "Kungsträdgården"), ("Skeppsholmen", "Skeppsholmen"),
+    ],
+    "Gamla stan": [("Gamla stan", "Stortorget"), ("Riddarholmen", "Riddarholmen")],
+    "Gärdet": [("Gärdeshöjden", "Gärdeshöjden"), ("Tessinparken", "Tessinparken"), ("Ladugårdsgärdet", "Ladugårdsgärdet")],
+}
+# Bays, lakes and channels to cut out, so areas follow the shore
+WATER = ["Riddarfjärden", "Strömmen", "Saltsjön", "Årstaviken", "Hammarby sjö", "Barnhusviken", "Klara sjö",
+         "Karlbergssjön", "Ulvsundasjön", "Mälaren", "Nybroviken", "Ladugårdslandsviken", "Djurgårdsbrunnsviken",
+         "Brunnsviken", "Långholmskanalen", "Pålsundet", "Fiskarhamnen", "Lilla Värtan"]
 last = 0.0
 
 
@@ -51,78 +84,90 @@ def nominatim(q, **extra):
     time.sleep(max(0, 1.1 - (time.time() - last)))
     params = {"q": f"{q}, Stockholm", "format": "jsonv2", "limit": 5, "countrycodes": "se", **extra}
     url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=40) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60) as r:
         last = time.time()
         return json.load(r)
 
 
-def district(name):
+def in_box(lon, lat):
+    return BOX[0] <= lon <= BOX[2] and BOX[1] <= lat <= BOX[3]
+
+
+def stadsdel(name):
     for h in nominatim(name, polygon_geojson=1):
         if h["category"] == "boundary" and h["type"] == "administrative" and h["geojson"]["type"] in ("Polygon", "MultiPolygon"):
-            return shape(h["geojson"])
+            return shape(h["geojson"]).buffer(0)
     return None
 
 
-def neighbourhood(name):
-    for h in nominatim(name):
-        if h["category"] == "place" and h["type"] in ("neighbourhood", "quarter"):
-            return Point(float(h["lon"]), float(h["lat"]))
+def centre(query):
+    """The place's point: OpenStreetMap's own neighbourhood point when there is one (the search
+    often lists a station or street of the same name first), otherwise the first hit."""
+    hits = [h for h in nominatim(query) if in_box(float(h["lon"]), float(h["lat"]))]
+    hits.sort(key=lambda h: h["category"] != "place")
+    return Point(float(hits[0]["lon"]), float(hits[0]["lat"])) if hits else None
+
+
+# Nearest is measured in metres: a degree east-west is about half as long as one north-south here
+EAST = 0.511  # cos(59.33°)
+
+
+def metric(g):
+    return affinity.scale(g, xfact=EAST, yfact=1, origin=(0, 0))
+
+
+def degrees(g):
+    return affinity.scale(g, xfact=1 / EAST, yfact=1, origin=(0, 0))
+
+
+def water(name):
+    for h in nominatim(name, polygon_geojson=1, polygon_threshold=0.00005):
+        if h["geojson"]["type"] in ("Polygon", "MultiPolygon") and h["category"] in ("natural", "water", "waterway", "place"):
+            g = shape(h["geojson"]).buffer(0)
+            if g.intersects(Point((BOX[0] + BOX[2]) / 2, (BOX[1] + BOX[3]) / 2).buffer(0.1)):
+                return g
     return None
 
 
 def main():
-    districts = {}
-    for name, group in DISTRICTS.items():
-        poly = district(name)
-        if poly is None:
-            print(f"No boundary for {name}")
-            continue
-        districts[name] = (poly.buffer(0), group)
-        print(f"District {name}: {poly.geom_type}")
-    seen = set()
-    try:
-        cache = json.loads((ROOT / "data" / "geocode.json").read_text("utf-8"))
-        seen = {v["area"] for v in cache.values() if v and v.get("inner") and v.get("area")}
-    except (OSError, ValueError):
-        pass
-    points = {}
-    for name in sorted((seen | set(EXTRA_NEIGHBOURHOODS)) - set(DISTRICTS)):
-        pt = neighbourhood(name)
-        if pt is not None:
-            points[name] = pt
-    print(f"{len(points)} neighbourhood points")
-
+    wet = [w for n in WATER if (w := water(n)) is not None]
+    sea = unary_union(wet) if wet else None
+    print(f"{len(wet)} bodies of water to cut out")
     features = []
-    for dname, (poly, group) in districts.items():
-        inside = {n: p for n, p in points.items() if poly.contains(p)}
-        cells = {}
-        if inside:
-            if len(inside) == 1:
-                regions = {next(iter(inside)): poly}
+    for district, parts in DISTRICTS.items():
+        polys = [p for n in parts if (p := stadsdel(n)) is not None]
+        if not polys:
+            print(f"No boundary for {district}")
+            continue
+        land = unary_union(polys)
+        if sea is not None:
+            land = land.difference(sea).buffer(0)
+        land = unary_union([g for g in getattr(land, "geoms", [land]) if g.area > 2e-7])  # drop slivers of shore
+        pts = {}
+        for name, query in NEIGHBOURHOODS.get(district, []):
+            pt = centre(query)
+            if pt is None:
+                print(f"  {district}: no place found for {name} ({query})")
+            elif land.buffer(0.002).contains(pt):
+                pts[name] = pt
             else:
-                diagram = voronoi_diagram(MultiPoint(list(inside.values())), envelope=poly.envelope.buffer(0.02))
-                regions = {n: c for c in diagram.geoms for n, p in inside.items() if c.contains(p)}
-            for n, region in regions.items():
-                cells[n] = region.intersection(reach(inside[n])).intersection(poly)
-        rest = poly.difference(unary_union(list(cells.values()))) if cells else poly
-        if rest.area > poly.area * 0.02:  # the part no neighbourhood reaches keeps the district's name
-            cells[dname] = unary_union([rest, cells.get(dname, rest)])
-        for n, geom in cells.items():
-            geom = geom.simplify(0.00006, preserve_topology=True)
-            features.append({"type": "Feature", "properties": {"kind": "area", "name": n, "district": dname, "group": group},
-                             "geometry": round_coords(mapping(geom))})
-        outline = poly.simplify(0.00006, preserve_topology=True)
-        features.append({"type": "Feature", "properties": {"kind": "district", "name": dname, "group": group},
-                         "geometry": round_coords(mapping(outline))})
-    out = {"type": "FeatureCollection", "attribution": "Boundaries © OpenStreetMap contributors (ODbL)", "features": features}
+                print(f"  {district}: {name} lies outside the district, left out")
+        if len(pts) < 2:
+            cells = {(next(iter(pts)) if pts else district): land}
+        else:
+            diagram = voronoi_diagram(MultiPoint([metric(p) for p in pts.values()]), envelope=metric(land.envelope.buffer(0.02)))
+            cells = {n: degrees(c).intersection(land) for c in diagram.geoms for n, p in pts.items() if c.contains(metric(p))}
+        for name, geom in cells.items():
+            if geom.is_empty:
+                continue
+            features.append({"type": "Feature", "properties": {"kind": "area", "name": name, "district": district, "group": district},
+                             "geometry": round_coords(mapping(geom.simplify(0.00004, preserve_topology=True)))})
+        features.append({"type": "Feature", "properties": {"kind": "district", "name": district, "group": district},
+                         "geometry": round_coords(mapping(land.simplify(0.00004, preserve_topology=True)))})
+        print(f"{district}: {len(cells)} neighbourhoods")
+    out = {"type": "FeatureCollection", "attribution": "Boundaries and places © OpenStreetMap contributors (ODbL)", "features": features}
     (ROOT / "areas.geojson").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), "utf-8")
-    print(f"Wrote areas.geojson: {len(districts)} districts, {sum(f['properties']['kind'] == 'area' for f in features)} areas")
-
-
-def reach(pt):
-    """A circle of REACH_M metres around a point, stretched for Stockholm's latitude."""
-    r = REACH_M / 111320
-    return affinity.scale(pt.buffer(r, 32), xfact=1 / 0.511, yfact=1, origin=pt)  # cos(59.33°) ≈ 0.511
+    print(f"Wrote areas.geojson: {sum(f['properties']['kind'] == 'area' for f in features)} neighbourhoods")
 
 
 def round_coords(g):

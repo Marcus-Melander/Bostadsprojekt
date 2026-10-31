@@ -23,8 +23,16 @@ SITEMAP_DAYS = 30   # sitemap entries changed in the last month; older ones are 
 # obj: what a link to one apartment looks like on that site. clicks: how many times to press
 # "show more" at most. anywhere: the cards don't name the area, so OpenStreetMap decides.
 AGENTS = [
+    # Erik Olsson lists all of Sweden; its search narrows to an area by id, one page per inner-city district
+    {"name": "Erik Olsson", "lists": [f"https://www.erikolsson.se/homes?areaIds={i}" for i in (467, 667, 387, 528, 898, 1961, 668)],
+     "obj": r"erikolsson\.se/homes/[^/?#]+-\d+$"},
     {"name": "Alicia Edelman", "lists": ["https://aliciaedelman.se/till-salu"], "obj": r"/bostad/"},
-    {"name": "Notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"], "obj": r"/kopa-bostad/objekt/"},
+    # Notar's national list shows only its 25 newest (it pages inside the page), and each inner-city office
+    # page shows its 12 newest; together they cover most of Notar's inner-city apartments, not all
+    {"name": "Notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"] +
+                               [f"https://www.notar.se/maklare-och-kontor/kontor/{o}" for o in
+                                ("gamlastan-hornstull", "sodermalm-katarina", "kungsholmen", "vasastan", "ostermalm", "gardet")],
+     "obj": r"/kopa-bostad/objekt/", "anywhere": True},
     {"name": "BOSTHLM", "lists": ["https://www.bosthlm.se/till-salu"], "obj": r"bosthlm\.se/\d+/"},
     {"name": "Historiska Hem", "lists": ["https://historiskahem.se/till-salu/"], "obj": r"/object/tillsalu-"},
     {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/"},
@@ -123,6 +131,16 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30):
     numbered page links ("?page=2") for lists split into pages."""
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(2500)
+    # Lists that grow as you scroll: keep scrolling until no new apartments appear
+    seen, still = -1, 0
+    for _ in range(40):
+        n = page.eval_on_selector_all("a[href]", f"els => els.filter(a => new RegExp({json.dumps(obj_rx)}).test(a.href)).length")
+        still = still + 1 if n == seen else 0
+        if still >= 2:
+            break
+        seen = n
+        page.mouse.wheel(0, 8000)
+        page.wait_for_timeout(900)
     for _ in range(clicks):
         for _ in range(3):
             page.mouse.wheel(0, 5000)

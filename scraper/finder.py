@@ -38,6 +38,7 @@ from history import History
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("BOSTADSPLAN_DATA", ROOT / "data"))  # another folder for test runs
+AREAS = geo.Areas(ROOT / "areas.geojson")
 PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
 AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
@@ -172,6 +173,7 @@ def read_listing(page, url, card, now, places):
     if not place or not place["inner"]:
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
+    AREAS.rename(d)
     if d["state"] == "sold":
         d["shows"] = []
     d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
@@ -357,6 +359,8 @@ def find(args):
     if "items" not in store or any(k.startswith(("annons/", "bostad/")) for k in store.get("items", {})):
         store = {"items": {}}  # listings saved by the old Booli scraper are replaced
     items = store["items"]
+    for p in items.values():  # neighbourhoods may have been redrawn since the last run
+        AREAS.rename(p)
     started, now = stamp(), dt.datetime.now()
     status("running", "Starting", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")

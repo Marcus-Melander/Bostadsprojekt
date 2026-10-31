@@ -82,3 +82,34 @@ def group_name(district, suburb):
         return "Kungsholmen"
     names = {"Vasastaden": "Vasastan", "Norrmalm": "Norrmalm", "Östermalm": "Östermalm", "Ladugårdsgärdet": "Gärdet"}
     return names.get(suburb, suburb or district.replace(" stadsdelsområde", ""))
+
+
+class Areas:
+    """The neighbourhoods in areas.geojson (scripts/build_areas.py). An apartment is named by
+    the one it lies in, so the finder, the history and the planner's map use the same names."""
+
+    def __init__(self, path):
+        self.shapes = []
+        try:
+            from shapely.geometry import Point, shape
+            self.Point = Point
+            data = json.loads(Path(path).read_text("utf-8"))
+            self.shapes = [(shape(f["geometry"]), f["properties"]) for f in data["features"] if f["properties"]["kind"] == "area"]
+        except Exception:  # no areas file, or Shapely missing: keep Nominatim's names
+            pass
+
+    def locate(self, lat, lon):
+        """(neighbourhood, district) for a point, or None outside every neighbourhood."""
+        if not self.shapes:
+            return None
+        pt = self.Point(lon, lat)
+        for geom, props in self.shapes:
+            if geom.contains(pt):
+                return props["name"], props["district"]
+        return None
+
+    def rename(self, p):
+        """Name one apartment by the neighbourhood it lies in."""
+        if p.get("lat") and not p.get("outside") and (hit := self.locate(p["lat"], p["lon"])):
+            p["area"], p["group"] = hit
+
