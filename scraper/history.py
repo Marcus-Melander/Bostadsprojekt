@@ -34,7 +34,7 @@ APT_COLS = ["url", "agent", "addr", "area", "district", "lat", "lon", "rooms", "
 class History:
     def __init__(self, data_dir):
         self.dir = Path(data_dir)
-        self.db = sqlite3.connect(self.dir / "history.sqlite")
+        self.db = sqlite3.connect(self.dir / "history.sqlite", check_same_thread=False)  # the finder writes under its own lock
         self.db.executescript(SCHEMA)
 
     def record(self, p, at, on_list=True):

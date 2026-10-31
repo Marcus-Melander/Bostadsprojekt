@@ -6,6 +6,7 @@ are spaced out and every answer is kept in data/geocode.json; an address is look
 import json
 import os
 import re
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -28,6 +29,7 @@ class Geocoder:
         except (OSError, ValueError):
             self.cache = {}
         self.last = 0.0
+        self.lock = threading.Lock()  # one lookup at a time across every agent being read
 
     def _save(self):
         tmp = self.path.with_suffix(".tmp")
@@ -36,6 +38,10 @@ class Geocoder:
 
     def lookup(self, address):
         """{lat, lon, area, group, district, inner} for a street address in Stockholm, or None."""
+        with self.lock:
+            return self._lookup(address)
+
+    def _lookup(self, address):
         key = re.sub(r"\s+", " ", address.strip().lower())
         if key in self.cache:
             return self.cache[key]

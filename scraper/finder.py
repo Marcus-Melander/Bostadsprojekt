@@ -23,7 +23,9 @@ import os
 import random
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -35,9 +37,10 @@ import geo
 from history import History
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
+DATA = Path(os.environ.get("BOSTADSPLAN_DATA", ROOT / "data"))  # another folder for test runs
 PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
+AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
 BLOCKED = re.compile(r"captcha|verify you are human|är du en människa|access denied|unusual traffic", re.I)
 DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
@@ -245,6 +248,83 @@ def follow(page, store, saved, robots, hist):
         time.sleep(random.uniform(*PAUSE_S))
 
 
+def launch(pw, show):
+    try:  # your installed Google Chrome; Playwright's own Chromium as a fallback
+        return pw.chromium.launch(channel="chrome", headless=not show)
+    except PlaywrightError:
+        return pw.chromium.launch(headless=not show)
+
+
+def progress(sh, agent=None, text=None):
+    """One status line for all agents being read at once."""
+    with sh["lock"]:
+        if agent:
+            if text is None:
+                sh["busy"].pop(agent, None)
+            else:
+                sh["busy"][agent] = text
+        now = ", ".join(f"{a} {t}" for a, t in sh["busy"].items())
+        status("running", f"Reading estate agents, {sh['done']} of {sh['total']} done" + (f". Now: {now}" if now else ""), started=sh["started"])
+
+
+def read_agent(ag, sh):
+    """One agent's list and apartments, in a browser of its own. Shared data is changed under the lock."""
+    items, f, now, robots = sh["items"], sh["f"], sh["now"], sh["robots"]
+    try:
+        with sync_playwright() as pw:
+            browser = launch(pw, sh["show"])
+            page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
+            progress(sh, ag["name"], "(list)")
+            cards = agents.discover(ag, page, robots, DATA / "cache", log)
+            want = {u: t for u, t in cards.items() if agents.looks_inner(u, t)
+                    and not ((c := agents.parse_card(t)).get("price") and f.get("maxPrice") and c["price"] > f["maxPrice"] * 1.15)}
+            read = kept = 0
+            for n, (url, card) in enumerate(want.items(), 1):
+                with sh["lock"]:
+                    old = items.get(url)
+                    if old and old.get("read") and now - dt.datetime.fromisoformat(old["read"]) < READ_EVERY:
+                        old["seen"] = stamp()
+                        kept += not old.get("outside")
+                        continue
+                if not robots.allowed(url):
+                    continue
+                progress(sh, ag["name"], f"{n}/{len(want)}")
+                p, refused = read_listing(page, url, card, now, sh["places"])
+                if refused:
+                    log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
+                    with sh["lock"]:
+                        sh["notes"].append(f"{ag['name']} refused a page, so some of its apartments may be missing.")
+                    break
+                read += 1
+                with sh["lock"]:
+                    if p:
+                        p.update(agent=ag["name"], seen=stamp())
+                        items[url] = p
+                        kept += not p.get("outside")
+                        if not p.get("outside"):
+                            sh["hist"].record(p, stamp())
+                    write_json(DATA / "listings.json", sh["store"])
+                time.sleep(random.uniform(*PAUSE_S))
+            browser.close()
+    except Exception as e:  # one agent failing doesn't stop the others
+        log(f"{ag['name']}: stopped early ({e!r})")
+        with sh["lock"]:
+            sh["notes"].append(f"Reading {ag['name']} stopped early; see data/scraper.log.")
+        cards, want, read, kept = {}, {}, 0, 0
+    with sh["lock"]:
+        sh["report"][ag["name"]] = {"listed": len(cards), "candidates": len(want), "read": read, "inner": kept}
+        # Apartments that left an agent's list are usually sold: keep checking them for the final price
+        if cards:
+            for url in [u for u, p in items.items() if p.get("agent") == ag["name"] and u not in cards
+                        and u not in sh["visits"] and u not in sh["saved"]]:
+                p = items.pop(url)
+                if not p.get("outside"):
+                    sh["store"].setdefault("left", {})[url] = {**p, "left": stamp()}
+        sh["done"] += 1
+    log(f"{ag['name']}: {len(cards)} on the list, {len(want)} inner-city candidates, read {read}, {kept} in the inner city")
+    progress(sh, ag["name"], None)
+
+
 def run(args):
     DATA.mkdir(exist_ok=True)
     lock = DATA / ".scrape.lock"
@@ -281,50 +361,15 @@ def find(args):
     places, robots, hist = geo.Geocoder(DATA, log), agents.Robots(), History(DATA)
     chosen = [a for a in agents.AGENTS if not args.agents or a["name"] in args.agents]
     report, notes = {}, []
+    shared = {"items": items, "store": store, "f": f, "now": now, "visits": visits, "saved": saved, "places": places,
+              "robots": robots, "hist": hist, "report": report, "notes": notes, "started": started, "show": args.show,
+              "lock": threading.Lock(), "busy": {}, "done": 0, "total": len(chosen)}
     try:
+        with ThreadPoolExecutor(max_workers=AT_ONCE) as pool:
+            list(pool.map(lambda ag: read_agent(ag, shared), chosen))
         with sync_playwright() as pw:
-            try:  # your installed Google Chrome; Playwright's own Chromium as a fallback
-                browser = pw.chromium.launch(channel="chrome", headless=not args.show)
-            except PlaywrightError:
-                browser = pw.chromium.launch(headless=not args.show)
+            browser = launch(pw, args.show)
             page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
-            for i, ag in enumerate(chosen, 1):
-                status("running", f"Reading {ag['name']}'s list ({i} of {len(chosen)})", started=started)
-                cards = agents.discover(ag, page, robots, DATA / "cache", log)
-                want = {u: t for u, t in cards.items() if agents.looks_inner(u, t)
-                        and not ((c := agents.parse_card(t)).get("price") and f.get("maxPrice") and c["price"] > f["maxPrice"] * 1.15)}
-                read = kept = 0
-                for n, (url, card) in enumerate(want.items(), 1):
-                    old = items.get(url)
-                    if old and old.get("read") and now - dt.datetime.fromisoformat(old["read"]) < READ_EVERY:
-                        old["seen"] = stamp()
-                        kept += not old.get("outside")
-                        continue
-                    if not robots.allowed(url):
-                        continue
-                    status("running", f"Reading {ag['name']}, apartment {n} of {len(want)}", started=started)
-                    p, refused = read_listing(page, url, card, now, places)
-                    if refused:
-                        log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
-                        notes.append(f"{ag['name']} refused a page, so some of its apartments may be missing.")
-                        break
-                    read += 1
-                    if p:
-                        p.update(agent=ag["name"], seen=stamp())
-                        items[url] = p
-                        kept += not p.get("outside")
-                        if not p.get("outside"):
-                            hist.record(p, stamp())
-                    write_json(DATA / "listings.json", store)
-                    time.sleep(random.uniform(*PAUSE_S))
-                report[ag["name"]] = {"listed": len(cards), "candidates": len(want), "read": read, "inner": kept}
-                log(f"{ag['name']}: {len(cards)} on the list, {len(want)} inner-city candidates, read {read}, {kept} in the inner city")
-                # Apartments that left an agent's list are usually sold: keep checking them for the final price
-                if cards:
-                    for url in [u for u, p in items.items() if p.get("agent") == ag["name"] and u not in cards and u not in visits and u not in saved]:
-                        p = items.pop(url)
-                        if not p.get("outside"):
-                            store.setdefault("left", {})[url] = {**p, "left": stamp()}
             if saved:
                 status("running", f"Following {len(saved)} saved apartment{'s' if len(saved) > 1 else ''}", started=started)
                 follow(page, store, saved, robots, hist)
