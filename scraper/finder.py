@@ -45,7 +45,9 @@ AT_ONCE = 4                        # agents read side by side; each site still g
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
 BLOCKED = re.compile(r"captcha|verify you are human|är du en människa|access denied|unusual traffic", re.I)
 DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
-BOOLI_INNERSTAN = "143"            # Booli's area "Stockholms innerstad", used only for the count
+# Booli's own area, used only to read its count for the same filter. Only the whole inner city:
+# Booli answers one search a session and refuses the next, so district counts aren't possible.
+BOOLI_AREAS = {"Stockholms innerstad": "143"}
 
 
 # ---------- Files ----------
@@ -103,10 +105,8 @@ def fits(p, f):
 
 # ---------- The answer key ----------
 
-def booli_count(pw, f):
-    """How many apartments Booli shows in Stockholms innerstad for the same filter: one page,
-    in a Chrome window of its own, since Booli refuses Chrome without one."""
-    q = {"areaIds": BOOLI_INNERSTAN, "objectType": "Lägenhet"}
+def booli_query(f, area_id):
+    q = {"areaIds": area_id, "objectType": "Lägenhet"}
     if f.get("maxPrice"):
         q["maxListPrice"] = f["maxPrice"]
     if f.get("minRooms"):
@@ -117,28 +117,65 @@ def booli_count(pw, f):
         q["maxRent"] = f["maxAvgift"]
     if f.get("notGround"):
         q["floor"] = "aboveBottomFloor"
-    url = "https://www.booli.se/sok/till-salu?" + urlencode(q)
+    return "https://www.booli.se/sok/till-salu?" + urlencode(q)
+
+
+def booli_count(pw, f):
+    """How many apartments Booli shows for the same filter in Stockholms innerstad: one search page,
+    in a Chrome window of its own (Booli refuses Chrome without one). If Booli refuses it, there's
+    no count that day."""
+    out = {"districts": {}, "at": stamp()}
     try:
         try:
             browser = pw.chromium.launch(channel="chrome", headless=False)
         except PlaywrightError:
             browser = pw.chromium.launch(headless=False)
         page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
-        resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
-        page.wait_for_timeout(4000)
-        text = page.inner_text("body")
+        for i, (name, area_id) in enumerate(BOOLI_AREAS.items()):
+            if i:
+                time.sleep(random.uniform(20, 40))
+            resp = page.goto(booli_query(f, area_id), wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(4000)
+            text = page.inner_text("body").replace("\u00a0", " ")
+            if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
+                log(f"Booli's count: Booli refused the page for {name} ({resp.status if resp else '?'}); no more counts today")
+                break
+            m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text)
+            if not m:
+                log(f"Booli's count: no count shown for {name}")
+                continue
+            c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
+            if name == "Stockholms innerstad":
+                out.update(c)
+            else:
+                out["districts"][name] = c
         browser.close()
     except PlaywrightError as e:
-        log(f"Booli's count: couldn't load the page ({e})")
-        return None
-    if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
-        log(f"Booli's count: Booli refused the page ({resp.status if resp else '?'}), so there is no count today")
-        return None
-    m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text.replace(" ", " "))
-    if not m:
-        log("Booli's count: the page didn't show a count")
-        return None
-    return {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0), "at": stamp()}
+        log(f"Booli's count: couldn't load a page ({e})")
+    return out if "forSale" in out or out["districts"] else None
+
+
+def counted(items, f):
+    """The apartments to compare with Booli, counted the way Booli counts: each once (two agents
+    can list the same one); one without an asking price as coming soon, as Booli shows those;
+    and one for sale only when its page states what the filter checks, since Booli can't filter
+    on what's missing."""
+    seen, out = set(), []
+    for p in items.values():
+        if p.get("outside") or not fits(p, f):
+            continue
+        if not p.get("price"):
+            p = {**p, "soon": True}
+        if not p.get("soon"):
+            needs = [("rooms", f.get("minRooms")), ("kvm", f.get("minArea")), ("floor", f.get("notGround")), ("avgift", f.get("maxAvgift"))]
+            if any(on and p.get(k) in (None, "") for k, on in needs):
+                continue
+        key = (re.sub(r"[^a-z0-9]+", "", agents.ascii_lower(p.get("addr", ""))), round(p.get("kvm") or 0))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
 
 
 # ---------- Reading the agents ----------
@@ -392,9 +429,13 @@ def find(args):
     cutoff = (now - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
     for p in items.values():  # past showings drop off
         p["shows"] = [s for s in p.get("shows", []) if s["start"] >= cutoff]
-    found = [p for p in items.values() if not p.get("outside") and fits(p, f)]
+    found = counted(items, f)
+    by = {}
+    for p in found:
+        d = by.setdefault(p.get("group") or "Other", {"forSale": 0, "soon": 0})
+        d["soon" if p.get("soon") else "forSale"] += 1
     store.update(lastRun=stamp(), filter=f, agents=report,
-                 found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon"))})
+                 found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon")), "districts": by})
     hist.export_csv()
     store["history"] = hist.counts()
     hist.close()

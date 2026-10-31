@@ -23,7 +23,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
-- **More agents,** such as Fastighetsbyrån, SkandiaMäklarna, LF, Living and Svensk Fastighetsförmedling, until the answer key matches.
+- **More agents: the biggest gap.** About two thirds of the for-sale apartments in your budget belong to agents not covered yet, such as Fastighetsbyrån, SkandiaMäklarna, Svensk Fastighetsförmedling, Länsförsäkringar, Living, Mäklarhuset, Wrede and Karlsson & Uddare. Add them until the for-sale count nears Booli's.
 - **Commute, grocery store and gym.**
   - Distance to the nearest grocery store and gym from OpenStreetMap.
   - Travel time to work by SL, via Trafiklab ResRobot (a free key). Without a key, estimate it from the nearest T-bana station.
@@ -31,6 +31,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 ## Done
 
+- **A fair answer key.** Each apartment is counted once even when two agents list it. One without an asking price counts as coming soon, as on Booli, including Bjurfors' "på förhand" sales. One for sale counts only when its page states what the filter checks. Counts per district aren't possible: Booli answers one search a session and refuses the next, so the finder reads only the whole inner city. First fair result: 38 for sale against Booli's 119, and 167 coming soon against 160. Most for-sale apartments in your budget belong to agents not covered yet.
 - **More and better neighbourhoods, rated at two levels.** 56 neighbourhoods across seven districts, including SoFo (centred on Nytorget), Mariatorget, Mariaberget, Högalid, Tanto, Katarina, Sofia and Slussen on Södermalm, and Fridhemsplan, Rålambshov, Thorildsplan and Kungsholms strand on Kungsholmen. Districts follow the shore, with 11 bays and channels cut out. Each apartment is named by the neighbourhood it lies in. You rate a district and any neighbourhood in it; an unrated neighbourhood takes its district's rating.
 - **Erik Olsson:** read through its own area search, one page per inner-city district (`/homes?areaIds=467` Södermalm, `667` Kungsholmen, `387` Vasastan, `528` Östermalm, `898` Norrmalm/City, `1961` Gamla stan, `668` Gärdet), scrolling until each list ends. About 111 apartments.
 - **More of Notar's list:** the finder reads Notar's 25 newest apartments plus the 12 newest from each of its six inner-city offices, about 48 inner-city apartments instead of 5. Notar has no complete list per office, so a few older ones may still be missing.
