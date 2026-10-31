@@ -223,6 +223,45 @@ a { color: var(--text); text-underline-offset: 2px; }
 .evid a { font-size: 12px; color: var(--muted); }
 svg text { font-family: var(--f-body); }
 @media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
+/* Showings */
+.show input[type="text"], .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
+.show label.paste { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+.show label.paste input { width: 100%; }
+.crawl { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.crawl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--control); flex: none; }
+.crawl .dot.running { background: var(--data); animation: pulse 1.2s ease-in-out infinite; }
+.crawl .dot.done { background: var(--positive); }
+.crawl .dot.blocked, .crawl .dot.error, .crawl .dot.denied { background: var(--negative); }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .crawl .dot.running { animation: none; } }
+#tabs button.busy::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--data); margin-left: 6px; vertical-align: middle; }
+.hood-group h4 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 2px; }
+.hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.hood-row label { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.hood-row input[type="text"] { grid-column: 1 / -1; }
+.hood-row.never label { color: var(--muted); text-decoration: line-through; }
+.my-area { padding: 10px 0; border-top: 1px solid var(--rule); display: grid; gap: 6px; }
+.my-area:first-of-type { border-top: 0; }
+.my-area ul { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 4px; }
+.my-area li { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.my-area li em { flex-basis: 100%; color: var(--muted); }
+.show-day { font-size: var(--fs-section); margin: 22px 0 8px; display: flex; gap: 8px; align-items: baseline; }
+.show-day .dim { font-size: 13px; font-weight: 400; }
+.show-card { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; }
+.show-card + .show-card { margin-top: 8px; }
+.show-card.never { opacity: .5; }
+.show-card .t { font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.show-card p { margin: 4px 0 6px; font-size: 14px; }
+.show-card a { color: var(--text); }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.visit { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+.sc-act { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+@media (max-width: 900px) { .bench.show > div:last-child { order: -1; } }
+@media (max-width: 640px) {
+  .show-card { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .sc-act { flex-direction: row; align-items: center; }
+  .visit { grid-template-columns: minmax(0, 1fr); }
+}
 </style>
 
 <header class="top">
@@ -238,6 +277,7 @@ svg text { font-family: var(--f-body); }
       <button role="tab" data-tab="five">5-year budget</button>
       <button role="tab" data-tab="value">Area prices</button>
       <button role="tab" data-tab="search">Apartments</button>
+      <button role="tab" data-tab="show">Showings</button>
       <button role="tab" data-tab="bid">Bidding</button>
       <button role="tab" data-tab="furnish">Furnishing</button>
       <button role="tab" data-tab="steps">Buying steps</button>
@@ -395,6 +435,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
+  show: { auto: true, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
 });
 let S = DEFAULT();
 
@@ -425,7 +466,7 @@ function merge(base, saved) {
 
 /* ---------- Persistence: private per-person doc in db, browser storage as fallback ---------- */
 const LS_KEY = "sthlm-bostadsplan-v1";
-let docRef = null, saveTimer = null, saving = false, pending = false;
+let docRef = null, saveTimer = null, saving = false, pending = false, storeDb = null, storeId = null;
 function setSaveState(text, ok) {
   const el = document.getElementById("saveState");
   el.className = "save-state" + (ok ? " ok" : "");
@@ -458,6 +499,7 @@ async function initStore() {
     const id = await user.id();
     if (!id) return;
     docRef = db.collection("data/users/" + id).doc("plan");
+    storeDb = db; storeId = id;
     const snap = await Promise.race([docRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
     if (snap.exists) {
       const d = snap.data();
@@ -1343,6 +1385,452 @@ function clearExample() {
   Object.assign(S.fin, { gross1: 0, gross2: 0, net1: 0, net2: 0, savings: 0, monthlySave: 0, targetPrice: 0 });
 }
 
+/* ---------- Showings: read Booli slowly through the Claude desktop app's browser ---------- */
+const BOOLI = "https://www.booli.se";
+// Booli's own named areas, from its area search (31 Oct 2026). Smaller areas come first,
+// so an apartment keeps the most precise name; whole districts catch the rest.
+const HOODS = [
+  ["255555", "SoFo", "Södermalm"], ["874678", "Mariatorget", "Södermalm"], ["41668", "Mariaberget", "Södermalm"], ["845555", "Hornstull", "Södermalm"],
+  ["4796", "Sofia", "Södermalm"], ["7197", "Katarina", "Södermalm"], ["8069", "Maria", "Södermalm"], ["849853", "Högalid", "Södermalm"],
+  ["826197", "Främre Kungsholmen", "Kungsholmen"], ["880478", "Övre Kungsholmen", "Kungsholmen"], ["931427", "Västra Kungsholmen", "Kungsholmen"],
+  ["874672", "Nedre Kungsholmen", "Kungsholmen"], ["874670", "Östra Kungsholmen", "Kungsholmen"], ["3598", "Fredhäll", "Kungsholmen"],
+  ["874666", "Birkastan", "Vasastan"], ["874687", "Sibirien", "Vasastan"], ["96512", "Hagastaden", "Vasastan"],
+  ["1012251", "Lärkstaden", "Östermalm"],
+  ["115341", "Other Södermalm", "Södermalm"], ["115353", "Other Kungsholmen", "Kungsholmen"], ["115349", "Other Vasastan", "Vasastan"],
+  ["115348", "Other Östermalm", "Östermalm"], ["115350", "Norrmalm", "Norrmalm"], ["115346", "Gamla stan", "Gamla stan"], ["115347", "Gärdet", "Gärdet"],
+];
+const DISTRICTS = ["Södermalm", "Kungsholmen", "Vasastan", "Östermalm", "Norrmalm", "Gamla stan", "Gärdet"];
+const FEATS = { Hiss: "lift", Balkong: "balcony", Eldstad: "fireplace", Uteplats: "patio", Terrass: "terrace", Takterrass: "roof terrace" };
+const REFRESH_MS = 6 * 3600e3;   // read an area again after 6 hours
+const DETAIL_MS = 24 * 3600e3;   // and a listing page after a day
+const MAX_PAGES = 4;             // result pages per area
+const pauseMs = () => 7000 + Math.random() * 7000; // a person's pace between pages
+
+function allHoods() { return [...S.show.extra.map(([id, name]) => [id, name, "Your Booli areas"]), ...HOODS]; }
+function hoodName(id) { const h = allHoods().find((x) => x[0] === id); return h ? h[1] : "Booli area " + id; }
+function hoodOn(id) { return S.show.on[id] !== false; }
+function rating(id) { return (S.show.ratings[id] || {}).r ?? ""; }
+function isNever(p) { return (p.in || []).some((id) => rating(id) === "never"); }
+
+/* Dates are kept as local "YYYY-MM-DDTHH:MM" strings, which sort and compare as text */
+const pad2 = (n) => String(n).padStart(2, "0");
+const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const SV_MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+function dateFor(day, monthIdx, time, now) {
+  let d = new Date(now.getFullYear(), monthIdx, day);
+  if (d < new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)) d = new Date(now.getFullYear() + 1, monthIdx, day);
+  return isoLocal(d).slice(0, 11) + time.padStart(5, "0");
+}
+// "Sön 8 nov kl 12:30", "Idag kl 17:00", "Imorgon kl 12:45"
+function parseWhen(txt, now) {
+  if (!txt) return null;
+  const t = txt.match(/kl (\d{1,2}:\d{2})/); if (!t) return null;
+  if (/^Idag/i.test(txt) || /^Imorgon/i.test(txt)) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (/^Imorgon/i.test(txt) ? 1 : 0));
+    return isoLocal(d).slice(0, 11) + t[1].padStart(5, "0");
+  }
+  const m = txt.match(/(\d{1,2}) ([a-zåäö]{3})/i); if (!m) return null;
+  const mi = SV_MONTHS.indexOf(m[2].toLowerCase()); if (mi < 0) return null;
+  return dateFor(+m[1], mi, t[1], now);
+}
+const numOf = (s) => { const v = parseFloat(String(s).replace(/[^\d,]/g, "").replace(",", ".")); return isFinite(v) ? v : null; };
+
+// A Booli search page as the browser's accessibility tree (read_page)
+function parseSearch(text, now) {
+  const items = []; let cur = null, next = null;
+  for (const raw of text.split("\n")) {
+    const l = raw.trim();
+    let m = l.match(/^link "([^"]*lägenhet på [^"]*)" \[ref_\d+\] href="\/(annons|bostad)\/(\d+)"/);
+    if (m) { cur = { key: m[2] + "/" + m[3], feats: [] }; items.push(cur); continue; }
+    m = l.match(/^link "Nästa sida" .*href="([^"]+)"/);
+    if (m) { next = m[1]; cur = null; continue; }
+    if (!cur) continue;
+    const s = (l.match(/^[a-z]+ "([^"]*)"/) || [])[1];
+    if (s == null) continue;
+    if (l.startsWith("heading ")) cur.addr = s;
+    else if (/^Lägenhet · /.test(s)) cur.label = s.split(" · ")[1];
+    else if (/^(Mån|Tis|Ons|Tor|Fre|Lör|Sön|Idag|Imorgon)\b.*kl \d{1,2}:\d{2}$/i.test(s)) cur.next = parseWhen(s, now);
+    else if (/^[\d\s ]+ kr$/.test(s)) cur.price = numOf(s);
+    else if (s === "Pris ej angivet") cur.price = null;
+    else if (/ kvadratmeter$/.test(s)) cur.kvm = numOf(s);
+    else if (/^[\d,]+ rum$/.test(s)) cur.rooms = numOf(s);
+    else if (/^vån /.test(s)) cur.floor = s.slice(4);
+    else if (s === "BV") cur.floor = "BV";
+    else if (/ kr\/mån$/.test(s)) cur.avgift = numOf(s);
+    else if (FEATS[s] && !cur.feats.includes(s)) cur.feats.push(s);
+    else if (s === "Snart till salu") cur.soon = true;
+  }
+  return { items: items.filter((c) => c.addr), next };
+}
+// A Booli listing page as plain text (get_page_text): every showing, build year, running costs
+const SV_LONG = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"];
+function parseDetail(text, now) {
+  const out = { shows: [] };
+  const re = new RegExp(`(\\d{1,2}) (${SV_LONG.join("|")})\\s*(\\d{1,2}:\\d{2})\\s*[–-]\\s*(\\d{1,2}:\\d{2})`, "g");
+  for (const m of text.matchAll(re)) {
+    const start = dateFor(+m[1], SV_LONG.indexOf(m[2]), m[3], now);
+    if (!out.shows.some((s) => s.start === start)) out.shows.push({ start, end: m[4].padStart(5, "0") });
+  }
+  let m = text.match(/Byggår\s+(\d{4})/); if (m) out.built = +m[1];
+  m = text.match(/Driftskostnaden är ([\d\s ]+) kr/); if (m) out.drift = numOf(m[1]);
+  m = text.match(/till salu i (\d+) dagar/); if (m) out.days = +m[1];
+  m = text.match(/Utropspris\s+([\d\s ]+) kr/); if (m) out.price = numOf(m[1]);
+  return out;
+}
+function looksBlocked(text) { return /captcha|verify you are human|är du en människa|access denied|unusual traffic/i.test(text); }
+
+/* ---------- The listings store: a private doc of its own, browser storage as fallback ---------- */
+let LIST = { items: {}, done: {}, lastRun: null };
+let listRef = null, listTimer = null;
+const LIST_KEY = "sthlm-bostadsplan-booli-v1";
+function saveList() {
+  clearTimeout(listTimer);
+  listTimer = setTimeout(async () => {
+    pruneList();
+    try { localStorage.setItem(LIST_KEY, JSON.stringify(LIST)); } catch (e) {}
+    if (listRef) try { await listRef.set({ list: JSON.stringify(LIST), savedAt: new Date().toISOString() }); } catch (e) {}
+  }, 1500);
+}
+function pruneList() {
+  const cutoff = isoLocal(new Date(Date.now() - 2 * 86400e3));
+  for (const [k, p] of Object.entries(LIST.items)) {
+    const last = [p.next, ...(p.shows || []).map((s) => s.start)].filter(Boolean).sort().pop();
+    if (!S.show.visits[k] && (!last || last < cutoff) && Date.now() - Date.parse(p.seen || 0) > 3 * 86400e3) delete LIST.items[k];
+  }
+}
+async function loadList(db, id) {
+  try { const t = localStorage.getItem(LIST_KEY); if (t) LIST = { ...LIST, ...JSON.parse(t) }; } catch (e) {}
+  if (db && id) {
+    listRef = db.collection("data/users/" + id).doc("booli");
+    try {
+      const snap = await Promise.race([listRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
+      if (snap.exists) { const d = JSON.parse(snap.data().list); if (!LIST.lastRun || (d.lastRun && d.lastRun > LIST.lastRun)) LIST = { ...LIST, ...d }; }
+    } catch (e) {}
+  }
+  if (S.tab === "show") refresh();
+}
+function mergeCards(cards, hoodId) {
+  const order = allHoods().map((h) => h[0]);
+  for (const c of cards) {
+    const p = LIST.items[c.key] || (LIST.items[c.key] = { key: c.key, in: [] });
+    Object.assign(p, c, { seen: new Date().toISOString() });
+    if (!p.in.includes(hoodId)) p.in.push(hoodId);
+    p.hood = [...p.in].sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
+  }
+}
+
+/* ---------- Booli search links: your budget, or a filter pasted from Booli ---------- */
+function budgetFilter() {
+  const s = S.search, a = affordability(), p = new URLSearchParams({ objectType: "Lägenhet" });
+  const to = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
+  if (to > 0) p.set("maxListPrice", to);
+  if (s.minRooms) p.set("minRooms", s.minRooms);
+  if (s.minArea) p.set("minLivingArea", s.minArea);
+  if (s.maxAvgift) p.set("maxRent", s.maxAvgift);
+  return p.toString();
+}
+function searchUrl(ids, page) {
+  const p = new URLSearchParams(S.show.filter || budgetFilter());
+  if (!p.has("objectType")) p.set("objectType", "Lägenhet");
+  p.set("areaIds", ids.join(","));
+  if (page > 1) p.set("page", page);
+  return `${BOOLI}/sok/till-salu?${p.toString().replace(/%2C/g, ",")}`;
+}
+function parseBooliLink(str) {
+  let u; try { u = new URL(String(str).trim()); } catch (e) { return null; }
+  if (u.hostname.replace(/^www\./, "") !== "booli.se") return null;
+  const p = new URLSearchParams(u.search);
+  const ids = (p.get("areaIds") || "").split(",").map((x) => x.trim()).filter((x) => /^\d+$/.test(x));
+  p.delete("areaIds"); p.delete("page");
+  return { ids, filter: p.toString() };
+}
+const FILTER_LABELS = { maxListPrice: ["Max price", "kr"], minListPrice: ["Min price", "kr"], minRooms: ["Min rooms", ""], maxRooms: ["Max rooms", ""],
+  minLivingArea: ["Min area", "m²"], maxLivingArea: ["Max area", "m²"], maxRent: ["Max avgift", "kr/mån"], minFloor: ["Min floor", ""], upcomingSale: ["Coming soon", ""] };
+function filterChips(q) {
+  return [...new URLSearchParams(q)].filter(([k]) => k !== "objectType").map(([k, v]) => {
+    const [label, unit] = FILTER_LABELS[k] || [k, ""];
+    return `<span class="chip">${esc(label)} ${/^\d+$/.test(v) ? nf.format(+v) : esc(v)}${unit ? " " + unit : ""}</span>`;
+  }).join("") || `<span class="chip">No filters</span>`;
+}
+
+/* ---------- The reader ---------- */
+const HOST = "host:claude_browser";
+const CRAWL = { state: "idle", msg: "", tab: null, stop: false };
+let mcpNs = null;
+function setCrawl(state, msg) {
+  CRAWL.state = state; CRAWL.msg = msg;
+  const b = document.querySelector('#tabs button[data-tab="show"]'); if (b) b.classList.toggle("busy", state === "running");
+  if (S.tab === "show") refresh();
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function pauseStep() { const end = Date.now() + pauseMs(); while (Date.now() < end && !CRAWL.stop) await sleep(500); }
+async function hostCall(tool, input) {
+  const r = await mcpNs.callTool(HOST, tool, input, { cache: false });
+  const text = (r.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
+  return text || (typeof r.payload === "string" ? r.payload : JSON.stringify(r.payload ?? ""));
+}
+async function openPage(url) {
+  if (CRAWL.tab) {
+    try { await hostCall("navigate", { url, tabId: CRAWL.tab }); }
+    catch (e) { if (e && e.code === "tool_error") CRAWL.tab = null; else throw e; }
+  }
+  if (!CRAWL.tab) {
+    const t = await hostCall("preview_start", { url });
+    CRAWL.tab = (t.match(/"tabId"\s*:\s*"([^"]+)"/) || [])[1] || null;
+  }
+  await sleep(2500); // let Booli finish drawing the results
+}
+const withTab = (o) => (CRAWL.tab ? { ...o, tabId: CRAWL.tab } : o);
+function needsDetail(p, max) {
+  const soon = isoLocal(new Date(Date.now() + 14 * 86400e3)), nowS = isoLocal(new Date());
+  if (!p.next || p.next < nowS || p.next > soon) return false;
+  if (p.price && p.price > max * 1.15) return false;
+  return !p.detail || Date.now() - Date.parse(p.detail) > DETAIL_MS;
+}
+async function runCrawl(manual) {
+  if (CRAWL.state === "running") return;
+  mcpNs = mcpNs || (await window.claude?.use?.("mcp"));
+  if (!mcpNs) return setCrawl("nohost", "Reading Booli works when the planner is open in the Claude desktop app.");
+  CRAWL.stop = false;
+  setCrawl("running", "Starting…");
+  try {
+    const hoods = allHoods().filter(([id]) => hoodOn(id) && (manual || !LIST.done[id] || Date.now() - Date.parse(LIST.done[id]) > REFRESH_MS));
+    for (const [id, name] of hoods) {
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        if (CRAWL.stop) return setCrawl("paused", "Paused. Press Start to continue where it stopped.");
+        setCrawl("running", `Reading ${name}${page > 1 ? ", page " + page : ""}`);
+        await openPage(searchUrl([id], page));
+        const text = await hostCall("read_page", withTab({ filter: "all", depth: 40, max_chars: 300000 }));
+        if (looksBlocked(text)) return setCrawl("blocked", "Booli asked for a human check, so reading stopped. Finish it yourself in the browser pane, then press Start.");
+        const res = parseSearch(text, new Date());
+        mergeCards(res.items, id); saveList();
+        if (!res.next || !res.items.length) break;
+        await pauseStep();
+      }
+      LIST.done[id] = new Date().toISOString(); saveList();
+      await pauseStep();
+    }
+    const max = affordability().max;
+    const want = Object.values(LIST.items).filter((p) => !isNever(p) && needsDetail(p, max));
+    for (const [i, p] of want.entries()) {
+      if (CRAWL.stop) return setCrawl("paused", "Paused. Press Start to continue where it stopped.");
+      setCrawl("running", `Reading showing times, ${i + 1} of ${want.length}`);
+      await openPage(`${BOOLI}/${p.key}`);
+      const text = await hostCall("get_page_text", withTab({ max_chars: 20000 }));
+      if (looksBlocked(text)) return setCrawl("blocked", "Booli asked for a human check, so reading stopped. Finish it yourself in the browser pane, then press Start.");
+      const d = parseDetail(text, new Date());
+      Object.assign(p, d, { price: p.price ?? d.price, detail: new Date().toISOString() });
+      saveList();
+      await pauseStep();
+    }
+    LIST.lastRun = new Date().toISOString(); saveList();
+    setCrawl("done", "");
+  } catch (e) {
+    const c = e && e.code;
+    if (["server_not_connected", "not_granted", "capability_disabled", "capability_removed"].includes(c)) setCrawl("nohost", "Reading Booli works when the planner is open in the Claude desktop app.");
+    else if (["not_in_manifest", "approval_required", "cancelled", "consent_required"].includes(c)) setCrawl("denied", "The planner isn't allowed to use the browser yet. Press Start to be asked.");
+    else setCrawl("error", "The browser stopped answering" + (e && e.message ? ` (${String(e.message).slice(0, 120)})` : "") + ". Press Start to try again.");
+  }
+}
+
+/* ---------- Showings view ---------- */
+function showWindow(mode, now) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (mode === "week") {
+    const mon = new Date(today); mon.setDate(today.getDate() + ((8 - today.getDay()) % 7 || 7));
+    const end = new Date(mon); end.setDate(mon.getDate() + 7);
+    return [isoLocal(mon), isoLocal(end)];
+  }
+  const end = new Date(today); end.setDate(today.getDate() + (mode === "all" ? 60 : 8));
+  return [isoLocal(now), isoLocal(end)];
+}
+function showingsIn(p, from, to) {
+  const starts = (p.shows || []).map((s) => ({ ...s }));
+  if (p.next && !starts.some((s) => s.start === p.next)) starts.push({ start: p.next });
+  return starts.filter((s) => s.start >= from && s.start < to).sort((a, b) => (a.start < b.start ? -1 : 1));
+}
+function describeListing(p) {
+  const bits = [];
+  bits.push([p.rooms ? String(p.rooms).replace(".", ",") + " rum" : "Apartment", p.kvm ? String(p.kvm).replace(".", ",") + " m²" : ""].filter(Boolean).join(", "));
+  if (p.floor) bits[0] += p.floor === "BV" ? " on the ground floor" : ` on floor ${p.floor}`;
+  const f = (p.feats || []).map((x) => FEATS[x]);
+  if (f.length) bits[0] += " with " + (f.length > 1 ? f.slice(0, -1).join(", ") + " and " + f[f.length - 1] : f[0]);
+  if (p.built) bits.push(`built ${p.built}`);
+  if (p.avgift && p.kvm) {
+    const y = p.avgift * 12 / p.kvm;
+    if (y < 650) bits.push("low avgift for its size"); else if (y > 1000) bits.push("high avgift for its size");
+  }
+  if (p.days > 21) bits.push(`on the market for ${p.days} days`);
+  return bits.join(", ") + ".";
+}
+const fmtDay = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+const fmtShort = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function ratingSelect(attr, v) {
+  const opts = [["", "Not rated"], ["5", "5 · love it"], ["4", "4"], ["3", "3"], ["2", "2"], ["1", "1"], ["never", "Never here"]];
+  return `<select ${attr}>${opts.map(([k, l]) => `<option value="${k}" ${String(v) === k ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+}
+function crawlPanel() {
+  const st = CRAWL.state, n = Object.keys(LIST.items).length;
+  const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  const text = st === "running" ? CRAWL.msg : st === "idle" || st === "done" ? (last ? `Last read ${last}. ${n} apartments saved.` : "Not read yet.") : CRAWL.msg;
+  const btn = st === "running" ? `<button class="btn" data-act="crawl-pause">Pause</button>` : st === "nohost" ? "" : `<button class="btn primary" data-act="crawl-start">${last ? "Read again now" : "Start reading Booli"}</button>`;
+  return `<section class="panel">
+    <h3>Booli reader</h3>
+    <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}</span></div>
+    <div class="row" style="margin-top:12px">${btn}
+      <label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.auto" ${S.show.auto ? "checked" : ""}> Start when I open the planner</label></div>
+    <p class="dim" style="font-size:12px;margin:10px 0 0">It opens Booli in the desktop app's browser pane, one page every 7 to 14 seconds, and stops if Booli asks for a human check. Each area is read again after 6 hours.</p>
+  </section>`;
+}
+function filterPanel() {
+  const ids = allHoods().filter(([id]) => hoodOn(id)).map(([id]) => id);
+  const link = searchUrl(ids, 1);
+  return `<section class="panel">
+    <h3>Search filter</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 8px">${S.show.filter ? "Using the filter you pasted from Booli." : "Using your budget from My finances and the Apartments tab."}</p>
+    <div class="chips">${filterChips(S.show.filter || budgetFilter())}</div>
+    <label class="paste">Paste a Booli search link
+      <input type="url" id="booli-paste" placeholder="https://www.booli.se/sok/till-salu?areaIds=…" value=""></label>
+    ${S.show.pasteMsg ? `<p class="dim" style="font-size:12px;margin:6px 0 0">${esc(S.show.pasteMsg)}</p>` : ""}
+    <label class="paste">Copy this search to Booli
+      <input type="text" id="booli-copy" readonly value="${esc(link)}"></label>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" data-act="copy-filter">Copy link</button>
+      <a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Open in Booli ↗</a>
+      ${S.show.filter ? `<button class="btn ghost" data-act="filter-budget">Use my budget instead</button>` : ""}
+    </div>
+  </section>`;
+}
+function areasPanel(counts) {
+  const groups = {};
+  for (const h of allHoods()) (groups[h[2]] = groups[h[2]] || []).push(h);
+  return `<section class="panel">
+    <h3>Areas</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 4px">Untick an area to stop reading it. <strong>Never here</strong> hides every apartment Booli places in that area.</p>
+    ${Object.entries(groups).map(([g, hs]) => `<div class="hood-group"><h4>${esc(g)}</h4>${hs.map(([id, name]) => {
+      const r = S.show.ratings[id] || {};
+      return `<div class="hood-row ${r.r === "never" ? "never" : ""}">
+        <label><input type="checkbox" data-hood-on="${id}" ${hoodOn(id) ? "checked" : ""}> ${esc(name)}</label>
+        <span class="dim" title="Showings in view">${counts[id] || ""}</span>
+        ${ratingSelect(`data-hood-r="${id}" aria-label="Rating for ${esc(name)}"`, r.r ?? "")}
+        ${r.r || r.note ? `<input type="text" data-hood-note="${id}" value="${esc(r.note || "")}" placeholder="Note about ${esc(name)}">` : ""}
+      </div>`;
+    }).join("")}</div>`).join("")}
+  </section>`;
+}
+function myAreasPanel() {
+  const visits = Object.entries(S.show.visits);
+  const ids = new Set([...Object.keys(S.show.ratings).filter((id) => { const r = S.show.ratings[id]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.hood)]);
+  if (!ids.size) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">After a showing, press <strong>I went</strong> on the apartment. Your rating and notes for it and its area collect here.</p></section>`;
+  const score = (id) => { const r = rating(id); return r === "never" ? -1 : r === "" ? 0 : +r; };
+  return `<section class="panel"><h3>Your areas</h3>${[...ids].sort((a, b) => score(b) - score(a)).map((id) => {
+    const r = S.show.ratings[id] || {}, vs = visits.filter(([, v]) => v.hood === id);
+    return `<div class="my-area">
+      <div class="row" style="justify-content:space-between"><strong>${esc(hoodName(id))}</strong>${ratingSelect(`data-hood-r="${id}" aria-label="Rating for ${esc(hoodName(id))}"`, r.r ?? "")}</div>
+      <input type="text" data-hood-note="${id}" value="${esc(r.note || "")}" placeholder="How did the area feel?">
+      ${vs.length ? `<ul>${vs.map(([k, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul>` : ""}
+    </div>`;
+  }).join("")}</section>`;
+}
+function showCard(p, s, a, cr) {
+  const v = S.show.visits[p.key], never = isNever(p), r = rating(p.hood);
+  const price = p.price || 0, mc = price ? monthlyCost(price, p.avgift, cr.rate) : null;
+  const fit = !price ? `<span class="chip info">No price yet</span>` : price <= a.max ? `<span class="chip good">Within budget</span>` : `<span class="chip bad">${kr(price - a.max)} over max</span>`;
+  const tracked = S.apts.some((x) => x.link === `${BOOLI}/${p.key}`);
+  return `<article class="show-card ${never ? "never" : ""}">
+    <div class="t">${s.start.slice(11)}${s.end ? "–" + s.end : ""}</div>
+    <div class="sc-main">
+      <div class="row" style="gap:8px"><a href="${BOOLI}/${esc(p.key)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
+        <span class="dim">${esc(hoodName(p.hood))}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
+      <p>${esc(describeListing(p))}</p>
+      <div class="facts"><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
+      ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.key)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
+        <input type="text" data-visit-note="${esc(p.key)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
+    </div>
+    <div class="sc-act">
+      ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.key)}">Undo visit</button>` : `<button class="btn" data-act="went" data-key="${esc(p.key)}" data-at="${s.start}">I went</button>`}
+      ${tracked ? `<span class="dim" style="font-size:12px">Tracked</span>` : `<button class="btn ghost" data-act="track" data-key="${esc(p.key)}">Track</button>`}
+    </div>
+  </article>`;
+}
+function showView() {
+  const sh = S.show, a = affordability(), cr = chosenRate();
+  const [from, to] = showWindow(sh.days, new Date());
+  const rows = [];
+  for (const p of Object.values(LIST.items)) for (const s of showingsIn(p, from, to)) rows.push({ p, s });
+  const counts = {};
+  for (const { p } of rows) for (const id of p.in || []) counts[id] = (counts[id] || 0) + 1;
+  const visible = rows.filter(({ p }) => hoodOn(p.hood) && (!sh.hideNever || !isNever(p))).sort((x, y) => (x.s.start < y.s.start ? -1 : 1));
+  const hidden = rows.filter(({ p }) => isNever(p)).length;
+  const days = {};
+  for (const r of visible) (days[r.s.start.slice(0, 10)] = days[r.s.start.slice(0, 10)] || []).push(r);
+  const list = Object.keys(LIST.items).length === 0
+    ? `<div class="note">No apartments yet. ${CRAWL.state === "nohost" ? "Open the planner in the Claude desktop app and the reader starts on its own." : "The reader fills this list as it goes."}</div>`
+    : !visible.length ? `<div class="note">No showings in this period${hidden ? `, apart from ${hidden} in areas you marked Never here` : ""}.</div>`
+    : Object.entries(days).map(([d, rs]) => `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${rs.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`).join("");
+  return `
+    <div class="lead"><h1>Showings</h1>
+    <p>Apartments in innanför tullarna with a visning, read from Booli and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
+    <div class="bench show">
+      <div class="stack">${crawlPanel()}${filterPanel()}${myAreasPanel()}${areasPanel(counts)}</div>
+      <div>
+        <div class="row" style="justify-content:space-between;margin-bottom:4px">
+          <div class="seg">${[["week", "Next week"], ["8", "Next 8 days"], ["all", "All upcoming"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
+          ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Hide ${hidden} in Never areas</label>` : ""}
+        </div>
+        ${list}
+      </div>
+    </div>`;
+}
+function showInput(t) {
+  if (t.id === "booli-paste") {
+    const r = parseBooliLink(t.value);
+    if (!r) { if (t.value.trim()) { S.show.pasteMsg = "That isn't a Booli search link."; refresh(); } return true; }
+    S.show.filter = r.filter;
+    if (r.ids.length) {
+      const known = new Set(allHoods().map((h) => h[0]));
+      for (const id of r.ids) if (!known.has(id)) S.show.extra.push([id, "Booli area " + id]);
+      for (const [id] of allHoods()) S.show.on[id] = r.ids.includes(id);
+    }
+    S.show.pasteMsg = r.ids.length ? `Filter saved. Reading only the ${r.ids.length} area${r.ids.length > 1 ? "s" : ""} in the link.` : "Filter saved for every ticked area.";
+    t.value = ""; LIST.done = {};
+    changed(true); return true;
+  }
+  if (t.dataset.hoodNote != null) { const id = t.dataset.hoodNote; S.show.ratings[id] = { ...(S.show.ratings[id] || {}), note: t.value }; changed(false); return true; }
+  if (t.dataset.visitNote != null) { const v = S.show.visits[t.dataset.visitNote]; if (v) v.note = t.value; changed(false); return true; }
+  return t.dataset.hoodOn != null || t.dataset.hoodR != null || t.dataset.visitR != null;
+}
+function showChange(t) {
+  if (t.dataset.hoodOn != null) { S.show.on[t.dataset.hoodOn] = t.checked; changed(true); return true; }
+  if (t.dataset.hoodR != null) { const id = t.dataset.hoodR; S.show.ratings[id] = { ...(S.show.ratings[id] || {}), r: t.value }; changed(true); return true; }
+  if (t.dataset.visitR != null) { const v = S.show.visits[t.dataset.visitR]; if (v) v.r = t.value; changed(true); return true; }
+  return false;
+}
+function showClick(a) {
+  const p = LIST.items[a.dataset.key];
+  switch (a.dataset.act) {
+    case "crawl-start": runCrawl(true); return true;
+    case "crawl-pause": CRAWL.stop = true; setCrawl("running", "Pausing after this page…"); return true;
+    case "filter-budget": S.show.filter = ""; S.show.pasteMsg = ""; LIST.done = {}; return false;
+    case "copy-filter": {
+      const el = document.getElementById("booli-copy");
+      const done = () => { S.show.pasteMsg = "Link copied. Paste it into your browser's address bar."; refresh(); };
+      if (navigator.clipboard) navigator.clipboard.writeText(el.value).then(done, () => { el.select(); document.execCommand("copy"); done(); });
+      else { el.select(); document.execCommand("copy"); done(); }
+      return true;
+    }
+    case "went": if (p) S.show.visits[p.key] = { at: a.dataset.at, r: "", note: "", addr: p.addr, hood: p.hood }; return false;
+    case "unwent": delete S.show.visits[a.dataset.key]; return false;
+    case "track":
+      if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${hoodName(p.hood)}`, price: p.price || null, bid: p.price || null,
+        avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: `${BOOLI}/${p.key}`, status: "Viewing booked" });
+      return false;
+  }
+  return null;
+}
+
+VIEWS.show = showView;
+
 /* ---------- Events ---------- */
 document.getElementById("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
@@ -1350,6 +1838,7 @@ document.getElementById("tabs").addEventListener("click", (e) => {
 });
 app.addEventListener("input", (e) => {
   const t = e.target;
+  if (showInput(t)) return;
   const val = t.type === "range" ? +t.value : t.hasAttribute("data-num") ? parseNum(t.value) : t.value;
   if (val === undefined) return; // half-typed number such as "6," or "-"
   if (t.dataset.path) {
@@ -1374,6 +1863,7 @@ app.addEventListener("input", (e) => {
 });
 app.addEventListener("change", (e) => {
   const t = e.target;
+  if (showChange(t)) return;
   if (t.dataset.check) { set(t.dataset.check, t.checked); return changed(true); }
   if (t.dataset.have) { S.furn.items[t.dataset.have] = { ...(S.furn.items[t.dataset.have] || {}), have: t.checked }; return changed(true); }
   if (t.dataset.xhave) { const x = S.furn.extra.find((i) => i.id === t.dataset.xhave); if (x) x.have = t.checked; return changed(true); }
@@ -1393,6 +1883,7 @@ app.addEventListener("click", (e) => {
   if (s) { const v = s.dataset.val; set(s.dataset.set, /^\d+$/.test(v) && ["fin.buyers", "value.win"].includes(s.dataset.set) ? +v : v); return changed(true); }
   const th = e.target.closest("th[data-sort]"); if (th) { S.rates.sort = th.dataset.sort; return changed(true); }
   const a = e.target.closest("[data-act]"); if (!a) return;
+  const sc = showClick(a); if (sc === true) return; if (sc === false) return changed(true);
   const id = () => Math.random().toString(36).slice(2, 9);
   switch (a.dataset.act) {
     case "clear-example": clearExample(); break;
@@ -1406,7 +1897,10 @@ app.addEventListener("click", (e) => {
 });
 
 render();
-initStore();
+initStore().then(async () => {
+  await loadList(storeDb, storeId);
+  if (S.show.auto) runCrawl(false);
+});
 </script>
 </body>
 </html>

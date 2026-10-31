@@ -10,6 +10,7 @@ A single-page planner for buying a bostadsrätt in Stockholm. Open `index.html` 
 - **5-year budget:** editable rate scenarios (steady, rising, falling, 2022-style shock) in today's money, showing money left each month, loan, apartment value and equity.
 - **Area prices:** yearly kr/kvm for 13 Stockholm districts, with a log-linear regression trend and a 95 % prediction range.
 - **Apartments:** Booli search links built from your budget, plus tracked apartments with monthly cost and checks on the förening.
+- **Showings:** apartments in innanför tullarna with a visning next week, read from Booli. Rate Booli's named areas (SoFo, Sofia, Birkastan…) from 1 to 5 or "Never here", add notes and log the showings you went to. You can paste a Booli search link to use its filters, or copy the current search back to Booli. The Booli reader runs only in the Claude desktop app: it uses the app's built-in browser at a slow pace and stops if Booli asks for a human check.
 - **Bidding:** a bidding plan between asking price and your walk-away price, what each extra bid costs per month, and what Swedish and Norwegian research says about jump bidding.
 - **Furnishing:** a room-by-room furniture budget at three price levels.
 - **Buying steps:** a checklist from saving the kontantinsats to getting the keys.
