@@ -1,9 +1,9 @@
-"""Estate agent sites: find a Booli listing on its agent's own site and read the details there.
+"""Estate agent sites: where each agent lists its apartments for sale, and how to read them.
 
-Booli names the agent on each search result. Each agent below says where it lists
-apartments for sale: a for-sale page (read in the browser, matched on the link text)
-or a sitemap (matched on the street address in the link). The listing page itself is
-read with one shared parser, since most agents show the same things the same way.
+The finder reads every agent's for-sale list (pressing "show more" where there is one)
+and, for agents whose list is incomplete, the entries in their sitemap that changed
+recently. It keeps the inner-city candidates, then opens each apartment's own page,
+which one shared parser reads, since most agents show the same things the same way.
 """
 import datetime as dt
 import gzip
@@ -18,43 +18,48 @@ from urllib.parse import urlparse
 
 UA = "Bostadsplan/1.0 (personal apartment planner)"
 CACHE_HOURS = 20
+SITEMAP_DAYS = 30   # sitemap entries changed in the last month; older ones are mostly sold
 
+# obj: what a link to one apartment looks like on that site
 AGENTS = [
-    {"name": "Alicia Edelman", "match": "alicia edelman", "lists": ["https://aliciaedelman.se/till-salu"]},
-    {"name": "Notar", "match": "notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"]},
-    {"name": "BOSTHLM", "match": "bosthlm", "lists": ["https://www.bosthlm.se/till-salu"]},
-    {"name": "Historiska Hem", "match": "historiska hem", "lists": ["https://historiskahem.se/till-salu/"]},
-    {"name": "Tradition", "match": "tradition", "lists": ["https://tradition.se/till-salu"]},
-    {"name": "Södermäklarna", "match": "södermäklarna", "lists": ["https://www.sodermaklarna.se/till-salu"]},
-    {"name": "Stadshem", "match": "stadshem", "lists": ["https://stadshem.se/till-salu"]},
-    {"name": "Bergets Ro", "match": "bergets ro", "sitemaps": ["https://www.bergetsro.se/sitemap_index.xml"]},
-    {"name": "Bjurfors", "match": "bjurfors", "sitemaps": ["https://www.bjurfors.se/sitemap.xml"]},
-    {"name": "Behrer & Partners", "match": "behrer", "sitemaps": ["https://www.behrer.se/sitemap.xml"]},
+    {"name": "Alicia Edelman", "lists": ["https://aliciaedelman.se/till-salu"], "obj": r"/bostad/"},
+    {"name": "Notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"], "obj": r"/kopa-bostad/objekt/"},
+    {"name": "BOSTHLM", "lists": ["https://www.bosthlm.se/till-salu"], "obj": r"bosthlm\.se/\d+/"},
+    {"name": "Historiska Hem", "lists": ["https://historiskahem.se/till-salu/"], "obj": r"/object/tillsalu-"},
+    {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/"},
+    {"name": "Södermäklarna", "lists": ["https://www.sodermaklarna.se/till-salu"], "obj": r"/bostad/"},
+    {"name": "Stadshem", "lists": ["https://stadshem.se/till-salu"], "obj": r"/objekt/"},
+    {"name": "Bergets Ro", "lists": ["https://www.bergetsro.se/till-salu/"], "obj": r"/houses/",
+     "sitemaps": ["https://www.bergetsro.se/houses-sitemap.xml", "https://www.bergetsro.se/houses-sitemap2.xml"]},
+    {"name": "Bjurfors", "lists": ["https://www.bjurfors.se/sv/tillsalu/stockholm/stockholm/"], "obj": r"/sv/tillsalu/stockholm/stockholm/[^/]+/[^/]+",
+     "sitemaps": ["https://www.bjurfors.se/sitemap.xml"]},
+    {"name": "Behrer & Partners", "lists": ["https://www.behrer.se/vara-hem/"], "obj": r"/objekt/[^/]+/?$"},
 ]
 
+# Names that place a card in innanför tullarna, and some that place it outside. Checked on
+# accent-free lower case, so "Södermalm" and "sodermalm" in a link both count.
+INNER = re.compile(
+    r"sodermalm|\bsofo\b|\bsofia\b|katarina|\bmaria\b|mariatorget|mariaberget|hogalid|hornstull|zinkensdamm|skanstull|"
+    r"slussen|tanto|reimersholme|langholmen|kungsholmen|fridhemsplan|fredhall|marieberg|stadshagen|kristineberg|"
+    r"ralambshov|vasastan|vasastaden|birkastan|sibirien|roda bergen|odenplan|hagastaden|ostermalm|larkstaden|gardet|"
+    r"djurgarden|norrmalm|\bcity\b|gamla stan|riddarholmen|skeppsholmen|innerstan|innerstaden|karlaplan")
+OUTER = re.compile(
+    r"essingen|liljeholm|hammarby|hagersten|alvsjo|bromma|solna|sundbyberg|nacka|lidingo\b|danderyd|taby|huddinge|"
+    r"farsta|enskede|johanneshov|arsta|midsommarkransen|aspudden|spanga|kista|haninge|goteborg|malmo|uppsala")
 
-def agent_for(broker):
-    b = (broker or "").lower()
-    return next((a for a in AGENTS if a["match"] in b), None)
 
-
-# ---------- Addresses ----------
-
-def slug(s):
+def ascii_lower(s):
     s = unicodedata.normalize("NFKD", str(s).lower())
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = re.sub(r"(\d+)\s+([a-z])\b", r"\1\2", s)  # "33 A" and "33A" are the same door
-    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    return re.sub(r"(\d+)-([a-z])(?=-|$)", r"\1\2", s)  # and so is "33-a" in a link
+    return "".join(c for c in s if not unicodedata.combining(c))
 
 
-def matches(addr, href, text=""):
-    a = slug(addr)
-    if not a:
+def looks_inner(url, text):
+    """A card worth opening: it names an inner-city area and nothing clearly outside it.
+    A card with no text (from a sitemap) is opened, and its address decides."""
+    hay = ascii_lower(urlparse(url).path.replace("-", " ").replace("/", " ") + " " + text)
+    if OUTER.search(hay):
         return False
-    # the address must end at a word boundary, so "Hornsgatan 15" doesn't match "Hornsgatan 153"
-    rx = re.compile(rf"(^|-){re.escape(a)}(-|$)")
-    return bool(rx.search(slug(urlparse(href).path)) or rx.search(slug(text)))
+    return bool(INNER.search(hay)) or not text
 
 
 # ---------- Being a polite visitor ----------
@@ -86,81 +91,74 @@ def fetch_text(url):
     return (gzip.decompress(b) if b[:2] == b"\x1f\x8b" else b).decode("utf-8", "replace")
 
 
-def sitemap_urls(url, cache_dir, depth=0):
-    """Every page link in a sitemap, following sitemap indexes. Cached for most of a day."""
-    cache = Path(cache_dir) / ("sitemap-" + slug(url)[:80] + ".json")
-    if depth == 0 and cache.exists() and time.time() - cache.stat().st_mtime < CACHE_HOURS * 3600:
-        return json.loads(cache.read_text())
+def sitemap_entries(url, cache_dir):
+    """[url, lastmod] pairs from one sitemap, cached for most of a day."""
+    cache = Path(cache_dir) / ("sitemap-" + re.sub(r"[^a-z0-9]+", "-", url.lower())[:80] + ".json")
+    if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_HOURS * 3600:
+        data = json.loads(cache.read_text())
+        if data and isinstance(data[0], list):
+            return data
     text = fetch_text(url)
-    locs = re.findall(r"<loc>\s*([^<]+?)\s*</loc>", text)
-    if "<sitemapindex" in text and depth < 2:
-        out = []
-        for sub in locs:
-            if re.search(r"post|page-sitemap|news|blog|nyhet|artik|kontor|broker|maklare|personal|category|tag", sub, re.I):
-                continue
-            out += sitemap_urls(sub, cache_dir, depth + 1)
-            time.sleep(1)
-        locs = out
-    if depth == 0:
-        cache.parent.mkdir(exist_ok=True)
-        cache.write_text(json.dumps(locs))
-    return locs
+    out = [[m.group(1).strip(), (m.group(2) or "").strip()]
+           for m in re.finditer(r"<loc>\s*([^<]+?)\s*</loc>(?:\s*<lastmod>\s*([^<]+?)\s*</lastmod>)?", text)]
+    cache.parent.mkdir(exist_ok=True)
+    cache.write_text(json.dumps(out))
+    return out
 
 
-def list_links(page, url):
-    """Links on an agent's for-sale page, after scrolling so lazy lists load."""
+def list_cards(page, url, obj_rx, clicks=8):
+    """Every apartment link on a for-sale list, with its card text. Scrolls, and presses
+    "Ladda fler" / "Visa fler" so lists that load in parts show everything."""
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(2500)
-    for _ in range(6):
-        page.mouse.wheel(0, 5000)
-        page.wait_for_timeout(700)
-    return page.eval_on_selector_all(
-        "a[href]", "els => els.map(a => [a.href, (a.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 200)])")
+    for _ in range(clicks):
+        for _ in range(3):
+            page.mouse.wheel(0, 5000)
+            page.wait_for_timeout(500)
+        more = page.locator("button, a").filter(has_text=re.compile(r"^\s*(ladda|visa) fler(?! sålda)", re.I))
+        if not more.count():
+            break
+        try:
+            more.first.click(timeout=3000)
+            page.wait_for_timeout(1500)
+        except Exception:
+            break
+    links = page.eval_on_selector_all(
+        "a[href]", """els => els.map(a => {
+            const card = a.closest('article, li, [class*=card], [class*=object], [class*=item]') || a;
+            return [a.href.split('#')[0], (card.innerText || a.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400)];
+        })""")
+    cards = {}
+    for h, t in links:
+        if re.search(obj_rx, h) and not re.search(r"/(salda|sold|slutpris)", h, re.I):
+            cards[h] = max(cards.get(h, ""), t, key=len)
+    return cards
 
 
-class AgentIndex:
-    """Where each agent's apartments are, gathered once per run and only for agents we need."""
-
-    def __init__(self, page, robots, cache_dir, log):
-        self.page, self.robots, self.cache_dir, self.log = page, robots, cache_dir, log
-        self.links = {}
-
-    def _load(self, agent):
-        links = []
-        for url in agent.get("lists", []):
-            if not self.robots.allowed(url):
-                self.log(f"{agent['name']}: robots.txt asks visitors not to read {url}, skipped")
-                continue
-            try:
-                links += [(h, t, True) for h, t in list_links(self.page, url)]
-            except Exception as e:
-                self.log(f"{agent['name']}: couldn't read {url} ({e})")
-            time.sleep(3)
-        for url in agent.get("sitemaps", []):
-            try:
-                links += [(h, "", False) for h in sitemap_urls(url, self.cache_dir)]
-            except Exception as e:
-                self.log(f"{agent['name']}: couldn't read sitemap {url} ({e})")
-        self.links[agent["name"]] = links
-        self.log(f"{agent['name']}: {len(links)} links to match against")
-
-    def candidates(self, agent, addr):
-        """Pages that may be this apartment: links from the for-sale page first. Sitemaps also keep
-        old sales of the same address, so the caller tries a few and keeps the one still for sale."""
-        if agent["name"] not in self.links:
-            self._load(agent)
-        host = urlparse((agent.get("lists") or agent.get("sitemaps"))[0]).netloc.replace("www.", "")
-        hits, seen = [], set()
-        for h, t, listed in self.links[agent["name"]]:
-            h = h.split("#")[0]
-            if h in seen or host not in h or not matches(addr, h, t) or re.search(r"/(salda|sold|slutpris)", h, re.I):
-                continue
-            seen.add(h)
-            hits.append((not listed, h))
-        return [h for _, h in sorted(hits, key=lambda x: x[0])][:3]
+def discover(agent, page, robots, cache_dir, log):
+    """Candidate apartments for one agent: {url: card text}."""
+    found = {}
+    for url in agent.get("lists", []):
+        if not robots.allowed(url):
+            log(f"{agent['name']}: robots.txt asks visitors not to read {url}, skipped")
+            continue
+        try:
+            found.update(list_cards(page, url, agent["obj"]))
+        except Exception as e:
+            log(f"{agent['name']}: couldn't read {url} ({e})")
+        time.sleep(3)
+    since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=SITEMAP_DAYS)).isoformat()
+    for url in agent.get("sitemaps", []):
+        try:
+            for u, lastmod in sitemap_entries(url, cache_dir):
+                if re.search(agent["obj"], u) and lastmod and lastmod >= since and u not in found:
+                    found[u] = ""
+        except Exception as e:
+            log(f"{agent['name']}: couldn't read sitemap {url} ({e})")
+    return found
 
 
-# ---------- One parser for agent listing pages ----------
+# ---------- Reading cards and listing pages ----------
 
 SV_MONTHS = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"]
 MONTH_RX = "|".join(m[:3] for m in SV_MONTHS)
@@ -168,11 +166,18 @@ MONTH_RX = "|".join(m[:3] for m in SV_MONTHS)
 SHOW_RX = re.compile(
     rf"(?<!\d)(\d{{1,2}})\s*(?:\|\s*)?({MONTH_RX})[a-zåäö]*\.?(?:\s*\d{{4}})?[^0-9]{{0,40}}?"
     rf"(\d{{1,2}})[:.](\d{{2}})(?:\s*[-–]\s*(\d{{1,2}})[:.](\d{{2}}))?", re.I)
+PRICE_RX = re.compile(r"(\d{1,3}(?:[ . ]\d{3}){1,3})\s*kr(?!\s*/\s*m)", re.I)
+ROOMS_RX = re.compile(r"(\d+(?:[.,]5)?)\s*(?:rum|rok)\b", re.I)
+KVM_RX = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:\+\s*\d+(?:[.,]\d+)?\s*)?(?:kvm|m²|m2)\b", re.I)
+AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
+SOON_RX = re.compile(r"snart till salu|kommer snart|snart på marknaden|kommande försäljning", re.I)
+SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|slutpris\s*:?\s*\d", re.I)
+ADDR_RX = re.compile(r"([A-ZÅÄÖ][A-Za-zÅÄÖåäöéü.'\-]+(?: [A-Za-zÅÄÖåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
 FEATURE_RX = [
     ("stambyte done", r"stamby(?:te|tet|ten)\s+(?:är\s+|har\s+)?(?:gjor|genomför|utför|klar|färdig)|nya stammar|stambytt"),
     ("stambyte coming", r"stambyte\s+(?:är\s+)?(?:planera|beslut|kommer|inplanera|påbörja)"),
-    ("renovated kitchen", r"(?:ny|ny-|helt? ?|nyligen |varsamt |totalt? ?)?renoverat kök|nytt kök|köket (?:är |har )?(?:ny|helt? |nyligen )?renoverat"),
-    ("renovated bathroom", r"(?:ny|helt? ?|nyligen |totalt? ?)?renoverat (?:bad|dusch)rum|nytt (?:bad|dusch)rum|badrummet (?:är |har )?(?:ny|helt? |nyligen )?renoverat"),
+    ("renovated kitchen", r"renoverat kök|nytt kök|köket (?:är |har )?(?:ny|helt? |nyligen )?renoverat"),
+    ("renovated bathroom", r"renoverat (?:bad|dusch)rum|nytt (?:bad|dusch)rum|badrummet (?:är |har )?(?:ny|helt? |nyligen )?renoverat"),
     ("tiled bathroom", r"helkaklat"),
     ("fireplace", r"kakelugn|öppen spis|eldstad"),
     ("herringbone parquet", r"fiskbensparkett"),
@@ -190,19 +195,49 @@ FEATURE_RX = [
 SKIP_PARA = re.compile(r"cookie|samtycke|personuppgift|integritet|nyhetsbrev|gdpr", re.I)
 
 
+def _price(m):
+    """An asking price from a match, or None for amounts too small to be one (an avgift, a fee)."""
+    v = int(re.sub(r"\D", "", m.group(1)))
+    return v if v >= 300000 else None
+
+
+def _num(s):
+    v = float(re.sub(r"[^\d,.]", "", s).replace(",", "."))
+    return int(v) if v.is_integer() else v
+
+
+def parse_card(text):
+    """What a for-sale list shows about an apartment: its price and whether it's coming soon."""
+    t = re.sub(r"[  ]", " ", text)
+    out = {}
+    for m in PRICE_RX.finditer(t):
+        if p := _price(m):
+            out["price"] = p
+            break
+    if SOON_RX.search(t):
+        out["soon"] = True
+    return out
+
+
+def is_sold(text):
+    return bool(SOLD_RX.search(text[:4000]))
+
+
+def find_address(*texts):
+    """The street address in a heading or page title, e.g. "Hornsgatan 153" from "Hornsgatan 153, 4 tr"."""
+    for t in texts:
+        if t and (m := ADDR_RX.search(re.sub(r"\s+", " ", t))):
+            a = m.group(1).strip()
+            a = re.sub(r"(\d) ([A-Za-z])$", r"\1\2", a)
+            return a[0] + a[1:].lower() if a.isupper() else a
+    return None
+
+
 def _date(day, month_idx, now):
     d = dt.date(now.year, month_idx + 1, day)
     if d < now.date() - dt.timedelta(days=7):
         d = d.replace(year=now.year + 1)
     return d
-
-
-# "Såld" or "Slutpris: 4 150 000 kr" on the page, but not menu links such as "Sålda" or "Slutpriser"
-SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|slutpris\s*:?\s*\d", re.I)
-
-
-def is_sold(text):
-    return bool(SOLD_RX.search(text[:4000]))
 
 
 def parse_agent_page(text, now):
@@ -249,15 +284,94 @@ def parse_agent_page(text, now):
     v = value(r"våningsplan|våning")
     if v and len(v) < 60:
         out["floorText"] = v
-    v = value(r"månadsavgift|avgift")
-    if v and len(v) < 200 and re.search(r"\d", v):
-        out["avgiftText"] = v
+        if re.match(r"\s*(bv|bottenvåning|entréplan|gatuplan)", v, re.I):
+            out["floor"] = "BV"
+        elif m := re.search(r"(\d+(?:[.,]5)?)", v):
+            out["floor"] = m.group(1).replace(",", ".")
+    avg = value(r"månadsavgift|avgift")
+    if avg and len(avg) < 200 and (m := re.search(r"(\d{1,2}[ .]?\d{3})\s*kr", avg)):
+        out["avgift"] = int(re.sub(r"\D", "", m.group(1)))
+    v = value(r"utgångspris|utropspris|accepterat pris|pris")
+    if v and (m := PRICE_RX.search(v)) and _price(m):
+        out["price"] = _price(m)
+    v = value(r"antal rum|rum")
+    if v and (m := re.match(r"\s*(\d+(?:[.,]5)?)", v)):
+        out["rooms"] = _num(m.group(1))
+    v = value(r"boarea|boyta|storlek|bostadsyta")
+    if v and (m := re.match(r"\s*(\d+(?:[.,]\d+)?)", v)):
+        out["kvm"] = _num(m.group(1))
+    # Otherwise the first price, rooms, size and avgift the page mentions
+    if "price" not in out:
+        for m in PRICE_RX.finditer(flat[:3000]):
+            if p := _price(m):
+                out["price"] = p
+                break
+    if "rooms" not in out and (m := ROOMS_RX.search(flat[:3000])):
+        out["rooms"] = _num(m.group(1))
+    if "kvm" not in out and (m := KVM_RX.search(flat[:3000])):
+        out["kvm"] = _num(m.group(1))
+    if "avgift" not in out and (m := AVGIFT_RX.search(flat)):
+        out["avgift"] = int(re.sub(r"\D", "", m.group(1)))
+    if SOON_RX.search(flat[:3000]):
+        out["soon"] = True
 
     paras = [l for l in lines if len(l) >= 160 and not SKIP_PARA.search(l)]
     if paras:
         out["desc"] = "\n\n".join(paras[:5])[:3000]
-    hay = " ".join([out.get("desc", ""), out.get("floorText", ""), out.get("avgiftText", "")]).lower()
+    hay = " ".join([out.get("desc", ""), out.get("floorText", ""), avg or ""]).lower()
     out["extra"] = [name for name, rx in FEATURE_RX if re.search(rx, hay)]
     if "stambyte done" in out["extra"] and "stambyte coming" in out["extra"]:
         out["extra"].remove("stambyte coming")
     return out
+
+
+# ---------- Bidding ----------
+
+BIDDING_RX = re.compile(r"pågående budgivning|budgivning pågår|budgivningen pågår", re.I)
+HIGH_BID_RX = re.compile(r"(?:högsta|aktuellt|senaste|ledande)\s+bud(?:et)?\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr", re.I)
+FINAL_RX = re.compile(r"(?:slutpris|såld för|sålt för|köpeskilling)\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr", re.I)
+
+
+def parse_bidding(text):
+    """Where an apartment is in its sale: for sale, in bidding (with the highest bid and how
+    many bids there are) or sold (with the final price, when the agent publishes it)."""
+    t = re.sub(r"[\u00a0\u202f]", " ", text)
+    out = {"state": "for sale"}
+    if m := FINAL_RX.search(t):
+        out.update(state="sold", final=int(re.sub(r"\D", "", m.group(1))))
+    elif is_sold(t):
+        out["state"] = "sold"
+    elif BIDDING_RX.search(t) or HIGH_BID_RX.search(t):
+        out["state"] = "bidding"
+    if m := HIGH_BID_RX.search(t):
+        out["bid"] = int(re.sub(r"\D", "", m.group(1)))
+    # The bid list: one amount per row under the "Tidpunkt" header
+    lines = [l.strip() for l in t.split("\n") if l.strip()]
+    if "Tidpunkt" in lines:
+        rows = lines[lines.index("Tidpunkt") + 1:][:120]
+        out["bids"] = sum(1 for l in rows if re.fullmatch(r"\d{1,3}(?: \d{3}){1,3} kr", l))
+    return out
+
+
+# ---------- Photos ----------
+
+def _photo_key(url):
+    # The same photo comes in several sizes: "1200_med5q7.jpg", "med5q7_1920.jpg", "x-1536x1024.jpg"
+    stem = urlparse(url).path.rsplit("/", 1)[-1].rsplit(".", 1)[0].lower()
+    return re.sub(r"^\d{3,4}_|_(?:\d{3,4}|thumb)$|-\d+x\d+$", "", stem)
+
+
+def photos(page, limit=15):
+    """The listing's photos: the page's share image first, then the large gallery images."""
+    urls = page.eval_on_selector_all('meta[property="og:image"]', "els => els.map(e => e.content.trim())")
+    urls += page.eval_on_selector_all(
+        "img", "els => els.filter(i => i.naturalWidth >= 600).map(i => i.currentSrc || i.src)")
+    out, seen = [], set()
+    for u in urls:
+        if not u.startswith("http") or re.search(r"\.svg(\?|$)|logo|icon|avatar|maklare|broker|staff", u, re.I):
+            continue
+        k = _photo_key(u)
+        if k not in seen:
+            seen.add(k)
+            out.append(u)
+    return out[:limit]

@@ -1,0 +1,313 @@
+"""Daily apartment finder for Stockholm Bostadsplan.
+
+Reads every estate agent's for-sale list (see agents.py), opens the apartments in
+innanför tullarna that may fit your filter, and saves them to data/listings.json:
+every showing time, price, size, avgift, floor, build year, description, features and
+photos. Each address is placed on OpenStreetMap for its neighbourhood (geo.py).
+
+Once a run, it also reads how many apartments Booli shows for the same filter, as an
+answer key for what the finder may have missed. That is one search page; if Booli
+refuses it, the count is simply missing that day.
+
+It drives your installed Google Chrome, follows each site's robots.txt, keeps a slow
+pace, and stops reading a site that blocks it. Nothing is retried.
+
+    .venv/bin/python scraper/finder.py               # normal run
+    .venv/bin/python scraper/finder.py --agents Notar BOSTHLM
+    .venv/bin/python scraper/finder.py --show        # watch the browser
+"""
+import argparse
+import datetime as dt
+import json
+import os
+import random
+import re
+import sys
+import time
+from pathlib import Path
+from urllib.parse import urlencode
+
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import sync_playwright
+
+import agents
+import geo
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "data"
+PAUSE_S = (3, 6)                   # between pages on one agent's site
+READ_EVERY = dt.timedelta(hours=20)
+BLOCKED = re.compile(r"captcha|verify you are human|är du en människa|access denied|unusual traffic", re.I)
+DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
+BOOLI_INNERSTAN = "143"            # Booli's area "Stockholms innerstad", used only for the count
+
+
+# ---------- Files ----------
+
+def read_json(path, default):
+    try:
+        return json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def write_json(path, data):
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+    os.replace(tmp, path)
+
+
+def log(msg):
+    line = f"{dt.datetime.now():%Y-%m-%d %H:%M:%S}  {msg}"
+    print(line, flush=True)
+    with open(DATA / "scraper.log", "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def status(state, msg="", **extra):
+    s = read_json(DATA / "status.json", {})
+    s.update(state=state, msg=msg, updated=dt.datetime.now().isoformat(timespec="seconds"), **extra)
+    write_json(DATA / "status.json", s)
+
+
+def stamp():
+    return dt.datetime.now().isoformat(timespec="seconds")
+
+
+# ---------- Your filter ----------
+
+def fits(p, f):
+    """Whether an apartment matches the filter set in the planner."""
+    if p.get("soon") and not f.get("includeSoon", True):
+        return False
+    if f.get("maxPrice") and p.get("price") and p["price"] > f["maxPrice"]:
+        return False
+    if f.get("minRooms") and p.get("rooms") and p["rooms"] < f["minRooms"]:
+        return False
+    if f.get("minArea") and p.get("kvm") and p["kvm"] < f["minArea"]:
+        return False
+    if f.get("maxAvgift") and p.get("avgift") and p["avgift"] > f["maxAvgift"]:
+        return False
+    if f.get("notGround") and p.get("floor") in ("BV", "0"):
+        return False
+    return True
+
+
+# ---------- The answer key ----------
+
+def booli_count(pw, f):
+    """How many apartments Booli shows in Stockholms innerstad for the same filter: one page,
+    in a Chrome window of its own, since Booli refuses Chrome without one."""
+    q = {"areaIds": BOOLI_INNERSTAN, "objectType": "Lägenhet"}
+    if f.get("maxPrice"):
+        q["maxListPrice"] = f["maxPrice"]
+    if f.get("minRooms"):
+        q["minRooms"] = f["minRooms"]
+    if f.get("minArea"):
+        q["minLivingArea"] = f["minArea"]
+    if f.get("maxAvgift"):
+        q["maxRent"] = f["maxAvgift"]
+    if f.get("notGround"):
+        q["floor"] = "aboveBottomFloor"
+    url = "https://www.booli.se/sok/till-salu?" + urlencode(q)
+    try:
+        try:
+            browser = pw.chromium.launch(channel="chrome", headless=False)
+        except PlaywrightError:
+            browser = pw.chromium.launch(headless=False)
+        page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
+        resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(4000)
+        text = page.inner_text("body")
+        browser.close()
+    except PlaywrightError as e:
+        log(f"Booli's count: couldn't load the page ({e})")
+        return None
+    if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
+        log(f"Booli's count: Booli refused the page ({resp.status if resp else '?'}), so there is no count today")
+        return None
+    m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text.replace(" ", " "))
+    if not m:
+        log("Booli's count: the page didn't show a count")
+        return None
+    return {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0), "at": stamp()}
+
+
+# ---------- Reading the agents ----------
+
+def read_listing(page, url, card, now, places):
+    """Open one apartment page. Returns (listing or None, refused?)."""
+    try:
+        resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        page.wait_for_timeout(2000)
+        for _ in range(3):  # galleries load their photos as you scroll
+            page.mouse.wheel(0, 2500)
+            page.wait_for_timeout(500)
+        text = page.inner_text("body")
+    except PlaywrightError as e:
+        log(f"Couldn't open {url} ({e})")
+        return None, False
+    if resp is not None and resp.status in (403, 429):
+        return None, True
+    if BLOCKED.search(text):
+        return None, True
+    if (resp is not None and resp.status >= 400) or agents.is_sold(text):
+        return None, False
+    d = agents.parse_agent_page(text, now)
+    h1 = page.locator("h1").first.inner_text() if page.locator("h1").count() else ""
+    title = page.title()
+    addr = agents.find_address(h1, title, card, text[:600])
+    if not addr:
+        log(f"No address found on {url}")
+        return None, False
+    place = places.lookup(addr)
+    if not place or not place["inner"]:
+        return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
+    d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
+    d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
+    return d, False
+
+
+def follow(page, store, saved, robots):
+    """Every saved apartment, read on every run whatever the filter says: its state,
+    the highest bid and, once sold, the final price. Each day's reading is kept."""
+    followed = store.setdefault("followed", {})
+    for url, name in saved.items():
+        if not robots.allowed(url):
+            continue
+        try:
+            resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(2500)
+            text = page.inner_text("body")
+        except PlaywrightError as e:
+            log(f"Following {name}: couldn't open the page ({e})")
+            continue
+        f = followed.setdefault(url, {"addr": name, "history": []})
+        if resp is not None and resp.status == 404:
+            f["state"] = "gone"  # the agent took the page down, usually soon after the sale
+            continue
+        if (resp is not None and resp.status in (403, 429)) or BLOCKED.search(text):
+            log(f"Following {name}: the site refused the page")
+            continue
+        b = agents.parse_bidding(text)
+        f.update(b, read=stamp())
+        today, last = stamp()[:10], (f["history"][-1] if f["history"] else {})
+        entry = {"at": stamp(), **{k: b[k] for k in ("state", "bid", "bids", "final") if k in b}}
+        if last.get("at", "")[:10] == today:
+            f["history"][-1] = entry
+        elif {k: v for k, v in last.items() if k != "at"} != {k: v for k, v in entry.items() if k != "at"} or not last:
+            f["history"].append(entry)
+        log(f"Following {name}: {b['state']}" + (f", highest bid {b['bid']:,} kr".replace(",", " ") if b.get("bid") else ""))
+        time.sleep(random.uniform(*PAUSE_S))
+
+
+def run(args):
+    DATA.mkdir(exist_ok=True)
+    lock = DATA / ".scrape.lock"
+    if lock.exists() and time.time() - lock.stat().st_mtime < 4 * 3600:
+        try:
+            os.kill(int(lock.read_text()), 0)
+            print("Another run is going.", file=sys.stderr)
+            return 1
+        except (ValueError, OSError):
+            pass  # left behind by a run that was stopped
+    lock.write_text(str(os.getpid()))
+    try:
+        return find(args)
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def find(args):
+    cfg = read_json(DATA / "scrape.json", {})
+    f = {**DEFAULT_FILTER, **(cfg.get("filter") or {})}
+    if args.max_price:
+        f["maxPrice"] = args.max_price
+    plan = read_json(DATA / "plan.json", {})
+    visits = plan.get("show", {}).get("visits", {})
+    # Apartments you saved, by their page on the agent's site
+    saved = {a["link"]: a.get("address") or a["link"] for a in plan.get("apts", []) if str(a.get("link", "")).startswith("http")}
+    store = read_json(DATA / "listings.json", {})
+    if "items" not in store or any(k.startswith(("annons/", "bostad/")) for k in store.get("items", {})):
+        store = {"items": {}}  # listings saved by the old Booli scraper are replaced
+    items = store["items"]
+    started, now = stamp(), dt.datetime.now()
+    status("running", "Starting", started=started)
+    log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")
+    places, robots = geo.Geocoder(DATA, log), agents.Robots()
+    chosen = [a for a in agents.AGENTS if not args.agents or a["name"] in args.agents]
+    report, notes = {}, []
+    try:
+        with sync_playwright() as pw:
+            try:  # your installed Google Chrome; Playwright's own Chromium as a fallback
+                browser = pw.chromium.launch(channel="chrome", headless=not args.show)
+            except PlaywrightError:
+                browser = pw.chromium.launch(headless=not args.show)
+            page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
+            for i, ag in enumerate(chosen, 1):
+                status("running", f"Reading {ag['name']}'s list ({i} of {len(chosen)})", started=started)
+                cards = agents.discover(ag, page, robots, DATA / "cache", log)
+                want = {u: t for u, t in cards.items() if agents.looks_inner(u, t)
+                        and not ((c := agents.parse_card(t)).get("price") and f.get("maxPrice") and c["price"] > f["maxPrice"] * 1.15)}
+                read = kept = 0
+                for n, (url, card) in enumerate(want.items(), 1):
+                    old = items.get(url)
+                    if old and old.get("read") and now - dt.datetime.fromisoformat(old["read"]) < READ_EVERY:
+                        old["seen"] = stamp()
+                        kept += not old.get("outside")
+                        continue
+                    if not robots.allowed(url):
+                        continue
+                    status("running", f"Reading {ag['name']}, apartment {n} of {len(want)}", started=started)
+                    p, refused = read_listing(page, url, card, now, places)
+                    if refused:
+                        log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
+                        notes.append(f"{ag['name']} refused a page, so some of its apartments may be missing.")
+                        break
+                    read += 1
+                    if p:
+                        p.update(agent=ag["name"], seen=stamp())
+                        items[url] = p
+                        kept += not p.get("outside")
+                    write_json(DATA / "listings.json", store)
+                    time.sleep(random.uniform(*PAUSE_S))
+                report[ag["name"]] = {"listed": len(cards), "candidates": len(want), "read": read, "inner": kept}
+                log(f"{ag['name']}: {len(cards)} on the list, {len(want)} inner-city candidates, read {read}, {kept} in the inner city")
+                # Apartments that left an agent's list are sold or withdrawn
+                if cards:
+                    for url in [u for u, p in items.items() if p.get("agent") == ag["name"] and u not in cards and u not in visits and u not in saved]:
+                        del items[url]
+            if saved:
+                status("running", f"Following {len(saved)} saved apartment{'s' if len(saved) > 1 else ''}", started=started)
+                follow(page, store, saved, robots)
+            if not args.no_count:
+                status("running", "Reading Booli's count", started=started)
+                store["booli"] = booli_count(pw, f) or {**(store.get("booli") or {}), "missing": stamp()}
+            browser.close()
+    except Exception as e:  # keep what was read, and say what went wrong
+        write_json(DATA / "listings.json", store)
+        log(f"Failed: {e!r}")
+        status("error", f"The finder stopped early: {str(e)[:160]}", started=started)
+        return 3
+    cutoff = (now - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+    for p in items.values():  # past showings drop off
+        p["shows"] = [s for s in p.get("shows", []) if s["start"] >= cutoff]
+    found = [p for p in items.values() if not p.get("outside") and fits(p, f)]
+    store.update(lastRun=stamp(), filter=f, agents=report,
+                 found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon"))})
+    write_json(DATA / "listings.json", store)
+    b = store.get("booli") or {}
+    msg = f"Found {store['found']['forSale']} for sale and {store['found']['soon']} coming soon."
+    msg += f" Booli shows {b['forSale']} and {b['soon']}." if b.get("forSale") is not None and not b.get("missing") else " Booli's count wasn't available today."
+    log(f"Run finished. {msg}")
+    status("partial" if notes else "done", " ".join([msg] + notes), started=started, finished=store["lastRun"])
+    return 0
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--agents", nargs="*", help="only these agents, by name")
+    ap.add_argument("--max-price", type=int, help="max price instead of the planner's filter")
+    ap.add_argument("--no-count", action="store_true", help="don't read Booli's count")
+    ap.add_argument("--show", action="store_true", help="show the browser window")
+    sys.exit(run(ap.parse_args()))

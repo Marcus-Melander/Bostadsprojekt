@@ -1,5 +1,5 @@
 #!/bin/bash
-# Starts the planner's server when you log in, and runs the Booli scraper every day at 06:30.
+# Starts the planner's server when you log in, and runs the apartment finder every day at 06:30.
 # If the Mac is asleep at 06:30, launchd runs the scraper when it wakes.
 # Remove both again with: scripts/install-mac.sh --remove
 set -euo pipefail
@@ -37,7 +37,7 @@ cat > "$AGENTS/$SCRAPE.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$SCRAPE</string>
-  <key>ProgramArguments</key><array><string>$ROOT/.venv/bin/python</string><string>$ROOT/scraper/booli_scraper.py</string></array>
+  <key>ProgramArguments</key><array><string>$ROOT/.venv/bin/python</string><string>$ROOT/scraper/finder.py</string></array>
   <key>WorkingDirectory</key><string>$ROOT</string>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>30</integer></dict>
   <key>StandardOutPath</key><string>$ROOT/data/scraper.out</string>
@@ -47,4 +47,4 @@ PLIST
 
 launchctl bootstrap "gui/$(id -u)" "$AGENTS/$SERVER.plist"
 launchctl bootstrap "gui/$(id -u)" "$AGENTS/$SCRAPE.plist"
-echo "Installed. The planner is at http://localhost:8765 and Booli is read every day at 06:30."
+echo "Installed. The planner is at http://localhost:8765 and the finder runs every day at 06:30."

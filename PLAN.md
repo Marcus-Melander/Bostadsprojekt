@@ -1,70 +1,44 @@
-# Plan: showings, areas and location scores
+# Plan and feature list
 
-The goal is a new **Showings** view in the planner. It lists apartments in innanför tullarna that have a visning next week. Each one gets a one-sentence description and a score for how well it fits you. You can rate an area after a showing, and apartments near places you disliked are hidden.
+Every feature asked for goes here, with where it stands. The planner runs locally (`server.py` on http://localhost:8765) and a scraper fills it once a day.
 
-The work is split into seven steps of about a day each. Each step ends in something you can use.
+**Rule for the whole project:** everything is automatic, except what can't be found online: your salary, savings, what you put aside each month, and your own ratings and notes.
 
-## Constraints that shape the design
+## In progress
 
-- **The published planner can't fetch other websites.** A claude.ai artifact runs in a sandbox, so listing data has to arrive some other way: a local script that writes a data file, the desktop app's browser, or something you paste in.
-- **Booli blocks plain scripted requests.** A direct request from a script gets HTTP 403. We will not disguise a script as a browser to get around that. Step 1 picks a source that works within what Booli allows.
-- **Location data must be free and have no key where possible.** Grocery stores and gyms come from OpenStreetMap through the Overpass API, which is free and needs no key. Commute times need SL's journey planner through Trafiklab's ResRobot API, which needs a free personal key.
+- **Find listings on the estate agents' own sites instead of Booli.** Read every agent's for-sale list, pressing "show more" where needed. Use recent sitemap entries where a list is incomplete. Keep the inner-city candidates, then read each apartment's page.
+- **Remove everything about Booli from the planner and the scraper,** except Booli's count (next item).
+- **Booli's count as the answer key.** Once a day, the scraper reads the count Booli shows for the same filter (for example "118 till salu och 160 snart till salu" in Stockholms innerstad). The planner compares it with what we found. It's one page a day; if Booli refuses it, the count is simply missing that day.
+- **Our own neighbourhoods.** Look each address up on OpenStreetMap (Nominatim, at most one lookup a second) to get its neighbourhood and district, and to check that it's inside the inner city. Carry ratings over from Booli's areas by name, for example SoFo.
+- **Our own search filter:** max price (4 500 000 kr), min rooms, min m², max avgift, not on the ground floor, coming soon included.
 
-## Steps
+## Next
 
-### 1. Listing source (needs your decision)
+- **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
+- **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
+- **Cover Erik Olsson.** Their list covers all of Sweden in one endlessly scrolling page and needs a way to filter to Stockholm.
+- **More agents,** such as Fastighetsbyrån, SkandiaMäklarna, LF, Living and Svensk Fastighetsförmedling, until the answer key matches.
+- **Commute, grocery store and gym.**
+  - Distance to the nearest grocery store and gym from OpenStreetMap.
+  - Travel time to work by SL, via Trafiklab ResRobot (a free key). Without a key, estimate it from the nearest T-bana station.
+- **Ranking.** One score from budget fit, commute, grocery store, gym, your area ratings and features, with sliders for how much each counts and a reason for every score.
 
-| Option | How it works | Trade-off |
-|---|---|---|
-| A. Booli in the app's browser | When you open the planner in the Claude desktop app, it reads Booli's search results and listing pages through the built-in browser, which you approve. It opens only the pages a person would, at a slow pace. | Most automatic. It only works in the desktop app, and Booli's terms of use should be checked first. |
-| B. Paste a listing | You paste a Booli link or the listing text, and the planner extracts the fields. | Always works and is fully within the rules, but it is manual: about 10 seconds per apartment. |
-| C. Booli e-mail alerts | Booli e-mails new listings for a saved search, and the planner reads them through your Gmail connector. | Automatic and legitimate, but the e-mails may not include showing times. |
-| D. Ask Booli for API access | Booli has offered an API to partners. | Cleanest data, but it is uncertain and slow to get. |
+## Done
 
-Whichever source we pick fills the same record for each apartment: id, link, address, latitude and longitude, price, kvm, rooms, avgift, floor, showing times and the description text.
-
-### 2. Features and a one-line description
-
-- Rules in Swedish pick out features from the description: balkong, hiss, eldstad, renoverat kök or badrum, stambyte gjort, takhöjd, våning, läge (gård or gata, söderläge), förråd, uteplats and tvättstuga.
-- The planner's built-in Claude access then writes one sentence per apartment from those features. For example: "Bright 2:a on 4th floor with balcony to the courtyard, kitchen renovated 2021, stambyte done."
-- Each sentence is generated once and saved.
-
-### 3. Showings next week
-
-- The view shows a day-by-day list of showings from Monday to Sunday.
-- Each row shows the time, the address, the one-line description, the monthly cost from your finances, and whether it fits your max bid.
-- One click adds an apartment to your tracked apartments or to the bidding plan.
-
-### 4. Area ratings and "never near here again"
-
-- After a showing you rate the place from 1 to 5, or choose **never near here**. The rating is saved with the apartment's coordinates.
-- Apartments within a set distance of a disliked place are hidden or scored lower. The distance is 600 m by default and you can change it. Apartments near places you liked get a boost.
-- You can also rate whole neighbourhoods, such as Hornstull, SoFo, Birkastan or Gärdet, before you've been to any showing there.
-
-### 5. Location scores
-
-- **Grocery stores and gyms:** a local script downloads supermarkets and gyms in innanför tullarna from OpenStreetMap once, and the planner works out the walking distance to the nearest of each.
-- **Commute:** you enter your work address. With a ResRobot key, the script works out the door-to-door SL travel time from a grid of points over the inner city. Without a key, the planner estimates it from the nearest T-bana station and the line to your work.
-- These are saved as a data file, so the planner needs no network at runtime.
-
-### 6. Ranking
-
-- One score per apartment combines:
-  - fit with your budget;
-  - commute time;
-  - distance to a grocery store and to a gym;
-  - your area ratings;
-  - features you care about.
-- You set how much each part counts with sliders.
-- Each apartment shows why it scored as it did. For example: "12 min to work, ICA 150 m, no gym within 1 km, near a place you rated 2."
-
-### 7. Map, tests and release
-
-- Add a map if the artifact sandbox allows map tiles. Otherwise, draw a simple outline of innanför tullarna.
-- Extend the browser test, update the README and push.
-
-## Order and dependencies
-
-- Step 1 must come first, because every later step uses the listing record.
-- Steps 4 and 5 don't depend on each other.
-- Step 6 needs steps 2 to 5.
+- **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.
+- **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here).
+- **Save apartments and follow their bidding.** "Save" on a showing (it replaces Track) adds the apartment to Saved. The finder then reads its page on every run, whatever the filter says. It records the highest bid each day and the final price once it's sold, and Saved shows the bid history.
+- **Show whether the daily run is installed.** The finder panel shows "Runs every morning at 06:30, next run tomorrow" when the schedule is installed, and how to switch it on when it isn't.
+- **The planner:** finances, mortgage rates, 5-year budget, area prices, bidding guide, furnishing budget and buying steps.
+- **The Showings tab:**
+  - next week's showings, checked against your budget;
+  - a one-line description of each apartment;
+  - photos and the agent's full description;
+  - "I went", with a rating and notes for the apartment;
+  - area ratings with notes, and "Never here" to hide an area.
+- **The estate agent reader:** every showing time, the build year, running costs, the description, features such as stambyte or a renovated kitchen, and photos, for 10 agents:
+  - Alicia Edelman, Notar, BOSTHLM, Historiska Hem and Tradition;
+  - Södermäklarna, Stadshem, Bergets Ro, Bjurfors and Behrer & Partners.
+- **Running locally:** a local server, the plan saved in `data/plan.json`, and a daily run at 06:30 via `scripts/install-mac.sh`.
+- **Moving the plan off claude.ai:** done once with export and import; the export box was then removed.
+- **The scraper doesn't stop on a refusal:** it keeps what it read, shows a plain message, and never retries.

@@ -69,6 +69,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             s = json.loads(read(DATA / "status.json", b"{}") or b"{}")
             s["running"] = scraper_running()
+            s["scheduled"] = (Path.home() / "Library/LaunchAgents/se.bostadsplan.scrape.plist").exists()
             if s.get("state") == "running" and not s["running"]:
                 s["state"] = "error"
                 s["msg"] = "The last run stopped without finishing. See data/scraper.log."
@@ -103,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(409, {"error": "already running"})
         DATA.mkdir(exist_ok=True)
         log = open(DATA / "scraper.out", "ab")
-        subprocess.Popen([sys.executable, str(ROOT / "scraper" / "booli_scraper.py")], cwd=ROOT,
+        subprocess.Popen([sys.executable, str(ROOT / "scraper" / "finder.py")], cwd=ROOT,
                          stdout=log, stderr=log, start_new_session=True)
         self.json(202, {"ok": True})
 

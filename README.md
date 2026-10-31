@@ -1,19 +1,20 @@
 # Stockholm Bostadsplan
 
-A single-page planner for buying a bostadsrätt in Stockholm. It runs on your own Mac: a small Python server serves the planner and saves your plan, and a Playwright scraper reads Booli once a day.
+A single-page planner for buying a bostadsrätt in Stockholm. It runs on your own Mac: a small Python server serves the planner and saves your plan, and an apartment finder reads the estate agents' own sites once a day. Everything is automatic except what can't be found online: your finances, ratings and notes. `PLAN.md` lists every feature and where it stands.
 
 ## Running it
 
 ```bash
 scripts/setup.sh                 # once: Python environment with Playwright
 .venv/bin/python server.py       # then open http://localhost:8765
-scripts/install-mac.sh           # optional: server at login, scraper daily at 06:30
+scripts/install-mac.sh           # optional: server at login, finder daily at 06:30
 ```
 
-- `scraper/booli_scraper.py` drives your installed Google Chrome. Booli refuses headless Chrome, so a Chrome window opens while it runs, which takes a few minutes.
-- Booli search results give each apartment's next showing, price, size, avgift, features and estate agent. Booli refuses its own listing pages to scripts, so for apartments in your budget the scraper reads the **estate agent's** page instead (`scraper/agents.py`): every showing time, the build year and the description, which also gives features such as "stambyte done" or "renovated kitchen".
-- Agents covered so far: Alicia Edelman, Notar, BOSTHLM, Historiska Hem, Tradition, Södermäklarna, Stadshem, Bergets Ro, Bjurfors and Behrer & Partners. Erik Olsson isn't covered yet.
-- The scraper follows each site's robots.txt and waits 10–20 seconds between Booli pages. If a site blocks it, it stops reading that site and says so in the Showings tab; nothing is retried.
+- `scraper/finder.py` drives your installed Google Chrome. It reads each estate agent's for-sale list (`scraper/agents.py`), opens the inner-city apartments that may fit your filter, and saves every showing time, price, size, avgift, floor, build year, description, features and photos.
+- Each address is looked up on OpenStreetMap's Nominatim (`scraper/geo.py`, at most one lookup a second, cached in `data/geocode.json`). That gives the apartment's neighbourhood and district, and drops anything outside innanför tullarna.
+- Agents covered: Alicia Edelman, Notar, BOSTHLM, Historiska Hem, Tradition, Södermäklarna, Stadshem, Bergets Ro, Bjurfors and Behrer & Partners.
+- **Booli is used only as an answer key.** Once a run, the finder opens one Booli search page, in a Chrome window of its own, to read how many apartments Booli shows for the same filter in Stockholms innerstad. The Showings tab compares that with what the finder found. If Booli refuses the page, the count is missing that day.
+- The finder follows each site's robots.txt, waits a few seconds between pages, and stops reading a site that blocks it. Nothing is retried.
 - Your plan, the scraped listings and the logs are kept in `data/`, which git ignores.
 - `scripts/install-mac.sh --remove` removes the schedule again.
 
@@ -24,8 +25,8 @@ scripts/install-mac.sh           # optional: server at login, scraper daily at 0
 - **Mortgage rates:** list rates and average rates (snittränta) from 15 Swedish lenders, with the monthly interest on your loan.
 - **5-year budget:** editable rate scenarios (steady, rising, falling, 2022-style shock) in today's money, showing money left each month, loan, apartment value and equity.
 - **Area prices:** yearly kr/kvm for 13 Stockholm districts, with a log-linear regression trend and a 95 % prediction range.
-- **Apartments:** Booli search links built from your budget, plus tracked apartments with monthly cost and checks on the förening.
-- **Showings:** apartments in innanför tullarna with a visning next week, read from Booli. Rate Booli's named areas (SoFo, Sofia, Birkastan…) from 1 to 5 or "Never here", add notes and log the showings you went to. You can paste a Booli search link to use its filters, or copy the current search back to Booli. The listings come from the daily scraper.
+- **Apartments:** how high to search given room for bidding, plus tracked apartments with monthly cost and checks on the förening.
+- **Showings:** apartments in innanför tullarna with a visning next week, found on the estate agents' sites, with photos, the agent's description and the monthly cost. Set your filter (max price, rooms, size, avgift, ground floor, coming soon). Rate neighbourhoods from 1 to 5 or "Never here", add notes and log the showings you went to.
 - **Bidding:** a bidding plan between asking price and your walk-away price, what each extra bid costs per month, and what Swedish and Norwegian research says about jump bidding.
 - **Furnishing:** a room-by-room furniture budget at three price levels.
 - **Buying steps:** a checklist from saving the kontantinsats to getting the keys.

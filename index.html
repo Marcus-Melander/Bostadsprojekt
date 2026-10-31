@@ -69,16 +69,24 @@ body { background: var(--ground); color: var(--text); font-family: var(--f-body)
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ground); }
 .wrap { max-width: calc(1152px + 2 * max(16px, env(safe-area-inset-left, 0px))); margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ground); border-bottom: 1px solid var(--border); }
-.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 48px; }
+.topbar { display: flex; align-items: center; gap: 28px; height: 56px; }
+.topbar .save-state { margin-left: auto; white-space: nowrap; }
 .brand-name { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .brand-name svg { flex: none; }
 .brand-name span { color: var(--muted); font-weight: 500; }
 .save-state { font-size: var(--fs-small); color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .save-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--chart-2); display: inline-block; }
 .save-state.ok i { background: var(--positive); }
-nav.tabs { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+nav.tabs { display: flex; gap: 22px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
 nav.tabs::-webkit-scrollbar { display: none; }
-nav.tabs button { flex: none; font: 500 14px var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 0 10px; margin-bottom: -1px; cursor: pointer; }
+nav.tabs button { flex: none; font: 500 15px var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+nav.tabs .count { font-size: 12px; font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--raised); color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+nav.tabs .count:empty { display: none; }
+nav.subtabs { display: flex; gap: 4px; margin: -8px 0 24px; overflow-x: auto; scrollbar-width: none; }
+nav.subtabs button { flex: none; font: 500 13px var(--f-body); color: var(--muted); background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+nav.subtabs button:hover { color: var(--text); background: var(--raised); }
+nav.subtabs button[aria-current="true"] { color: var(--text); background: var(--surface); border-color: var(--border); }
+@media (max-width: 560px) { .topbar { gap: 14px; } .topbar .brand-name { font-size: 0; gap: 0; } .topbar .save-state span { display: none; } nav.tabs { gap: 16px; } nav.tabs button { font-size: 14px; } }
 nav.tabs button:hover { color: var(--text); }
 nav.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
@@ -89,7 +97,8 @@ main { padding-block: 32px 64px; }
 .lead p { margin: 0; color: var(--muted); font-size: 15px; line-height: 22px; max-width: 72ch; }
 .lead p strong { color: var(--text); font-weight: 500; }
 .bench { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
-@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.bench.rev { grid-template-columns: minmax(0, 1fr) minmax(0, 340px); }
+@media (max-width: 900px) { .bench, .bench.rev { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; min-width: 0; }
 .panel h3 { font-size: var(--fs-section); line-height: 22px; margin: 0 0 12px; font-weight: 500; }
 .stack { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
@@ -183,6 +192,8 @@ td a:hover { text-decoration: underline; }
 .apts { display: flex; flex-direction: column; gap: var(--gap); }
 .apt { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 16px; }
 @media (max-width: 760px) { .apt { grid-template-columns: minmax(0, 1fr); } }
+.apt-photo { grid-column: 1 / -1; display: block; aspect-ratio: 16 / 6; border-radius: 6px; overflow: hidden; background: var(--raised); margin: -4px -4px 0; }
+.apt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .apt-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; grid-column: 1 / -1; }
 .apt-head input[type="text"] { flex: 1 1 220px; font-weight: 500; font-size: 15px; height: 36px; }
 .apt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--gap); }
@@ -223,21 +234,51 @@ a { color: var(--text); text-underline-offset: 2px; }
 .evid a { font-size: 12px; color: var(--muted); }
 svg text { font-family: var(--f-body); }
 @media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
-.move textarea { width: 100%; margin-top: 12px; font: 400 13px var(--f-body); border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 8px; resize: vertical; }
+/* Map */
+.map-panel { padding: 0; overflow: hidden; margin: 8px 0 4px; }
+#map { height: 380px; background: var(--raised); }
+.map-panel .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: 12px; border-top: 1px solid var(--border); }
+.map-panel .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.map-panel .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.leaflet-container { font: 13px var(--f-body); }
+.leaflet-popup-content a { color: var(--data); }
+.leaflet-tile-pane { filter: saturate(.3) brightness(1.04); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); } }
+:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+@media (max-width: 640px) { #map { height: 300px; } }
 /* Showings */
-.show input[type="text"], .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
+.show input[type="text"]:not([data-num]), .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
 .show label.paste { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 12px; }
 .show label.paste input { width: 100%; }
-.crawl { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.crawl { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 20px; }
+.crawl > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.crawl .dot { margin-top: 6px; }
 .crawl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--control); flex: none; }
 .crawl .dot.running { background: var(--data); animation: pulse 1.2s ease-in-out infinite; }
 .crawl .dot.done { background: var(--positive); }
+.crawl .dot.partial { background: var(--warning); }
+.answer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.answer div { display: flex; flex-direction: column; gap: 2px; }
+.answer .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.answer .s { font-size: 12px; color: var(--muted); }
+.answer .booli { border-left: 1px solid var(--rule); padding-left: 10px; }
+details.agents { margin-top: 10px; font-size: 13px; }
+details.agents summary, details.undated > summary { cursor: pointer; }
+details.agents table { width: 100%; margin-top: 6px; border-collapse: collapse; }
+details.agents td { padding: 3px 0; border-top: 1px solid var(--rule); }
+details.agents td + td { text-align: right; color: var(--muted); }
+details.undated { margin-top: 22px; }
+.follow { margin: 0 0 12px; display: grid; gap: 6px; }
+.follow .bids { margin: 0; padding: 0; list-style: none; font-size: 12px; display: grid; gap: 2px; }
+.follow .bids li { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); }
+details.undated > summary { font-weight: 600; margin-bottom: 8px; }
+.hood-row > span:first-child { min-width: 0; }
 .crawl .dot.blocked, .crawl .dot.error, .crawl .dot.denied { background: var(--negative); }
 @keyframes pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .crawl .dot.running { animation: none; } }
-#tabs button.busy::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--data); margin-left: 6px; vertical-align: middle; }
+#tabs button.busy::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--data); margin-left: 6px; vertical-align: middle; }
 .hood-group h4 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 2px; }
-.hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
 .hood-row label { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .hood-row input[type="text"] { grid-column: 1 / -1; }
 .hood-row.never label { color: var(--muted); text-decoration: line-through; }
@@ -251,6 +292,13 @@ svg text { font-family: var(--f-body); }
 .show-card { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; }
 .show-card + .show-card { margin-top: 8px; }
 .show-card.never { opacity: .5; }
+.show-card.has-photo { grid-template-columns: 92px 168px minmax(0, 1fr) auto; }
+.show-card .thumb { display: block; width: 168px; aspect-ratio: 3 / 2; border-radius: 6px; overflow: hidden; background: var(--raised); }
+.show-card .thumb img, .gallery .strip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery { margin: 0 0 8px; font-size: 13px; }
+.gallery summary { cursor: pointer; }
+.gallery .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; margin-top: 8px; }
+.gallery .strip a { display: block; aspect-ratio: 3 / 2; border-radius: 4px; overflow: hidden; background: var(--raised); }
 .show-card .t { font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
 .show-card p { margin: 4px 0 6px; font-size: 14px; }
 .show-card a { color: var(--text); }
@@ -263,30 +311,25 @@ svg text { font-family: var(--f-body); }
 .sc-act { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 @media (max-width: 900px) { .bench.show > div:last-child { order: -1; } }
 @media (max-width: 640px) {
-  .show-card { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .show-card, .show-card.has-photo { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .show-card .thumb { width: 100%; }
   .sc-act { flex-direction: row; align-items: center; }
   .visit { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <header class="top">
-  <div class="wrap">
-    <div class="brand">
-      <div class="brand-name"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="5" fill="var(--data)"/><path d="M4.5 11.5 11 5.5l6.5 6V17h-4.25v-3.5h-4.5V17H4.5z" fill="var(--surface)"/></svg>Stockholm Bostadsplan</div>
-      <div class="save-state" id="saveState"><i></i><span>Loading…</span></div>
-    </div>
-    <nav class="tabs" role="tablist" id="tabs">
-      <button role="tab" data-tab="overview">Overview</button>
-      <button role="tab" data-tab="money">My finances</button>
-      <button role="tab" data-tab="rates">Mortgage rates</button>
-      <button role="tab" data-tab="five">5-year budget</button>
-      <button role="tab" data-tab="value">Area prices</button>
-      <button role="tab" data-tab="search">Apartments</button>
-      <button role="tab" data-tab="show">Showings</button>
-      <button role="tab" data-tab="bid">Bidding</button>
-      <button role="tab" data-tab="furnish">Furnishing</button>
-      <button role="tab" data-tab="steps">Buying steps</button>
+  <div class="wrap topbar">
+    <div class="brand-name"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="5" fill="var(--data)"/><path d="M4.5 11.5 11 5.5l6.5 6V17h-4.25v-3.5h-4.5V17H4.5z" fill="var(--surface)"/></svg>Bostadsplan</div>
+    <nav class="tabs" role="tablist" id="tabs" aria-label="Sections">
+      <button role="tab" data-sec="show">Showings</button>
+      <button role="tab" data-sec="saved">Saved<span class="count" id="savedCount"></span></button>
+      <button role="tab" data-sec="money">Money</button>
+      <button role="tab" data-sec="buying">Buying</button>
     </nav>
+    <div class="save-state" id="saveState"><i></i><span>Loading…</span></div>
   </div>
 </header>
 <main class="wrap" id="app"></main>
@@ -386,7 +429,7 @@ const STEPS = [
   ["credit", "Check your credit and clean up debts", "Pay off or close small loans and unused credit cards. Banks count your total debt against your income, and CSN counts too."],
   ["save", "Save the kontantinsats plus a buffer", "At least 10 % of the price in cash (since 1 April 2026), plus fees, moving and furniture."],
   ["promise", "Get a lånelöfte from two or three banks", "A loan commitment shows brokers you can pay. It is usually valid 3–6 months. Rate shopping within a short window counts as one inquiry in practice, but ask each bank whether they use UC."],
-  ["watch", "Watch Booli and Hemnet, study sold prices", "Use Booli's slutpriser to see what similar apartments in your area actually sold for, not just the asking price."],
+  ["watch", "Follow the market, study sold prices", "Look at slutpriser for similar apartments in your area to see what they actually sold for, not just the asking price."],
   ["view", "Go to viewings and ask for documents", "Ask the broker for the förening's årsredovisning, stadgar, planned renovations (stambyte, fönster, tak) and the energy declaration."],
   ["forening", "Review the bostadsrättsförening", "Look at debt per kvm, whether the avgift was recently raised or is about to be, whether it is an äkta förening, and if the land is owned or leased (tomträtt)."],
   ["bid", "Bid", "Bids are not legally binding in Sweden until the contract is signed. Decide your walk-away price before bidding starts."],
@@ -400,7 +443,7 @@ const STEPS = [
 /* ---------- State ---------- */
 const DEFAULT = () => ({
   v: 3,
-  tab: "overview",
+  tab: "show",
   example: true,
   fin: {
     buyers: 1,
@@ -440,7 +483,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { maxPrice: 4500000, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
+  show: { f: { maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
 });
 let S = DEFAULT();
 
@@ -456,6 +499,7 @@ function migrate() {
     if (S.search.area === "1" || S.search.area === "2") S.search.area = "115341";
   }
   if (!AREAS[S.value.area]) S.value.area = "centrala-stockholm";
+  migrateShow(); // Booli's areas and filter become our own
   S.v = 3;
 }
 function merge(base, saved) {
@@ -675,8 +719,6 @@ const AREAS = {
   ostermalm: { name: "Östermalm", from: 2005, now: 129172, v: [41102,48270,55741,54130,56105,60923,62911,63928,68007,74319,89044,93772,97274,93024,95043,102354,112186,115806,112144,116589,120781] },
 };
 const BUY_YEAR = 2026;
-// Booli area ids, checked on booli.se (30 Oct 2026)
-const BOOLI_AREAS = [["115341", "Södermalm"], ["1", "All of Stockholms kommun"]];
 // Log-linear least squares: ln(kr/kvm) = a + b·year, over the last `win` years (0 = all)
 function regress(key, win) {
   const A = AREAS[key] || AREAS["centrala-stockholm"];
@@ -740,7 +782,7 @@ const RANGES = {
   "fin.targetPrice": [1000000, 12000000, 25000], "fin.bankOffer": [0, 10000000, 50000],
   "bid.ask": [1000000, 12000000, 25000], "bid.walk": [1000000, 12000000, 25000], "bid.step": [5000, 100000, 5000],
   "five.avgiftExtra": [0, 5, 0.25], "rates.offer": [1, 6, 0.01], "value.manual": [-5, 10, 0.5],
-  "show.maxPrice": [1000000, 12000000, 50000],
+  "show.f.maxPrice": [1000000, 12000000, 50000], "show.f.minRooms": [1, 6, 0.5], "show.f.minArea": [15, 150, 5], "show.f.maxAvgift": [1000, 10000, 250],
   "search.minRooms": [1, 6, 0.5], "search.minArea": [15, 150, 5], "search.maxAvgift": [1000, 10000, 250], "search.headroom": [0, 25, 1],
 };
 const nfIn = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
@@ -818,11 +860,10 @@ const VIEWS = {
         <button class="tile" data-goto="rates"><span class="eyebrow">Monthly cost at target</span><span class="v">${kr(mc.total)}</span><span class="s">After ränteavdrag, at ${pct(cr.rate)} (${esc(cr.label)})</span></button>
         <button class="tile" data-goto="rates"><span class="eyebrow">Best 3-month list rate</span><span class="v">${pct(bestRate("m3"))}</span><span class="s">${esc(BANKS.find((b) => b.r.m3 === bestRate("m3")).name)}, updated ${RATES_UPDATED}</span></button>
         <button class="tile" data-goto="five"><span class="eyebrow">Tightest month in 5 years</span><span class="v">${kr(Math.min(...Object.values(S.five.scen).flatMap((sc) => projectFive(sc).map((r) => r.left))))}</span><span class="s">Left over in the worst scenario</span></button>
-        <button class="tile" data-goto="search"><span class="eyebrow">Search Booli up to</span><span class="v">${mkr(searchTo)}</span><span class="s">${S.apts.length} apartment${S.apts.length === 1 ? "" : "s"} tracked</span></button>
+        <button class="tile" data-goto="show"><span class="eyebrow">Showings search up to</span><span class="v">${mkr(+S.show.f.maxPrice || searchTo)}</span><span class="s">${apartments().length} apartments found, ${S.apts.length} saved</span></button>
         <button class="tile" data-goto="furnish"><span class="eyebrow">Furnishing budget</span><span class="v">${kr(furn.total)}</span><span class="s">${furn.count} items to buy, ${TIERS.find((t) => t[0] === S.furn.tier)[1].toLowerCase()}</span></button>
         <button class="tile" data-goto="steps"><span class="eyebrow">Buying steps</span><span class="v">${doneSteps} / ${STEPS.length}</span><span class="s">${doneSteps < STEPS.length ? "Next: " + esc(STEPS.find((s) => !S.steps[s[0]])[1]) : "All done. Welcome home."}</span></button>
-      </div>
-      ${movePanel()}`;
+      </div>`;
   },
 
   money() {
@@ -1142,7 +1183,7 @@ const VIEWS = {
           <section class="panel"><h3>Before you place the first bid</h3>
             <ul style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.9rem">
               <li>Write your walk-away price down, and tell it to someone who will hold you to it.</li>
-              <li>Look up what similar apartments in the förening and nearby actually sold for on Booli's slutpriser. Ignore the asking price: it is often set low to draw bidders.</li>
+              <li>Look up what similar apartments in the förening and nearby actually sold for (slutpriser). Ignore the asking price: it is often set low to draw bidders.</li>
               <li>Ask the broker how the bidding works: deadlines, whether they take bids before the viewing, and when the seller decides.</li>
               <li>Have your lånelöfte ready and check that it covers your walk-away price.</li>
               <li>Check the förening's årsredovisning before bidding, not after you've won.</li>
@@ -1202,39 +1243,22 @@ const VIEWS = {
   search() {
     const s = S.search, a = affordability();
     const searchTo = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
-    const q = (base) => {
-      const p = new URLSearchParams({ areaIds: s.area || "1", objectType: "Lägenhet" });
-      if (base === "till-salu") p.set("maxListPrice", searchTo);
-      if (s.minRooms) p.set("minRooms", s.minRooms);
-      if (s.minArea) p.set("minLivingArea", s.minArea);
-      if (s.maxAvgift) p.set("maxRent", s.maxAvgift);
-      return `https://www.booli.se/sok/${base}?${p.toString()}`;
-    };
+    const using = +S.show.f.maxPrice === searchTo;
     return `
-      <div class="lead"><h1>Apartments</h1>
-      <p>The search links are built from your max price. Paste in apartments you like to see what each one costs per month and how healthy the förening looks.</p></div>
-      <div class="bench">
-        <section class="panel"><h3>Booli search</h3>
-          <div class="field"><label for="f-area">Area</label><select id="f-area" data-path="search.area">
-            ${BOOLI_AREAS.map(([v, l]) => `<option value="${v}" ${s.area === v ? "selected" : ""}>${l}</option>`).join("")}
-            ${!BOOLI_AREAS.some(([v]) => v === s.area) ? `<option value="${esc(s.area)}" selected>Area id ${esc(s.area)}</option>` : ""}
-          </select><small>For Kungsholmen, Vasastan or Östermalm, pick the area on Booli and copy the number after <span class="mono">areaIds=</span> in the address into the field below.</small></div>
-          <div class="field"><label for="f-areaid">Booli area id</label><input id="f-areaid" type="text" inputmode="numeric" data-path="search.area" value="${esc(s.area)}" style="width:7em"></div>
-          ${numField("search.minRooms", "Min rooms", "rok", "", "0.5")}
-          ${numField("search.minArea", "Min size", "kvm", "", "5")}
-          ${numField("search.maxAvgift", "Max avgift", "kr/mån", "", "250")}
-          ${numField("search.headroom", "Room for bidding above asking", "%", "Stockholm apartments often sell above the asking price, so search below your max.", "1")}
-        </section>
+      <div class="lead"><h1>Saved apartments</h1>
+      <p>What each one costs per month, how healthy the förening looks and, once bidding starts, the highest bid each day. Save one from Showings, or add it here with a link to the agent's page.</p></div>
+      <div class="bench rev">
+        <div>
+          <div class="row" style="margin:0 0 12px"><span class="dim" style="font-size:13px">${S.apts.length} saved</span><span class="spacer"></span><button class="btn" data-act="add-apt">Add apartment</button></div>
+          <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">Nothing saved yet. Press Save on a showing to follow it here.</div>`}</div>
+        </div>
         <div class="stack">
-          <section class="panel">
+          <section class="panel"><h3>How high to search</h3>
+            ${numField("search.headroom", "Room for bidding above asking", "%", "Stockholm apartments often sell above the asking price, so search below your max.", "1")}
             <span class="eyebrow">Search asking prices up to</span>
             <div class="bigfig">${kr(searchTo).replace(" kr", "")}<small> kr</small></div>
-            <p class="dim" style="margin:4px 0 14px">${s.headroom} % below your max of ${kr(a.max)}.</p>
-            <div class="row">
-              <a class="btn primary" href="${q("till-salu")}" target="_blank" rel="noopener">Open for-sale on Booli ↗</a>
-              <a class="btn" href="${q("slutpriser")}" target="_blank" rel="noopener">Sold prices (slutpriser) ↗</a>
-              <a class="btn" href="https://www.hemnet.se/bostader" target="_blank" rel="noopener">Hemnet ↗</a>
-            </div>
+            <p class="dim" style="margin:4px 0 14px">${s.headroom} % below your max of ${kr(a.max)}. Showings searches up to ${kr(S.show.f.maxPrice)}.</p>
+            ${using ? `<span class="chip good">Showings uses this</span>` : `<button class="btn" data-act="use-searchto">Use it in Showings</button>`}
           </section>
           <section class="panel"><h3>What to check in the förening</h3>
             <dl class="kv" style="font-size:.86rem">
@@ -1246,9 +1270,7 @@ const VIEWS = {
             </dl>
           </section>
         </div>
-      </div>
-      <div class="row" style="margin:28px 0 12px"><h3 style="margin:0;font-family:var(--f-display)">Tracked apartments</h3><span class="spacer"></span><button class="btn primary" data-act="add-apt">Add apartment</button></div>
-      <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">No apartments yet. Find one on Booli and add it here to compare monthly costs.</div>`}</div>`;
+      </div>`;
   },
 
   furnish() {
@@ -1323,7 +1345,9 @@ function roomTotal(room) {
 
 function aptCard(p) {
   const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num">${numInput(`data-apt="${p.id}" data-k="${k}" aria-label="${esc(label)}"`, p[k])}<span>${unit}</span></span></label>`;
-  return `<article class="apt">
+  const photo = p.photo || ((LIST.items[p.link] || {}).photos || [])[0];
+  return `<article class="apt ${photo ? "has-photo" : ""}">
+    ${photo ? `<a class="apt-photo" href="${esc(p.link || photo)}" target="_blank" rel="noopener"><img src="${esc(photo)}" alt="Photo of ${esc(p.address)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="apt-head">
       ${p.example ? '<span class="chip ex">Example</span>' : ""}
       <input type="text" aria-label="Address" data-apt="${p.id}" data-k="address" value="${esc(p.address)}" placeholder="Address, area">
@@ -1339,10 +1363,23 @@ function aptCard(p) {
         ${f("rooms", "Rooms", "rok", "0.5")}
         ${f("debtKvm", "Förening debt per kvm", "kr", "500")}
       </div>
-      <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Listing link<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="https://www.booli.se/annons/…"></label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Listing link<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="The estate agent's page"></label>
     </div>
     <div class="apt-out" id="out-${p.id}">${aptOut(p)}</div>
   </article>`;
+}
+// What the finder saw on the agent's page: for sale, bidding (highest bid each day) or sold
+function followBlock(p) {
+  const f = (LIST.followed || {})[p.link];
+  if (!p.link || !/^https?:/.test(p.link)) return "";
+  if (!f) return `<p class="dim" style="font-size:12px;margin:0 0 10px">The finder follows this apartment from its next run.</p>`;
+  const ask = +p.price || 0;
+  const head = f.state === "sold" ? `<span class="chip">Sold${f.final ? " for " + kr(f.final) : ""}</span>${f.final && ask ? `<span class="dim" style="font-size:12px">${f.final >= ask ? "+" : ""}${kr(f.final - ask)} on asking</span>` : ""}`
+    : f.state === "bidding" ? `<span class="chip warn">Bidding${f.bid ? ": " + kr(f.bid) : ""}</span>${f.bid && ask ? `<span class="dim" style="font-size:12px">${f.bid >= ask ? "+" : ""}${kr(f.bid - ask)} on asking${f.bids ? ", " + f.bids + " bids" : ""}</span>` : ""}`
+    : f.state === "gone" ? `<span class="chip">Taken down by the agent</span>` : `<span class="chip info">For sale, no bids yet</span>`;
+  const hist = (f.history || []).filter((h) => h.bid || h.final);
+  return `<div class="follow"><div class="row" style="gap:8px">${head}</div>
+    ${hist.length > 1 ? `<ol class="bids">${hist.map((h) => `<li><span>${fmtShort(h.at)}</span><span>${kr(h.final || h.bid)}</span></li>`).join("")}</ol>` : ""}</div>`;
 }
 function aptOut(p) {
   const a = affordability(), cr = chosenRate();
@@ -1356,7 +1393,7 @@ function aptOut(p) {
   if (d) chips.push(d < 5000 ? `<span class="chip good">Low förening debt</span>` : d <= 15000 ? `<span class="chip warn">Moderate förening debt</span>` : `<span class="chip bad">High förening debt</span>`);
   const avgKvm = p.kvm ? (p.avgift * 12) / p.kvm : 0;
   if (avgKvm) chips.push(avgKvm < 700 ? `<span class="chip good">Low avgift/kvm</span>` : avgKvm < 1000 ? `<span class="chip warn">Average avgift/kvm</span>` : `<span class="chip bad">High avgift/kvm</span>`);
-  return `<div class="row" style="justify-content:space-between"><span class="eyebrow">Per month</span><span class="mono" style="font-size:1.3rem;font-weight:500">${kr(mc.total)}</span></div>
+  return `${followBlock(p)}<div class="row" style="justify-content:space-between"><span class="eyebrow">Per month</span><span class="mono" style="font-size:1.3rem;font-weight:500">${kr(mc.total)}</span></div>
     <dl class="kv" style="font-size:.82rem">
       <dt>Interest after avdrag</dt><dd>${kr(mc.interestNet)}</dd>
       <dt>Amortering</dt><dd>${kr(mc.amort)}</dd>
@@ -1367,12 +1404,36 @@ function aptOut(p) {
       <dt>Value in 5 years (area trend)</dt><dd>${price ? kr(valueAt(price, 5).mid) : "–"}</dd>
     </dl>
     <div class="chips">${chips.join("")}</div>
-    ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:.85rem">Open listing ↗</a>` : ""}`;
+    ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:.85rem">${esc(p.agent || "Open listing")} ↗</a>` : ""}`;
 }
 
+// Four sections in the menu; the less used pages sit under Money and Buying as sub-tabs
+const SECTIONS = {
+  show: ["Showings", [["show", "Showings"]]],
+  saved: ["Saved", [["search", "Saved apartments"]]],
+  money: ["Money", [["overview", "Overview"], ["money", "Finances"], ["rates", "Mortgage rates"], ["five", "5-year budget"]]],
+  buying: ["Buying", [["bid", "Bidding guide"], ["value", "Area prices"], ["furnish", "Furnishing"], ["steps", "Buying steps"]]],
+};
+const sectionOf = (tab) => Object.keys(SECTIONS).find((k) => SECTIONS[k][1].some(([t]) => t === tab)) || "show";
+function subnav() {
+  const [name, pages] = SECTIONS[sectionOf(S.tab)];
+  if (pages.length < 2) return "";
+  return `<nav class="subtabs" aria-label="${name}">${pages.map(([t, l]) => `<button data-goto="${t}" aria-current="${t === S.tab}">${l}</button>`).join("")}</nav>`;
+}
+function go(tab) {
+  S.tab = tab; S.lastTab = { ...(S.lastTab || {}), [sectionOf(tab)]: tab };
+  render(); window.scrollTo(0, 0); scheduleSave();
+}
+function page() { return subnav() + VIEWS[S.tab](); }
+function chrome() {
+  const sec = sectionOf(S.tab);
+  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.sec === sec));
+  const c = document.getElementById("savedCount"); if (c) c.textContent = S.apts.length || "";
+}
 function render() {
-  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === S.tab));
-  app.innerHTML = VIEWS[S.tab]();
+  chrome();
+  app.innerHTML = page();
+  drawMap();
 }
 // Update live outputs without rebuilding inputs (keeps focus while typing)
 // Update the page in place: only what changed is touched, and the field being edited is left alone
@@ -1380,6 +1441,7 @@ function morph(from, to) {
   if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) { from.replaceWith(to.cloneNode(true)); return; }
   if (from.nodeType === 3 || from.nodeType === 8) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
   if (from === document.activeElement && (from.tagName === "INPUT" || from.tagName === "SELECT")) return;
+  if (from.id === "map") return; // the map draws itself
   for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
   for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
   if (from.tagName === "INPUT") {
@@ -1396,9 +1458,11 @@ function morphChildren(from, to) {
   for (let i = t.length; i < f.length; i++) f[i].remove();
 }
 function refresh() {
+  chrome();
   const next = document.createElement("main");
-  next.innerHTML = VIEWS[S.tab]();
+  next.innerHTML = page();
   morphChildren(app, next);
+  drawMap();
 }
 function changed(full) { if (full) render(); else refresh(); scheduleSave(); }
 function clearExample() {
@@ -1407,95 +1471,63 @@ function clearExample() {
   Object.assign(S.fin, { gross1: 0, gross2: 0, net1: 0, net2: 0, savings: 0, monthlySave: 0, targetPrice: 0 });
 }
 
-/* ---------- Showings: read Booli slowly through the Claude desktop app's browser ---------- */
-const BOOLI = "https://www.booli.se";
-// Booli's own named areas, from its area search (31 Oct 2026). Smaller areas come first,
-// so an apartment keeps the most precise name; whole districts catch the rest.
-const HOODS = [
-  ["255555", "SoFo", "Södermalm"], ["874678", "Mariatorget", "Södermalm"], ["41668", "Mariaberget", "Södermalm"], ["845555", "Hornstull", "Södermalm"],
-  ["4796", "Sofia", "Södermalm"], ["7197", "Katarina", "Södermalm"], ["8069", "Maria", "Södermalm"], ["849853", "Högalid", "Södermalm"],
-  ["826197", "Främre Kungsholmen", "Kungsholmen"], ["880478", "Övre Kungsholmen", "Kungsholmen"], ["931427", "Västra Kungsholmen", "Kungsholmen"],
-  ["874672", "Nedre Kungsholmen", "Kungsholmen"], ["874670", "Östra Kungsholmen", "Kungsholmen"], ["3598", "Fredhäll", "Kungsholmen"],
-  ["874666", "Birkastan", "Vasastan"], ["874687", "Sibirien", "Vasastan"], ["96512", "Hagastaden", "Vasastan"],
-  ["1012251", "Lärkstaden", "Östermalm"],
-  ["115341", "Other Södermalm", "Södermalm"], ["115353", "Other Kungsholmen", "Kungsholmen"], ["115349", "Other Vasastan", "Vasastan"],
-  ["115348", "Other Östermalm", "Östermalm"], ["115350", "Norrmalm", "Norrmalm"], ["115346", "Gamla stan", "Gamla stan"], ["115347", "Gärdet", "Gärdet"],
-];
-const DISTRICTS = ["Södermalm", "Kungsholmen", "Vasastan", "Östermalm", "Norrmalm", "Gamla stan", "Gärdet"];
-const FEATS = { Hiss: "lift", Balkong: "balcony", Eldstad: "fireplace", Uteplats: "patio", Terrass: "terrace", Takterrass: "roof terrace" };
-const REFRESH_MS = 6 * 3600e3;   // read an area again after 6 hours
-const DETAIL_MS = 24 * 3600e3;   // and a listing page after a day
-const MAX_PAGES = 4;             // result pages per area
-const pauseMs = () => 7000 + Math.random() * 7000; // a person's pace between pages
-
-function allHoods() { return [...S.show.extra.map(([id, name]) => [id, name, "Your Booli areas"]), ...HOODS]; }
-function hoodName(id) { const h = allHoods().find((x) => x[0] === id); return h ? h[1] : "Booli area " + id; }
-function hoodOn(id) { return S.show.on[id] !== false; }
-function rating(id) { return (S.show.ratings[id] || {}).r ?? ""; }
-function isNever(p) { return (p.in || []).some((id) => rating(id) === "never"); }
+/* ---------- Showings: apartments the finder read from the estate agents' own sites ---------- */
+// Area names from before the finder placed addresses itself, so old ratings and visits keep their name
+const LEGACY_AREAS = { "255555": "SoFo", "874678": "Mariatorget", "41668": "Mariaberget", "845555": "Hornstull", "4796": "Sofia", "7197": "Katarina",
+  "8069": "Maria", "849853": "Högalid", "826197": "Främre Kungsholmen", "880478": "Övre Kungsholmen", "931427": "Västra Kungsholmen",
+  "874672": "Nedre Kungsholmen", "874670": "Östra Kungsholmen", "3598": "Fredhäll", "874666": "Birkastan", "874687": "Sibirien", "96512": "Hagastaden",
+  "1012251": "Lärkstaden", "115341": "Södermalm", "115353": "Kungsholmen", "115349": "Vasastan", "115348": "Östermalm", "115350": "Norrmalm",
+  "115346": "Gamla stan", "115347": "Gärdet" };
+function migrateShow() {
+  const sh = S.show;
+  for (const [id, name] of Object.entries(LEGACY_AREAS)) {
+    if (sh.ratings[id]) { sh.ratings[name] = { ...sh.ratings[id], ...(sh.ratings[name] || {}) }; delete sh.ratings[id]; }
+  }
+  for (const v of Object.values(sh.visits)) if (LEGACY_AREAS[v.hood]) { v.area = LEGACY_AREAS[v.hood]; delete v.hood; }
+  if (!sh.f) {
+    const q = new URLSearchParams(sh.filter || "");
+    sh.f = { maxPrice: +q.get("maxListPrice") || +sh.maxPrice || 4500000, minRooms: +q.get("minRooms") || null, minArea: +q.get("minLivingArea") || null,
+      maxAvgift: +q.get("maxRent") || null, notGround: q.get("floor") === "aboveBottomFloor", includeSoon: true };
+  }
+  for (const k of ["filter", "pasteMsg", "on", "extra", "maxPrice"]) delete sh[k];
+}
+function rating(name) { return (S.show.ratings[name] || {}).r ?? ""; }
+function isNever(p) { return rating(p.area) === "never" || rating(p.group) === "never"; }
 
 /* Dates are kept as local "YYYY-MM-DDTHH:MM" strings, which sort and compare as text */
 const pad2 = (n) => String(n).padStart(2, "0");
 const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-/* ---------- Listings come from the local server, which the Python scraper fills ---------- */
-let LIST = { items: {}, done: {}, lastRun: null };
+
+/* ---------- Listings come from the local server, which the finder fills ---------- */
+let LIST = { items: {}, lastRun: null };
 const LOCAL = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 async function loadList() {
   if (!LOCAL) return;
-  try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) LIST = { ...LIST, ...(await r.json()) }; } catch (e) {}
+  try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) LIST = { items: {}, ...(await r.json()) }; } catch (e) {}
   if (S.tab === "show") refresh();
 }
-// What the scraper reads: ticked areas in order, the search filter, your max price and the areas you never want
-function scrapeConfig() {
-  return {
-    areas: allHoods().filter(([id]) => hoodOn(id)).map(([id, name]) => [id, name]),
-    query: S.show.filter || budgetFilter(),
-    maxPrice: Math.round(+S.show.maxPrice > 0 ? +S.show.maxPrice : affordability().max),
-    never: Object.keys(S.show.ratings).filter((id) => rating(id) === "never"),
-  };
+// What the finder reads: your filter
+function scrapeConfig() { return { filter: S.show.f }; }
+// Same test as the finder's, so the planner and the finder agree on what fits
+function fits(p, f = S.show.f) {
+  if (p.outside) return false;
+  if (p.soon && !f.includeSoon) return false;
+  if (f.maxPrice && p.price && p.price > f.maxPrice) return false;
+  if (f.minRooms && p.rooms && p.rooms < f.minRooms) return false;
+  if (f.minArea && p.kvm && p.kvm < f.minArea) return false;
+  if (f.maxAvgift && p.avgift && p.avgift > f.maxAvgift) return false;
+  if (f.notGround && (p.floor === "BV" || p.floor === "0")) return false;
+  return true;
 }
+function apartments() { return Object.values(LIST.items).filter((p) => fits(p)); }
 
-/* ---------- Booli search links: your budget, or a filter pasted from Booli ---------- */
-function budgetFilter() {
-  const s = S.search, a = affordability(), p = new URLSearchParams({ objectType: "Lägenhet" });
-  const to = +S.show.maxPrice > 0 ? +S.show.maxPrice : Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
-  if (to > 0) p.set("maxListPrice", to);
-  if (s.minRooms) p.set("minRooms", s.minRooms);
-  if (s.minArea) p.set("minLivingArea", s.minArea);
-  if (s.maxAvgift) p.set("maxRent", s.maxAvgift);
-  return p.toString();
-}
-function searchUrl(ids, page) {
-  const p = new URLSearchParams(S.show.filter || budgetFilter());
-  if (!p.has("objectType")) p.set("objectType", "Lägenhet");
-  p.set("areaIds", ids.join(","));
-  if (page > 1) p.set("page", page);
-  return `${BOOLI}/sok/till-salu?${p.toString().replace(/%2C/g, ",")}`;
-}
-function parseBooliLink(str) {
-  let u; try { u = new URL(String(str).trim()); } catch (e) { return null; }
-  if (u.hostname.replace(/^www\./, "") !== "booli.se") return null;
-  const p = new URLSearchParams(u.search);
-  const ids = (p.get("areaIds") || "").split(",").map((x) => x.trim()).filter((x) => /^\d+$/.test(x));
-  p.delete("areaIds"); p.delete("page");
-  return { ids, filter: p.toString() };
-}
-const FILTER_LABELS = { maxListPrice: ["Max price", "kr"], minListPrice: ["Min price", "kr"], minRooms: ["Min rooms", ""], maxRooms: ["Max rooms", ""],
-  minLivingArea: ["Min area", "m²"], maxLivingArea: ["Max area", "m²"], maxRent: ["Max avgift", "kr/mån"], minFloor: ["Min floor", ""], upcomingSale: ["Coming soon", ""] };
-function filterChips(q) {
-  return [...new URLSearchParams(q)].filter(([k]) => k !== "objectType").map(([k, v]) => {
-    const [label, unit] = FILTER_LABELS[k] || [k, ""];
-    return `<span class="chip">${esc(label)} ${/^\d+$/.test(v) ? nf.format(+v) : esc(v)}${unit ? " " + unit : ""}</span>`;
-  }).join("") || `<span class="chip">No filters</span>`;
-}
-
-/* ---------- The scraper's status ---------- */
-const CRAWL = { state: "idle", msg: "" };
+/* ---------- The finder's status ---------- */
+const CRAWL = { state: "idle", msg: "", scheduled: null };
 const NO_SERVER = "The local server isn't answering. Start it with: .venv/bin/python server.py";
 let pollTimer = null;
 function setCrawl(state, msg) {
   CRAWL.state = state; CRAWL.msg = msg;
-  const b = document.querySelector('#tabs button[data-tab="show"]'); if (b) b.classList.toggle("busy", state === "running");
+  const b = document.querySelector('#tabs button[data-sec="show"]'); if (b) b.classList.toggle("busy", state === "running");
   if (S.tab === "show") refresh();
 }
 async function pollStatus() {
@@ -1505,15 +1537,16 @@ async function pollStatus() {
     const st = await (await fetch("/api/status", { cache: "no-store" })).json();
     const was = CRAWL.state;
     if (st.running || was === "running") await loadList();
+    CRAWL.scheduled = !!st.scheduled;
     setCrawl(st.running ? "running" : st.state || "idle", st.msg || "");
     if (st.running) pollTimer = setTimeout(pollStatus, 5000);
   } catch (e) { setCrawl("error", NO_SERVER); }
 }
 async function startScrape() {
-  await flush(); // so the run uses the areas and budget on screen
+  await flush(); // so the run uses the filter on screen
   const r = await fetch("/api/scrape", { method: "POST" }).catch(() => null);
   if (!r) return setCrawl("error", NO_SERVER);
-  setCrawl("running", r.status === 409 ? "Already reading" : "Starting…");
+  setCrawl("running", r.status === 409 ? "Already running" : "Starting…");
   pollTimer = setTimeout(pollStatus, 2000);
 }
 
@@ -1529,24 +1562,19 @@ function showWindow(mode, now) {
   return [isoLocal(now), isoLocal(end)];
 }
 function showingsIn(p, from, to) {
-  // The estate agent's own times win; Booli's next showing fills in when the agent lists none
-  const starts = (p.shows || []).map((s) => ({ ...s }));
-  if (p.next && !starts.length) starts.push({ start: p.next });
-  return starts.filter((s) => s.start >= from && s.start < to).sort((a, b) => (a.start < b.start ? -1 : 1));
+  return (p.shows || []).filter((s) => s.start >= from && s.start < to).sort((a, b) => (a.start < b.start ? -1 : 1));
 }
 function describeListing(p) {
   const bits = [];
   bits.push([p.rooms ? String(p.rooms).replace(".", ",") + " rum" : "Apartment", p.kvm ? String(p.kvm).replace(".", ",") + " m²" : ""].filter(Boolean).join(", "));
-  if (p.floor) bits[0] += p.floor === "BV" ? " on the ground floor" : ` on floor ${p.floor}`;
-  // Booli's features first, then what the agent's description adds, at most six so the sentence stays readable
-  const f = [...new Set([...(p.feats || []).map((x) => FEATS[x]), ...(p.extra || [])])].slice(0, 6);
+  if (p.floor) bits[0] += p.floor === "BV" ? " on the ground floor" : ` on floor ${String(p.floor).replace(".", ",")}`;
+  const f = (p.extra || []).slice(0, 6); // at most six, so the sentence stays readable
   if (f.length) bits[0] += " with " + (f.length > 1 ? f.slice(0, -1).join(", ") + " and " + f[f.length - 1] : f[0]);
   if (p.built) bits.push(`built ${p.built}`);
   if (p.avgift && p.kvm) {
     const y = p.avgift * 12 / p.kvm;
     if (y < 650) bits.push("low avgift for its size"); else if (y > 1000) bits.push("high avgift for its size");
   }
-  if (p.days > 21) bits.push(`on the market for ${p.days} days`);
   return bits.join(", ") + ".";
 }
 const fmtDay = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -1556,141 +1584,194 @@ function ratingSelect(attr, v) {
   return `<select ${attr}>${opts.map(([k, l]) => `<option value="${k}" ${String(v) === k ? "selected" : ""}>${l}</option>`).join("")}</select>`;
 }
 function crawlPanel() {
-  const st = CRAWL.state, n = Object.keys(LIST.items).length;
+  const st = CRAWL.state, found = LIST.found, b = LIST.booli || {};
   const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
-  if (!LOCAL) return `<section class="panel"><h3>Booli scraper</h3>
-    <p style="margin:0;font-size:14px">The scraper runs on your Mac. Start the local server and open <strong>http://localhost:8765</strong> to see its listings here.</p></section>`;
-  const text = st === "running" || st === "blocked" || st === "error" ? CRAWL.msg : last ? `Last read ${last}. ${n} apartments saved. ${CRAWL.msg}` : "Not read yet.";
+  if (!LOCAL) return `<section class="panel"><h3>Apartment finder</h3>
+    <p style="margin:0;font-size:14px">The finder runs on your Mac. Start the local server and open <strong>http://localhost:8765</strong> to see the apartments here.</p></section>`;
+  const text = st === "running" || st === "error" ? CRAWL.msg : last ? `Last run ${last}.` : "Not run yet.";
+  const key = found ? `<div class="answer">
+      <div><span class="v">${found.forSale}</span><span class="s">for sale found</span></div>
+      <div><span class="v">${found.soon}</span><span class="s">coming soon found</span></div>
+      ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale} · ${b.soon}</span><span class="s">on Booli${b.missing ? ", from " + fmtShort(b.at) : ""}</span></div>` : ""}
+    </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Booli's count for the same filter in Stockholms innerstad is the answer key: the gap is what the finder doesn't cover yet.</p>` : ""}` : "";
+  const ag = LIST.agents ? Object.entries(LIST.agents) : [];
   return `<section class="panel">
-    <h3>Booli scraper</h3>
-    <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}</span></div>
-    ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Scrape now</button></div>`}
-    <p class="dim" style="font-size:12px;margin:10px 0 0">Runs every morning at 06:30 once installed with scripts/install-mac.sh. It loads one page every 4 to 9 seconds and stops if Booli blocks it.</p>
+    <h3>Apartment finder</h3>
+    <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}${st !== "running" && CRAWL.msg && st !== "error" ? " " + esc(CRAWL.msg) : ""}</span></div>
+    ${key}
+    ${ag.length ? `<details class="agents"><summary>${ag.length} estate agents read</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} in the inner city</td></tr>`).join("")}</table></details>` : ""}
+    ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Run now</button></div>`}
+    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Runs every morning at 06:30; next run ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 30) ? "today" : "tomorrow"} at 06:30.` : `Not scheduled yet, so it only runs when you press Run now. To run it every morning at 06:30, run <span class="mono">scripts/install-mac.sh</span> once.`} It follows each site's robots.txt and stops reading a site that blocks it.</p>
   </section>`;
 }
 function filterPanel() {
-  const ids = allHoods().filter(([id]) => hoodOn(id)).map(([id]) => id);
-  const link = searchUrl(ids, 1);
+  const f = S.show.f;
+  const chk = (k, label) => `<label class="dim" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" data-check="show.f.${k}" ${f[k] ? "checked" : ""}> ${label}</label>`;
   return `<section class="panel">
     <h3>Search filter</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 8px">${S.show.filter ? "Using the filter you pasted from Booli." : +S.show.maxPrice > 0 ? "Using the max price below, with rooms, size and avgift from the Apartments tab." : "Using your budget from My finances and the Apartments tab."}</p>
-    ${S.show.filter ? "" : numField("show.maxPrice", "Max price", "kr", "The asking price to search up to. Leave it empty to use your budget from My finances.")}
-    <div class="chips">${filterChips(S.show.filter || budgetFilter())}</div>
-    <label class="paste">Paste a Booli search link
-      <input type="url" id="booli-paste" placeholder="https://www.booli.se/sok/till-salu?areaIds=…" value=""></label>
-    ${S.show.pasteMsg ? `<p class="dim" style="font-size:12px;margin:6px 0 0">${esc(S.show.pasteMsg)}</p>` : ""}
-    <label class="paste">Copy this search to Booli
-      <input type="text" id="booli-copy" readonly value="${esc(link)}"></label>
-    <div class="row" style="margin-top:8px">
-      <button class="btn" data-act="copy-filter">Copy link</button>
-      <a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Open in Booli ↗</a>
-      ${S.show.filter ? `<button class="btn ghost" data-act="filter-budget">Use my budget instead</button>` : ""}
-    </div>
+    ${numField("show.f.maxPrice", "Max price", "kr", "The asking price to search up to.")}
+    ${numField("show.f.minRooms", "Min rooms", "rum")}
+    ${numField("show.f.minArea", "Min size", "m²")}
+    ${numField("show.f.maxAvgift", "Max avgift", "kr/mån", "Leave a field empty for no limit.")}
+    ${chk("notGround", "Not on the ground floor")}
+    ${chk("includeSoon", "Include apartments coming soon")}
   </section>`;
 }
-function areasPanel(counts) {
-  const groups = {};
-  for (const h of allHoods()) (groups[h[2]] = groups[h[2]] || []).push(h);
+function areaGroups(list) {
+  const g = {};
+  for (const p of list) {
+    if (!p.group) continue;
+    const grp = (g[p.group] = g[p.group] || {});
+    grp[p.area || p.group] = (grp[p.area || p.group] || 0) + 1;
+  }
+  return g;
+}
+function areaRow(name, count) {
+  const r = S.show.ratings[name] || {};
+  return `<div class="hood-row ${r.r === "never" ? "never" : ""}">
+    <span>${esc(name)}</span><span class="dim" title="Apartments">${count || ""}</span>
+    ${ratingSelect(`data-hood-r="${esc(name)}" aria-label="Rating for ${esc(name)}"`, r.r ?? "")}
+    ${r.r || r.note ? `<input type="text" data-hood-note="${esc(name)}" value="${esc(r.note || "")}" placeholder="Note about ${esc(name)}">` : ""}
+  </div>`;
+}
+function areasPanel(list) {
+  const groups = areaGroups(list);
+  if (!Object.keys(groups).length) return "";
   return `<section class="panel">
     <h3>Areas</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">Untick an area to stop reading it. <strong>Never here</strong> hides every apartment Booli places in that area.</p>
-    ${Object.entries(groups).map(([g, hs]) => `<div class="hood-group"><h4>${esc(g)}</h4>${hs.map(([id, name]) => {
-      const r = S.show.ratings[id] || {};
-      return `<div class="hood-row ${r.r === "never" ? "never" : ""}">
-        <label><input type="checkbox" data-hood-on="${id}" ${hoodOn(id) ? "checked" : ""}> ${esc(name)}</label>
-        <span class="dim" title="Showings in view">${counts[id] || ""}</span>
-        ${ratingSelect(`data-hood-r="${id}" aria-label="Rating for ${esc(name)}"`, r.r ?? "")}
-        ${r.r || r.note ? `<input type="text" data-hood-note="${id}" value="${esc(r.note || "")}" placeholder="Note about ${esc(name)}">` : ""}
-      </div>`;
-    }).join("")}</div>`).join("")}
+    <p class="dim" style="font-size:13px;margin:0 0 4px">The neighbourhoods the apartments are in, from OpenStreetMap. <strong>Never here</strong> hides every apartment in that area; rate a whole district to cover all of it.</p>
+    ${Object.entries(groups).sort().map(([g, areas]) => `<div class="hood-group"><h4>${esc(g)}</h4>
+      ${areaRow(g, Object.values(areas).reduce((a, b) => a + b, 0))}
+      ${Object.entries(areas).filter(([n]) => n !== g).sort().map(([n, c]) => areaRow(n, c)).join("")}</div>`).join("")}
   </section>`;
 }
 function myAreasPanel() {
   const visits = Object.entries(S.show.visits);
-  const ids = new Set([...Object.keys(S.show.ratings).filter((id) => { const r = S.show.ratings[id]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.hood)]);
-  if (!ids.size) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">After a showing, press <strong>I went</strong> on the apartment. Your rating and notes for it and its area collect here.</p></section>`;
-  const score = (id) => { const r = rating(id); return r === "never" ? -1 : r === "" ? 0 : +r; };
-  return `<section class="panel"><h3>Your areas</h3>${[...ids].sort((a, b) => score(b) - score(a)).map((id) => {
-    const r = S.show.ratings[id] || {}, vs = visits.filter(([, v]) => v.hood === id);
+  const names = new Set([...Object.keys(S.show.ratings).filter((n) => { const r = S.show.ratings[n]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.area).filter(Boolean)]);
+  if (!names.size) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">After a showing, press <strong>I went</strong> on the apartment. Your rating and notes for it and its area collect here.</p></section>`;
+  const score = (n) => { const r = rating(n); return r === "never" ? -1 : r === "" ? 0 : +r; };
+  return `<section class="panel"><h3>Your areas</h3>${[...names].sort((a, b) => score(b) - score(a)).map((n) => {
+    const r = S.show.ratings[n] || {}, vs = visits.filter(([, v]) => v.area === n);
     return `<div class="my-area">
-      <div class="row" style="justify-content:space-between"><strong>${esc(hoodName(id))}</strong>${ratingSelect(`data-hood-r="${id}" aria-label="Rating for ${esc(hoodName(id))}"`, r.r ?? "")}</div>
-      <input type="text" data-hood-note="${id}" value="${esc(r.note || "")}" placeholder="How did the area feel?">
-      ${vs.length ? `<ul>${vs.map(([k, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul>` : ""}
+      <div class="row" style="justify-content:space-between"><strong>${esc(n)}</strong>${ratingSelect(`data-hood-r="${esc(n)}" aria-label="Rating for ${esc(n)}"`, r.r ?? "")}</div>
+      <input type="text" data-hood-note="${esc(n)}" value="${esc(r.note || "")}" placeholder="How did the area feel?">
+      ${vs.length ? `<ul>${vs.map(([, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul>` : ""}
     </div>`;
   }).join("")}</section>`;
 }
 function showCard(p, s, a, cr) {
-  const v = S.show.visits[p.key], never = isNever(p), r = rating(p.hood);
+  const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);
   const price = p.price || 0, mc = price ? monthlyCost(price, p.avgift, cr.rate) : null;
   const fit = !price ? `<span class="chip info">No price yet</span>` : price <= a.max ? `<span class="chip good">Within budget</span>` : `<span class="chip bad">${kr(price - a.max)} over max</span>`;
-  const tracked = S.apts.some((x) => x.link === `${BOOLI}/${p.key}`);
-  return `<article class="show-card ${never ? "never" : ""}">
-    <div class="t">${s.start.slice(11)}${s.end ? "–" + s.end : ""}</div>
+  const tracked = S.apts.some((x) => x.link === p.url);
+  const photos = p.photos || [];
+  return `<article class="show-card ${never ? "never" : ""} ${photos.length ? "has-photo" : ""}">
+    <div class="t">${s ? s.start.slice(11) + (s.end ? "–" + s.end : "") : p.soon ? "Soon" : "No date"}</div>
+    ${photos.length ? `<a class="thumb" href="${esc(photos[0])}" target="_blank" rel="noopener"><img src="${esc(photos[0])}" alt="Photo of ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="sc-main">
-      <div class="row" style="gap:8px"><a href="${BOOLI}/${esc(p.key)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
-        <span class="dim">${esc(hoodName(p.hood))}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
+      <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
+        <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
       <p>${esc(describeListing(p))}</p>
-      ${p.desc ? `<details class="desc"><summary>${esc(p.agentName)}'s description</summary>${p.desc.split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
-      <div class="facts">${p.agentUrl ? `<a href="${esc(p.agentUrl)}" target="_blank" rel="noopener">${esc(p.agentName)} ↗</a>` : p.broker ? `<span>${esc(p.broker)}</span>` : ""}<span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
-      ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.key)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
-        <input type="text" data-visit-note="${esc(p.key)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
+      ${photos.length > 1 ? `<details class="gallery"><summary>${photos.length} photos</summary><div class="strip">${photos.slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("")}</div></details>` : ""}
+      ${p.desc ? `<details class="desc"><summary>${esc(p.agent)}'s description</summary>${p.desc.split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
+      <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
+      ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
+        <input type="text" data-visit-note="${esc(p.url)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
     </div>
     <div class="sc-act">
-      ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.key)}">Undo visit</button>` : `<button class="btn" data-act="went" data-key="${esc(p.key)}" data-at="${s.start}">I went</button>`}
-      ${tracked ? `<span class="dim" style="font-size:12px">Tracked</span>` : `<button class="btn ghost" data-act="track" data-key="${esc(p.key)}">Track</button>`}
+      ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.url)}">Undo visit</button>` : `<button class="btn" data-act="went" data-key="${esc(p.url)}" data-at="${s ? s.start : isoLocal(new Date())}">I went</button>`}
+      ${tracked ? `<span class="dim" style="font-size:12px">Saved</span>` : `<button class="btn ghost" data-act="track" data-key="${esc(p.url)}">Save</button>`}
     </div>
   </article>`;
+}
+/* ---------- The map: apartments as dots, each area drawn around its apartments in its rating's colour ---------- */
+const MAP = { map: null, el: null, layer: null, sig: "", fitted: false };
+function ratingColour(r) {
+  const c = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  return r === "never" ? c("--negative") : r === "" ? c("--muted") : +r >= 4 ? c("--positive") : +r === 3 ? c("--data") : c("--warning");
+}
+const ratingLabel = (r) => (r === "never" ? "Never here" : r ? r + "/5" : "Not rated");
+function metres(a, b) { // short distances in Stockholm, near enough for drawing
+  const dy = (a[0] - b[0]) * 111320, dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+function drawMap() {
+  const el = document.getElementById("map");
+  if (!el || !window.L) return;
+  if (MAP.el !== el) {
+    if (MAP.map) MAP.map.remove();
+    MAP.map = L.map(el, { scrollWheelZoom: false, zoomControl: true }).setView([59.325, 18.065], 13);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap contributors" }).addTo(MAP.map);
+    Object.assign(MAP, { el, layer: L.layerGroup().addTo(MAP.map), sig: "", fitted: false });
+  }
+  const list = apartments().filter((p) => p.lat && (!S.show.hideNever || !isNever(p)));
+  const sig = list.map((p) => p.url).join() + JSON.stringify(S.show.ratings);
+  if (sig === MAP.sig) return;
+  MAP.sig = sig;
+  MAP.layer.clearLayers();
+  const areas = {};
+  for (const p of list) (areas[p.area || p.group] = areas[p.area || p.group] || []).push(p);
+  for (const [name, ps] of Object.entries(areas)) {
+    const c = [ps.reduce((a, p) => a + p.lat, 0) / ps.length, ps.reduce((a, p) => a + p.lon, 0) / ps.length];
+    const radius = Math.max(220, ...ps.map((p) => metres(c, [p.lat, p.lon]) + 120));
+    const r = rating(name) || rating(ps[0].group), col = ratingColour(r);
+    L.circle(c, { radius, color: col, weight: 1, fillColor: col, fillOpacity: r ? 0.16 : 0.06 })
+      .bindTooltip(`${esc(name)} · ${ratingLabel(r)} · ${ps.length} apartment${ps.length > 1 ? "s" : ""}`, { sticky: true }).addTo(MAP.layer);
+  }
+  for (const p of list) {
+    const r = rating(p.area) || rating(p.group);
+    L.circleMarker([p.lat, p.lon], { radius: 6, color: "#ffffff", weight: 1.5, fillColor: ratingColour(r), fillOpacity: 1 })
+      .bindPopup(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Showing " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}<br><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a>`)
+      .addTo(MAP.layer);
+  }
+  if (!MAP.fitted && list.length) { MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08)); MAP.fitted = true; }
+}
+function mapPanel() {
+  if (!apartments().some((p) => p.lat)) return "";
+  const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Never here"], ["", "Not rated"]];
+  return `<section class="panel map-panel">
+    <div id="map" role="img" aria-label="Map of the apartments and your rated areas"></div>
+    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--muted)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Each area is drawn around the apartments found in it.</span></div>
+  </section>`;
 }
 function showView() {
   const sh = S.show, a = affordability(), cr = chosenRate();
   const [from, to] = showWindow(sh.days, new Date());
+  const list = apartments();
   const rows = [];
-  for (const p of Object.values(LIST.items)) for (const s of showingsIn(p, from, to)) rows.push({ p, s });
-  const counts = {};
-  for (const { p } of rows) for (const id of p.in || []) counts[id] = (counts[id] || 0) + 1;
-  const visible = rows.filter(({ p }) => hoodOn(p.hood) && (!sh.hideNever || !isNever(p))).sort((x, y) => (x.s.start < y.s.start ? -1 : 1));
+  for (const p of list) for (const s of showingsIn(p, from, to)) rows.push({ p, s });
+  const visible = rows.filter(({ p }) => !sh.hideNever || !isNever(p)).sort((x, y) => (x.s.start < y.s.start ? -1 : 1));
   const hidden = rows.filter(({ p }) => isNever(p)).length;
   const days = {};
   for (const r of visible) (days[r.s.start.slice(0, 10)] = days[r.s.start.slice(0, 10)] || []).push(r);
-  const list = Object.keys(LIST.items).length === 0
-    ? `<div class="note">No apartments yet. ${LOCAL ? "Press Scrape now, or wait for the morning run." : "Open the planner from the local server to see them."}</div>`
+  const undated = list.filter((p) => !(p.shows || []).length && (!sh.hideNever || !isNever(p)));
+  const body = !Object.keys(LIST.items).length
+    ? `<div class="note">No apartments yet. ${LOCAL ? "Press Run now, or wait for the morning run." : "Open the planner from the local server to see them."}</div>`
     : !visible.length ? `<div class="note">No showings in this period${hidden ? `, apart from ${hidden} in areas you marked Never here` : ""}.</div>`
     : Object.entries(days).map(([d, rs]) => `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${rs.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`).join("");
   return `
     <div class="lead"><h1>Showings</h1>
-    <p>Apartments in innanför tullarna with a visning, read from Booli every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
+    <p>Apartments in innanför tullarna with a visning, found on the estate agents' own sites every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
     <div class="bench show">
-      <div class="stack">${crawlPanel()}${filterPanel()}${myAreasPanel()}${areasPanel(counts)}</div>
+      <div class="stack">${crawlPanel()}${filterPanel()}${myAreasPanel()}${areasPanel(list)}</div>
       <div>
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
           <div class="seg">${[["week", "Next week"], ["8", "Next 8 days"], ["all", "All upcoming"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
           ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Hide ${hidden} in Never areas</label>` : ""}
         </div>
-        ${list}
+        ${mapPanel()}
+        ${body}
+        ${undated.length ? `<details class="undated"><summary>${undated.length} apartment${undated.length > 1 ? "s" : ""} without a showing yet</summary>${undated.map((p) => showCard(p, null, a, cr)).join("")}</details>` : ""}
       </div>
     </div>`;
 }
 function showInput(t) {
-  if (t.id === "booli-paste") {
-    const r = parseBooliLink(t.value);
-    if (!r) { if (t.value.trim()) { S.show.pasteMsg = "That isn't a Booli search link."; refresh(); } return true; }
-    S.show.filter = r.filter;
-    if (r.ids.length) {
-      const known = new Set(allHoods().map((h) => h[0]));
-      for (const id of r.ids) if (!known.has(id)) S.show.extra.push([id, "Booli area " + id]);
-      for (const [id] of allHoods()) S.show.on[id] = r.ids.includes(id);
-    }
-    S.show.pasteMsg = r.ids.length ? `Filter saved. Reading only the ${r.ids.length} area${r.ids.length > 1 ? "s" : ""} in the link.` : "Filter saved for every ticked area.";
-    t.value = ""; LIST.done = {};
-    changed(true); return true;
-  }
-  if (t.dataset.hoodNote != null) { const id = t.dataset.hoodNote; S.show.ratings[id] = { ...(S.show.ratings[id] || {}), note: t.value }; changed(false); return true; }
+  if (t.dataset.hoodNote != null) { const n = t.dataset.hoodNote; S.show.ratings[n] = { ...(S.show.ratings[n] || {}), note: t.value }; changed(false); return true; }
   if (t.dataset.visitNote != null) { const v = S.show.visits[t.dataset.visitNote]; if (v) v.note = t.value; changed(false); return true; }
-  return t.dataset.hoodOn != null || t.dataset.hoodR != null || t.dataset.visitR != null;
+  return t.dataset.hoodR != null || t.dataset.visitR != null;
 }
 function showChange(t) {
-  if (t.dataset.hoodOn != null) { S.show.on[t.dataset.hoodOn] = t.checked; changed(true); return true; }
-  if (t.dataset.hoodR != null) { const id = t.dataset.hoodR; S.show.ratings[id] = { ...(S.show.ratings[id] || {}), r: t.value }; changed(true); return true; }
+  if (t.dataset.hoodR != null) { const n = t.dataset.hoodR; S.show.ratings[n] = { ...(S.show.ratings[n] || {}), r: t.value }; changed(true); return true; }
   if (t.dataset.visitR != null) { const v = S.show.visits[t.dataset.visitR]; if (v) v.r = t.value; changed(true); return true; }
   return false;
 }
@@ -1698,76 +1779,23 @@ function showClick(a) {
   const p = LIST.items[a.dataset.key];
   switch (a.dataset.act) {
     case "crawl-start": startScrape(); return true;
-    case "filter-budget": S.show.filter = ""; S.show.pasteMsg = ""; LIST.done = {}; return false;
-    case "copy-filter": {
-      const el = document.getElementById("booli-copy");
-      const done = () => { S.show.pasteMsg = "Link copied. Paste it into your browser's address bar."; refresh(); };
-      if (navigator.clipboard) navigator.clipboard.writeText(el.value).then(done, () => { el.select(); document.execCommand("copy"); done(); });
-      else { el.select(); document.execCommand("copy"); done(); }
-      return true;
-    }
-    case "went": if (p) S.show.visits[p.key] = { at: a.dataset.at, r: "", note: "", addr: p.addr, hood: p.hood }; return false;
+    case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
     case "unwent": delete S.show.visits[a.dataset.key]; return false;
     case "track":
-      if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${hoodName(p.hood)}`, price: p.price || null, bid: p.price || null,
-        avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: `${BOOLI}/${p.key}`, status: "Viewing booked" });
+      if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${p.area || p.group || ""}`, price: p.price || null, bid: p.price || null,
+        avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: p.url, status: "Viewing booked",
+        photo: (p.photos || [])[0] || null, agent: p.agent || null });
       return false;
   }
   return null;
 }
-
 VIEWS.show = showView;
-
-/* ---------- Moving a plan between the claude.ai planner and the one on your Mac ---------- */
-let planMsg = "";
-function planJson() { return JSON.stringify({ app: "sthlm-bostadsplan", exported: new Date().toISOString(), plan: S }, null, 1); }
-function movePanel() {
-  return `<section class="panel move" style="margin-top:20px">
-    <h3>Move your plan</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 12px">Export your plan here, then import it into the other copy of the planner: claude.ai or the one on your Mac. Importing replaces the plan that's open.</p>
-    <div class="row">
-      <button class="btn" data-act="plan-export">Export plan</button>
-      <button class="btn ghost" data-act="plan-copy">Copy as text</button>
-      <label class="btn ghost">Import a file<input type="file" id="plan-file" accept=".json,application/json" hidden></label>
-    </div>
-    <textarea id="plan-paste" rows="3" placeholder="Or paste exported plan text here"></textarea>
-    <div class="row" style="margin-top:8px"><button class="btn ghost" data-act="plan-import">Import pasted text</button>${planMsg ? `<span class="dim" style="font-size:13px">${esc(planMsg)}</span>` : ""}</div>
-  </section>`;
-}
-async function exportPlan() {
-  const data = planJson(), filename = `bostadsplan-${isoLocal(new Date()).slice(0, 10)}.json`;
-  const dl = window.claude?.use ? await window.claude.use("downloads") : null;
-  if (dl) {
-    try { await dl.save({ filename, data }); planMsg = `Saved ${filename}.`; }
-    catch (e) { if (e && e.code === "declined") planMsg = "Not saved."; else return copyPlan(); }
-  } else {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
-    a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-    planMsg = `Saved ${filename} to your downloads.`;
-  }
-  refresh();
-}
-async function copyPlan() {
-  const data = planJson();
-  try { await navigator.clipboard.writeText(data); planMsg = "Copied. Paste it into the other planner's import box."; }
-  catch (e) { const t = document.getElementById("plan-paste"); if (t) { t.value = data; t.select(); } planMsg = "Couldn't reach the clipboard, so the text is in the box below: copy it from there."; }
-  refresh();
-}
-function importPlan(text) {
-  let j;
-  try { j = JSON.parse(text); } catch (e) { planMsg = "That isn't an exported plan."; return refresh(); }
-  const plan = j && (j.plan || j);
-  if (!plan || typeof plan !== "object" || !plan.fin) { planMsg = "That isn't an exported plan."; return refresh(); }
-  S = merge(DEFAULT(), plan); migrate(); S.tab = "overview";
-  planMsg = `Imported the plan exported ${j.exported ? new Date(j.exported).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}.`;
-  render(); scheduleSave();
-}
 
 /* ---------- Events ---------- */
 document.getElementById("tabs").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-tab]"); if (!b) return;
-  S.tab = b.dataset.tab; render(); window.scrollTo(0, 0); scheduleSave();
+  const b = e.target.closest("button[data-sec]"); if (!b) return;
+  const sec = b.dataset.sec;
+  go((S.lastTab || {})[sec] || SECTIONS[sec][1][0][0]);
 });
 app.addEventListener("input", (e) => {
   const t = e.target;
@@ -1797,7 +1825,6 @@ app.addEventListener("input", (e) => {
 app.addEventListener("change", (e) => {
   const t = e.target;
   if (showChange(t)) return;
-  if (t.id === "plan-file" && t.files && t.files[0]) { t.files[0].text().then(importPlan); t.value = ""; return; }
   if (t.dataset.check) { set(t.dataset.check, t.checked); return changed(true); }
   if (t.dataset.have) { S.furn.items[t.dataset.have] = { ...(S.furn.items[t.dataset.have] || {}), have: t.checked }; return changed(true); }
   if (t.dataset.xhave) { const x = S.furn.extra.find((i) => i.id === t.dataset.xhave); if (x) x.have = t.checked; return changed(true); }
@@ -1812,15 +1839,13 @@ app.addEventListener("focusout", (e) => {
   if (v !== undefined) t.value = fmtIn(v);
 });
 app.addEventListener("click", (e) => {
-  const g = e.target.closest("[data-goto]"); if (g) { S.tab = g.dataset.goto; render(); window.scrollTo(0, 0); return; }
+  const g = e.target.closest("[data-goto]"); if (g) return go(g.dataset.goto);
   const s = e.target.closest("[data-set]");
   if (s) { const v = s.dataset.val; set(s.dataset.set, /^\d+$/.test(v) && ["fin.buyers", "value.win"].includes(s.dataset.set) ? +v : v); return changed(true); }
   const th = e.target.closest("th[data-sort]"); if (th) { S.rates.sort = th.dataset.sort; return changed(true); }
   const a = e.target.closest("[data-act]"); if (!a) return;
   const sc = showClick(a); if (sc === true) return; if (sc === false) return changed(true);
-  if (a.dataset.act === "plan-export") return exportPlan();
-  if (a.dataset.act === "plan-copy") return copyPlan();
-  if (a.dataset.act === "plan-import") return importPlan(document.getElementById("plan-paste").value);
+  if (a.dataset.act === "use-searchto") { S.show.f.maxPrice = Math.floor(affordability().max * (1 - S.search.headroom / 100) / 50000) * 50000; return changed(true); }
   const id = () => Math.random().toString(36).slice(2, 9);
   switch (a.dataset.act) {
     case "clear-example": clearExample(); break;
