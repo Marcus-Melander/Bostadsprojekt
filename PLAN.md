@@ -29,6 +29,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 ## Done
 
+- **A faster planner.** Galleries and descriptions are built only when opened, Showings draws 30 apartments at a time with "Show more", typing redraws once you pause, nothing is redrawn when nothing changed, and a running finder reloads the list every 30 seconds instead of every 5.
 - **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.
 - **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here). Stadia Maps' quiet grey "Alidade Smooth" map, light and dark, which needs no key for a page on localhost.
 - **Save apartments and follow their bidding.** "Save" on a showing (it replaces Track) adds the apartment to Saved. The finder then reads its page on every run, whatever the filter says. It records the highest bid each day and the final price once it's sold, and Saved shows the bid history.

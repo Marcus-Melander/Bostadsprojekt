@@ -293,6 +293,7 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .show-day .dim { font-size: 13px; font-weight: 400; }
 .show-card { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; }
 .show-card + .show-card { margin-top: 8px; }
+.btn.more { margin: 14px auto 0; display: flex; }
 .show-card.never { opacity: .5; }
 .show-card.has-photo { grid-template-columns: 92px 168px minmax(0, 1fr) auto; }
 .show-card .thumb { display: block; width: 168px; aspect-ratio: 3 / 2; border-radius: 6px; overflow: hidden; background: var(--raised); }
@@ -1434,7 +1435,8 @@ function chrome() {
 }
 function render() {
   chrome();
-  app.innerHTML = page();
+  lastHtml = page();
+  app.innerHTML = lastHtml;
   drawMap();
 }
 // Update live outputs without rebuilding inputs (keeps focus while typing)
@@ -1444,6 +1446,7 @@ function morph(from, to) {
   if (from.nodeType === 3 || from.nodeType === 8) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
   if (from === document.activeElement && (from.tagName === "INPUT" || from.tagName === "SELECT")) return;
   if (from.id === "map") return; // the map draws itself
+  if (from.tagName === "DETAILS" && from.open && from.dataset.fill) return; // an opened gallery or description stays as it is
   for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
   for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
   if (from.tagName === "INPUT") {
@@ -1459,14 +1462,22 @@ function morphChildren(from, to) {
   t.forEach((node, i) => (f[i] ? morph(f[i], node) : from.appendChild(node.cloneNode(true))));
   for (let i = t.length; i < f.length; i++) f[i].remove();
 }
+let lastHtml = "", refreshTimer = null;
 function refresh() {
+  clearTimeout(refreshTimer); refreshTimer = null;
   chrome();
-  const next = document.createElement("main");
-  next.innerHTML = page();
-  morphChildren(app, next);
+  const html = page();
+  if (html !== lastHtml) { // most refreshes change nothing; then nothing is redrawn
+    const next = document.createElement("main");
+    next.innerHTML = html;
+    morphChildren(app, next);
+    lastHtml = html;
+  }
   drawMap();
 }
-function changed(full) { if (full) render(); else refresh(); scheduleSave(); }
+// While you type, the page is redrawn once you pause rather than on every key
+function refreshSoon() { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 180); }
+function changed(full) { if (full) render(); else refreshSoon(); scheduleSave(); }
 function clearExample() {
   S.example = false;
   S.apts = S.apts.filter((a) => !a.example);
@@ -1538,7 +1549,10 @@ async function pollStatus() {
   try {
     const st = await (await fetch("/api/status", { cache: "no-store" })).json();
     const was = CRAWL.state;
-    if (st.running || was === "running") await loadList();
+    if ((was === "running" && !st.running) || (st.running && Date.now() - (pollStatus.loaded || 0) > 30000)) {
+      pollStatus.loaded = Date.now();
+      await loadList();
+    }
     CRAWL.scheduled = !!st.scheduled;
     setCrawl(st.running ? "running" : st.state || "idle", st.msg || "");
     if (st.running) pollTimer = setTimeout(pollStatus, 5000);
@@ -1675,8 +1689,8 @@ function showCard(p, s, a, cr) {
       <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
         <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
       <p>${esc(describeListing(p))}</p>
-      ${photos.length > 1 ? `<details class="gallery"><summary>${photos.length} photos</summary><div class="strip">${photos.slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("")}</div></details>` : ""}
-      ${p.desc ? `<details class="desc"><summary>${esc(p.agent)}'s description</summary>${p.desc.split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
+      ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} photos</summary><div class="strip"></div></details>` : ""}
+      ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>${esc(p.agent)}'s description</summary><div class="fill"></div></details>` : ""}
       <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
       ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
         <input type="text" data-visit-note="${esc(p.url)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
@@ -1748,6 +1762,19 @@ function mapPanel() {
     <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Each area is drawn around the apartments found in it.</span></div>
   </section>`;
 }
+// Gallery photos and descriptions are built when you open them, not for every card up front
+function fillDetails(d) {
+  const p = LIST.items[d.dataset.key]; if (!p) return;
+  if (d.dataset.fill === "undated") {
+    const a = affordability(), cr = chosenRate();
+    d.querySelector(".fill").innerHTML = apartments().filter((p) => !(p.shows || []).length && (!S.show.hideNever || !isNever(p))).map((p) => showCard(p, null, a, cr)).join("");
+    return;
+  }
+  if (d.dataset.fill === "gallery") d.querySelector(".strip").innerHTML = (p.photos || []).slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
+  else d.querySelector(".fill").innerHTML = (p.desc || "").split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("");
+}
+const SHOW_STEP = 30; // cards drawn at a time
+let showLimit = SHOW_STEP;
 function showView() {
   const sh = S.show, a = affordability(), cr = chosenRate();
   const [from, to] = showWindow(sh.days, new Date());
@@ -1762,7 +1789,15 @@ function showView() {
   const body = !Object.keys(LIST.items).length
     ? `<div class="note">No apartments yet. ${LOCAL ? "Press Run now, or wait for the morning run." : "Open the planner from the local server to see them."}</div>`
     : !visible.length ? `<div class="note">No showings in this period${hidden ? `, apart from ${hidden} in areas you marked Never here` : ""}.</div>`
-    : Object.entries(days).map(([d, rs]) => `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${rs.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`).join("");
+    : (() => {
+        let left = showLimit;
+        const html = Object.entries(days).map(([d, rs]) => {
+          if (left <= 0) return "";
+          const shown = rs.slice(0, left); left -= shown.length;
+          return `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${shown.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`;
+        }).join("");
+        return html + (visible.length > showLimit ? `<button class="btn more" data-act="show-more">Show ${Math.min(SHOW_STEP, visible.length - showLimit)} more${visible.length - showLimit > SHOW_STEP ? ` (${visible.length - showLimit} left)` : ""}</button>` : "");
+      })();
   return `
     <div class="lead"><h1>Showings</h1>
     <p>Apartments in innanför tullarna with a visning, found on the estate agents' own sites every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
@@ -1775,7 +1810,7 @@ function showView() {
         </div>
         ${mapPanel()}
         ${body}
-        ${undated.length ? `<details class="undated"><summary>${undated.length} apartment${undated.length > 1 ? "s" : ""} without a showing yet</summary>${undated.map((p) => showCard(p, null, a, cr)).join("")}</details>` : ""}
+        ${undated.length ? `<details class="undated" data-fill="undated"><summary>${undated.length} apartment${undated.length > 1 ? "s" : ""} without a showing yet</summary><div class="fill"></div></details>` : ""}
       </div>
     </div>`;
 }
@@ -1793,6 +1828,7 @@ function showClick(a) {
   const p = LIST.items[a.dataset.key];
   switch (a.dataset.act) {
     case "crawl-start": startScrape(); return true;
+    case "show-more": showLimit += SHOW_STEP; refresh(); return true;
     case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
     case "unwent": delete S.show.visits[a.dataset.key]; return false;
     case "track":
@@ -1836,6 +1872,8 @@ app.addEventListener("input", (e) => {
   const xid = t.dataset.xname || t.dataset.xprice;
   if (xid) { const x = f.extra.find((i) => i.id === xid); if (x) x[t.dataset.xname ? "name" : "price"] = val; return changed(false); }
 });
+// Fill in a gallery, description or list when it's opened ("toggle" doesn't bubble, so listen while it travels down)
+app.addEventListener("toggle", (e) => { const d = e.target; if (d.open && d.dataset && d.dataset.fill) fillDetails(d); }, true);
 app.addEventListener("change", (e) => {
   const t = e.target;
   if (showChange(t)) return;
