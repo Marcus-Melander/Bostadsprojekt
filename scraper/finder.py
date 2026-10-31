@@ -32,11 +32,13 @@ from playwright.sync_api import sync_playwright
 
 import agents
 import geo
+from history import History
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
+FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
 BLOCKED = re.compile(r"captcha|verify you are human|är du en människa|access denied|unusual traffic", re.I)
 DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
 BOOLI_INNERSTAN = "143"            # Booli's area "Stockholms innerstad", used only for the count
@@ -78,6 +80,8 @@ def stamp():
 
 def fits(p, f):
     """Whether an apartment matches the filter set in the planner."""
+    if p.get("state") == "sold":
+        return False
     if p.get("soon") and not f.get("includeSoon", True):
         return False
     if f.get("maxPrice") and p.get("price") and p["price"] > f["maxPrice"]:
@@ -151,9 +155,10 @@ def read_listing(page, url, card, now, places):
         return None, True
     if BLOCKED.search(text):
         return None, True
-    if (resp is not None and resp.status >= 400) or agents.is_sold(text):
+    if resp is not None and resp.status >= 400:
         return None, False
     d = agents.parse_agent_page(text, now)
+    d.update(agents.parse_bidding(text))
     h1 = page.locator("h1").first.inner_text() if page.locator("h1").count() else ""
     title = page.title()
     addr = agents.find_address(h1, title, card, text[:600])
@@ -164,11 +169,47 @@ def read_listing(page, url, card, now, places):
     if not place or not place["inner"]:
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
+    if d["state"] == "sold":
+        d["shows"] = []
     d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
     return d, False
 
 
-def follow(page, store, saved, robots):
+def follow_left(page, store, robots, hist, started):
+    """Apartments that left their agent's list: check their page daily for up to a month,
+    to record that they sold and, where the agent shows it, the final price."""
+    left = store.setdefault("left", {})
+    now = dt.datetime.now()
+    todo = [u for u, p in left.items() if not p.get("final") and p.get("state") != "gone"
+            and now - dt.datetime.fromisoformat(p["left"]) < dt.timedelta(days=FOLLOW_DAYS)]
+    for i, url in enumerate(todo, 1):
+        p = left[url]
+        if not robots.allowed(url):
+            continue
+        status("running", f"Checking apartments that left the lists, {i} of {len(todo)}", started=started)
+        try:
+            resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(2000)
+            text = page.inner_text("body")
+        except PlaywrightError as e:
+            log(f"Couldn't open {url} ({e})")
+            continue
+        if resp is not None and resp.status in (404, 410):
+            p["state"] = "gone"  # the page was taken down, usually after the sale
+        elif (resp is not None and resp.status in (403, 429)) or BLOCKED.search(text):
+            log(f"{p.get('agent')} refused {url}; trying again tomorrow")
+            continue
+        else:
+            p.update(agents.parse_bidding(text))
+        hist.record(p, stamp(), on_list=False)
+        time.sleep(random.uniform(*PAUSE_S))
+    # After a month, or once the final price is known, the apartment stays only in the history
+    for u in [u for u, p in left.items() if p.get("final") or p.get("state") == "gone"
+              or now - dt.datetime.fromisoformat(p["left"]) >= dt.timedelta(days=FOLLOW_DAYS)]:
+        del left[u]
+
+
+def follow(page, store, saved, robots, hist):
     """Every saved apartment, read on every run whatever the filter says: its state,
     the highest bid and, once sold, the final price. Each day's reading is kept."""
     followed = store.setdefault("followed", {})
@@ -191,6 +232,9 @@ def follow(page, store, saved, robots):
             continue
         b = agents.parse_bidding(text)
         f.update(b, read=stamp())
+        known = store["items"].get(url) or store.get("left", {}).get(url)
+        if known:
+            hist.record({**known, **b}, stamp(), on_list=url in store["items"])
         today, last = stamp()[:10], (f["history"][-1] if f["history"] else {})
         entry = {"at": stamp(), **{k: b[k] for k in ("state", "bid", "bids", "final") if k in b}}
         if last.get("at", "")[:10] == today:
@@ -234,7 +278,7 @@ def find(args):
     started, now = stamp(), dt.datetime.now()
     status("running", "Starting", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")
-    places, robots = geo.Geocoder(DATA, log), agents.Robots()
+    places, robots, hist = geo.Geocoder(DATA, log), agents.Robots(), History(DATA)
     chosen = [a for a in agents.AGENTS if not args.agents or a["name"] in args.agents]
     report, notes = {}, []
     try:
@@ -269,17 +313,22 @@ def find(args):
                         p.update(agent=ag["name"], seen=stamp())
                         items[url] = p
                         kept += not p.get("outside")
+                        if not p.get("outside"):
+                            hist.record(p, stamp())
                     write_json(DATA / "listings.json", store)
                     time.sleep(random.uniform(*PAUSE_S))
                 report[ag["name"]] = {"listed": len(cards), "candidates": len(want), "read": read, "inner": kept}
                 log(f"{ag['name']}: {len(cards)} on the list, {len(want)} inner-city candidates, read {read}, {kept} in the inner city")
-                # Apartments that left an agent's list are sold or withdrawn
+                # Apartments that left an agent's list are usually sold: keep checking them for the final price
                 if cards:
                     for url in [u for u, p in items.items() if p.get("agent") == ag["name"] and u not in cards and u not in visits and u not in saved]:
-                        del items[url]
+                        p = items.pop(url)
+                        if not p.get("outside"):
+                            store.setdefault("left", {})[url] = {**p, "left": stamp()}
             if saved:
                 status("running", f"Following {len(saved)} saved apartment{'s' if len(saved) > 1 else ''}", started=started)
-                follow(page, store, saved, robots)
+                follow(page, store, saved, robots, hist)
+            follow_left(page, store, robots, hist, started)
             if not args.no_count:
                 status("running", "Reading Booli's count", started=started)
                 store["booli"] = booli_count(pw, f) or {**(store.get("booli") or {}), "missing": stamp()}
@@ -295,6 +344,9 @@ def find(args):
     found = [p for p in items.values() if not p.get("outside") and fits(p, f)]
     store.update(lastRun=stamp(), filter=f, agents=report,
                  found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon"))})
+    hist.export_csv()
+    store["history"] = hist.counts()
+    hist.close()
     write_json(DATA / "listings.json", store)
     b = store.get("booli") or {}
     msg = f"Found {store['found']['forSale']} for sale and {store['found']['soon']} coming soon."

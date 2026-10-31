@@ -1510,7 +1510,7 @@ async function loadList() {
 function scrapeConfig() { return { filter: S.show.f }; }
 // Same test as the finder's, so the planner and the finder agree on what fits
 function fits(p, f = S.show.f) {
-  if (p.outside) return false;
+  if (p.outside || p.state === "sold") return false;
   if (p.soon && !f.includeSoon) return false;
   if (f.maxPrice && p.price && p.price > f.maxPrice) return false;
   if (f.minRooms && p.rooms && p.rooms < f.minRooms) return false;
@@ -1599,6 +1599,7 @@ function crawlPanel() {
     <h3>Apartment finder</h3>
     <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}${st !== "running" && CRAWL.msg && st !== "error" ? " " + esc(CRAWL.msg) : ""}</span></div>
     ${key}
+    ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Price history: ${LIST.history.apartments} apartments, ${LIST.history.readings} daily readings, ${LIST.history.withBids} with bids and ${LIST.history.finalPrices} final prices so far. Saved in data/history.sqlite, with CSV files beside it.</p>` : ""}
     ${ag.length ? `<details class="agents"><summary>${ag.length} estate agents read</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} in the inner city</td></tr>`).join("")}</table></details>` : ""}
     ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Run now</button></div>`}
     <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Runs every morning at 06:30; next run ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 30) ? "today" : "tomorrow"} at 06:30.` : `Not scheduled yet, so it only runs when you press Run now. To run it every morning at 06:30, run <span class="mono">scripts/install-mac.sh</span> once.`} It follows each site's robots.txt and stops reading a site that blocks it.</p>

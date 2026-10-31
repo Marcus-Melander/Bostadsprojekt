@@ -12,7 +12,11 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 - **Our own neighbourhoods.** Look each address up on OpenStreetMap (Nominatim, at most one lookup a second) to get its neighbourhood and district, and to check that it's inside the inner city. Carry ratings over from Booli's areas by name, for example SoFo.
 - **Our own search filter:** max price (4 500 000 kr), min rooms, min m², max avgift, not on the ground floor, coming soon included.
 
+- **Collect price history for predictions.** Save as much as we can about every apartment the finder reads: its details, its agent and area, and each day's asking price, state, highest bid, number of bids and final price. The data goes into a SQLite database (`data/history.sqlite`), with CSV exports after every run (`data/apartments.csv`, `data/readings.csv`). Apartments that leave an agent's list are followed for up to 30 days, to catch the final price. This is the base for predicting final prices: how each agent prices compared with what apartments sell for, and how much prices rise in each area.
+
 ## Next
+
+- **Predict the final price.** Once there's enough history: for each agent and area, how far final prices land above asking and how many bids it usually takes. That gives a guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
