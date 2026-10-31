@@ -223,6 +223,7 @@ a { color: var(--text); text-underline-offset: 2px; }
 .evid a { font-size: 12px; color: var(--muted); }
 svg text { font-family: var(--f-body); }
 @media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
+.move textarea { width: 100%; margin-top: 12px; font: 400 13px var(--f-body); border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 8px; resize: vertical; }
 /* Showings */
 .show input[type="text"], .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
 .show label.paste { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 12px; }
@@ -439,7 +440,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
+  show: { maxPrice: 4500000, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
 });
 let S = DEFAULT();
 
@@ -739,6 +740,7 @@ const RANGES = {
   "fin.targetPrice": [1000000, 12000000, 25000], "fin.bankOffer": [0, 10000000, 50000],
   "bid.ask": [1000000, 12000000, 25000], "bid.walk": [1000000, 12000000, 25000], "bid.step": [5000, 100000, 5000],
   "five.avgiftExtra": [0, 5, 0.25], "rates.offer": [1, 6, 0.01], "value.manual": [-5, 10, 0.5],
+  "show.maxPrice": [1000000, 12000000, 50000],
   "search.minRooms": [1, 6, 0.5], "search.minArea": [15, 150, 5], "search.maxAvgift": [1000, 10000, 250], "search.headroom": [0, 25, 1],
 };
 const nfIn = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
@@ -819,7 +821,8 @@ const VIEWS = {
         <button class="tile" data-goto="search"><span class="eyebrow">Search Booli up to</span><span class="v">${mkr(searchTo)}</span><span class="s">${S.apts.length} apartment${S.apts.length === 1 ? "" : "s"} tracked</span></button>
         <button class="tile" data-goto="furnish"><span class="eyebrow">Furnishing budget</span><span class="v">${kr(furn.total)}</span><span class="s">${furn.count} items to buy, ${TIERS.find((t) => t[0] === S.furn.tier)[1].toLowerCase()}</span></button>
         <button class="tile" data-goto="steps"><span class="eyebrow">Buying steps</span><span class="v">${doneSteps} / ${STEPS.length}</span><span class="s">${doneSteps < STEPS.length ? "Next: " + esc(STEPS.find((s) => !S.steps[s[0]])[1]) : "All done. Welcome home."}</span></button>
-      </div>`;
+      </div>
+      ${movePanel()}`;
   },
 
   money() {
@@ -1447,7 +1450,7 @@ function scrapeConfig() {
   return {
     areas: allHoods().filter(([id]) => hoodOn(id)).map(([id, name]) => [id, name]),
     query: S.show.filter || budgetFilter(),
-    maxPrice: Math.round(affordability().max),
+    maxPrice: Math.round(+S.show.maxPrice > 0 ? +S.show.maxPrice : affordability().max),
     never: Object.keys(S.show.ratings).filter((id) => rating(id) === "never"),
   };
 }
@@ -1455,7 +1458,7 @@ function scrapeConfig() {
 /* ---------- Booli search links: your budget, or a filter pasted from Booli ---------- */
 function budgetFilter() {
   const s = S.search, a = affordability(), p = new URLSearchParams({ objectType: "Lägenhet" });
-  const to = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
+  const to = +S.show.maxPrice > 0 ? +S.show.maxPrice : Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
   if (to > 0) p.set("maxListPrice", to);
   if (s.minRooms) p.set("minRooms", s.minRooms);
   if (s.minArea) p.set("minLivingArea", s.minArea);
@@ -1570,7 +1573,8 @@ function filterPanel() {
   const link = searchUrl(ids, 1);
   return `<section class="panel">
     <h3>Search filter</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 8px">${S.show.filter ? "Using the filter you pasted from Booli." : "Using your budget from My finances and the Apartments tab."}</p>
+    <p class="dim" style="font-size:13px;margin:0 0 8px">${S.show.filter ? "Using the filter you pasted from Booli." : +S.show.maxPrice > 0 ? "Using the max price below, with rooms, size and avgift from the Apartments tab." : "Using your budget from My finances and the Apartments tab."}</p>
+    ${S.show.filter ? "" : numField("show.maxPrice", "Max price", "kr", "The asking price to search up to. Leave it empty to use your budget from My finances.")}
     <div class="chips">${filterChips(S.show.filter || budgetFilter())}</div>
     <label class="paste">Paste a Booli search link
       <input type="url" id="booli-paste" placeholder="https://www.booli.se/sok/till-salu?areaIds=…" value=""></label>
@@ -1714,6 +1718,52 @@ function showClick(a) {
 
 VIEWS.show = showView;
 
+/* ---------- Moving a plan between the claude.ai planner and the one on your Mac ---------- */
+let planMsg = "";
+function planJson() { return JSON.stringify({ app: "sthlm-bostadsplan", exported: new Date().toISOString(), plan: S }, null, 1); }
+function movePanel() {
+  return `<section class="panel move" style="margin-top:20px">
+    <h3>Move your plan</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 12px">Export your plan here, then import it into the other copy of the planner: claude.ai or the one on your Mac. Importing replaces the plan that's open.</p>
+    <div class="row">
+      <button class="btn" data-act="plan-export">Export plan</button>
+      <button class="btn ghost" data-act="plan-copy">Copy as text</button>
+      <label class="btn ghost">Import a file<input type="file" id="plan-file" accept=".json,application/json" hidden></label>
+    </div>
+    <textarea id="plan-paste" rows="3" placeholder="Or paste exported plan text here"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" data-act="plan-import">Import pasted text</button>${planMsg ? `<span class="dim" style="font-size:13px">${esc(planMsg)}</span>` : ""}</div>
+  </section>`;
+}
+async function exportPlan() {
+  const data = planJson(), filename = `bostadsplan-${isoLocal(new Date()).slice(0, 10)}.json`;
+  const dl = window.claude?.use ? await window.claude.use("downloads") : null;
+  if (dl) {
+    try { await dl.save({ filename, data }); planMsg = `Saved ${filename}.`; }
+    catch (e) { if (e && e.code === "declined") planMsg = "Not saved."; else return copyPlan(); }
+  } else {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    planMsg = `Saved ${filename} to your downloads.`;
+  }
+  refresh();
+}
+async function copyPlan() {
+  const data = planJson();
+  try { await navigator.clipboard.writeText(data); planMsg = "Copied. Paste it into the other planner's import box."; }
+  catch (e) { const t = document.getElementById("plan-paste"); if (t) { t.value = data; t.select(); } planMsg = "Couldn't reach the clipboard, so the text is in the box below: copy it from there."; }
+  refresh();
+}
+function importPlan(text) {
+  let j;
+  try { j = JSON.parse(text); } catch (e) { planMsg = "That isn't an exported plan."; return refresh(); }
+  const plan = j && (j.plan || j);
+  if (!plan || typeof plan !== "object" || !plan.fin) { planMsg = "That isn't an exported plan."; return refresh(); }
+  S = merge(DEFAULT(), plan); migrate(); S.tab = "overview";
+  planMsg = `Imported the plan exported ${j.exported ? new Date(j.exported).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}.`;
+  render(); scheduleSave();
+}
+
 /* ---------- Events ---------- */
 document.getElementById("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
@@ -1747,6 +1797,7 @@ app.addEventListener("input", (e) => {
 app.addEventListener("change", (e) => {
   const t = e.target;
   if (showChange(t)) return;
+  if (t.id === "plan-file" && t.files && t.files[0]) { t.files[0].text().then(importPlan); t.value = ""; return; }
   if (t.dataset.check) { set(t.dataset.check, t.checked); return changed(true); }
   if (t.dataset.have) { S.furn.items[t.dataset.have] = { ...(S.furn.items[t.dataset.have] || {}), have: t.checked }; return changed(true); }
   if (t.dataset.xhave) { const x = S.furn.extra.find((i) => i.id === t.dataset.xhave); if (x) x.have = t.checked; return changed(true); }
@@ -1767,6 +1818,9 @@ app.addEventListener("click", (e) => {
   const th = e.target.closest("th[data-sort]"); if (th) { S.rates.sort = th.dataset.sort; return changed(true); }
   const a = e.target.closest("[data-act]"); if (!a) return;
   const sc = showClick(a); if (sc === true) return; if (sc === false) return changed(true);
+  if (a.dataset.act === "plan-export") return exportPlan();
+  if (a.dataset.act === "plan-copy") return copyPlan();
+  if (a.dataset.act === "plan-import") return importPlan(document.getElementById("plan-paste").value);
   const id = () => Math.random().toString(36).slice(2, 9);
   switch (a.dataset.act) {
     case "clear-example": clearExample(); break;
