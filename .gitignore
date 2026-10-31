@@ -1,1 +1,4 @@
 .taste-skill/
+.venv/
+data/
+__pycache__/

@@ -253,6 +253,10 @@ svg text { font-family: var(--f-body); }
 .show-card .t { font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
 .show-card p { margin: 4px 0 6px; font-size: 14px; }
 .show-card a { color: var(--text); }
+.show-card details.desc { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.show-card details.desc summary { cursor: pointer; color: var(--text); font-size: 13px; }
+.show-card details.desc p { margin: 6px 0 0; font-size: 13px; }
+.facts a { color: var(--text); }
 .facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 13px; color: var(--muted); }
 .visit { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; margin-top: 10px; }
 .sc-act { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
@@ -435,7 +439,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { auto: true, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
+  show: { days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
 });
 let S = DEFAULT();
 
@@ -466,7 +470,7 @@ function merge(base, saved) {
 
 /* ---------- Persistence: private per-person doc in db, browser storage as fallback ---------- */
 const LS_KEY = "sthlm-bostadsplan-v1";
-let docRef = null, saveTimer = null, saving = false, pending = false, storeDb = null, storeId = null;
+let docRef = null, saveTimer = null, saving = false, pending = false;
 function setSaveState(text, ok) {
   const el = document.getElementById("saveState");
   el.className = "save-state" + (ok ? " ok" : "");
@@ -481,6 +485,14 @@ function scheduleSave() {
 }
 async function flush() {
   const local = lsWrite();
+  if (LOCAL) {
+    try {
+      const r = await fetch("/api/plan", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: S, scrape: scrapeConfig() }) });
+      if (!r.ok) throw new Error(r.status);
+      setSaveState("Saved on this computer", true);
+    } catch (e) { setSaveState(local ? "Saved in this browser only, the server isn't answering" : "Not saved", local); }
+    return;
+  }
   if (!docRef) { setSaveState(local ? "Saved in this browser" : "Not saved (storage blocked)", local); return; }
   if (saving) { pending = true; return; }
   saving = true;
@@ -493,13 +505,20 @@ async function initStore() {
   const local = lsRead();
   if (local) { S = merge(DEFAULT(), local); migrate(); render(); }
   setSaveState(local ? "Saved in this browser" : "Example plan", !!local);
+  if (LOCAL) {
+    try {
+      const r = await fetch("/api/plan", { cache: "no-store" });
+      if (r.ok) { S = merge(DEFAULT(), await r.json()); migrate(); render(); }
+      await flush(); // moves a browser-only plan to the server and gives the scraper this plan's areas and budget
+    } catch (e) { setSaveState("The local server isn't answering, saving in this browser", !!local); }
+    return;
+  }
   try {
     const [db, user] = await Promise.all([window.claude?.use?.("db"), window.claude?.use?.("user")]);
     if (!db || !user) return;
     const id = await user.id();
     if (!id) return;
     docRef = db.collection("data/users/" + id).doc("plan");
-    storeDb = db; storeId = id;
     const snap = await Promise.race([docRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
     if (snap.exists) {
       const d = snap.data();
@@ -1415,108 +1434,22 @@ function isNever(p) { return (p.in || []).some((id) => rating(id) === "never"); 
 /* Dates are kept as local "YYYY-MM-DDTHH:MM" strings, which sort and compare as text */
 const pad2 = (n) => String(n).padStart(2, "0");
 const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-const SV_MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
-function dateFor(day, monthIdx, time, now) {
-  let d = new Date(now.getFullYear(), monthIdx, day);
-  if (d < new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)) d = new Date(now.getFullYear() + 1, monthIdx, day);
-  return isoLocal(d).slice(0, 11) + time.padStart(5, "0");
-}
-// "Sön 8 nov kl 12:30", "Idag kl 17:00", "Imorgon kl 12:45"
-function parseWhen(txt, now) {
-  if (!txt) return null;
-  const t = txt.match(/kl (\d{1,2}:\d{2})/); if (!t) return null;
-  if (/^Idag/i.test(txt) || /^Imorgon/i.test(txt)) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (/^Imorgon/i.test(txt) ? 1 : 0));
-    return isoLocal(d).slice(0, 11) + t[1].padStart(5, "0");
-  }
-  const m = txt.match(/(\d{1,2}) ([a-zåäö]{3})/i); if (!m) return null;
-  const mi = SV_MONTHS.indexOf(m[2].toLowerCase()); if (mi < 0) return null;
-  return dateFor(+m[1], mi, t[1], now);
-}
-const numOf = (s) => { const v = parseFloat(String(s).replace(/[^\d,]/g, "").replace(",", ".")); return isFinite(v) ? v : null; };
-
-// A Booli search page as the browser's accessibility tree (read_page)
-function parseSearch(text, now) {
-  const items = []; let cur = null, next = null;
-  for (const raw of text.split("\n")) {
-    const l = raw.trim();
-    let m = l.match(/^link "([^"]*lägenhet på [^"]*)" \[ref_\d+\] href="\/(annons|bostad)\/(\d+)"/);
-    if (m) { cur = { key: m[2] + "/" + m[3], feats: [] }; items.push(cur); continue; }
-    m = l.match(/^link "Nästa sida" .*href="([^"]+)"/);
-    if (m) { next = m[1]; cur = null; continue; }
-    if (!cur) continue;
-    const s = (l.match(/^[a-z]+ "([^"]*)"/) || [])[1];
-    if (s == null) continue;
-    if (l.startsWith("heading ")) cur.addr = s;
-    else if (/^Lägenhet · /.test(s)) cur.label = s.split(" · ")[1];
-    else if (/^(Mån|Tis|Ons|Tor|Fre|Lör|Sön|Idag|Imorgon)\b.*kl \d{1,2}:\d{2}$/i.test(s)) cur.next = parseWhen(s, now);
-    else if (/^[\d\s ]+ kr$/.test(s)) cur.price = numOf(s);
-    else if (s === "Pris ej angivet") cur.price = null;
-    else if (/ kvadratmeter$/.test(s)) cur.kvm = numOf(s);
-    else if (/^[\d,]+ rum$/.test(s)) cur.rooms = numOf(s);
-    else if (/^vån /.test(s)) cur.floor = s.slice(4);
-    else if (s === "BV") cur.floor = "BV";
-    else if (/ kr\/mån$/.test(s)) cur.avgift = numOf(s);
-    else if (FEATS[s] && !cur.feats.includes(s)) cur.feats.push(s);
-    else if (s === "Snart till salu") cur.soon = true;
-  }
-  return { items: items.filter((c) => c.addr), next };
-}
-// A Booli listing page as plain text (get_page_text): every showing, build year, running costs
-const SV_LONG = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"];
-function parseDetail(text, now) {
-  const out = { shows: [] };
-  const re = new RegExp(`(\\d{1,2}) (${SV_LONG.join("|")})\\s*(\\d{1,2}:\\d{2})\\s*[–-]\\s*(\\d{1,2}:\\d{2})`, "g");
-  for (const m of text.matchAll(re)) {
-    const start = dateFor(+m[1], SV_LONG.indexOf(m[2]), m[3], now);
-    if (!out.shows.some((s) => s.start === start)) out.shows.push({ start, end: m[4].padStart(5, "0") });
-  }
-  let m = text.match(/Byggår\s+(\d{4})/); if (m) out.built = +m[1];
-  m = text.match(/Driftskostnaden är ([\d\s ]+) kr/); if (m) out.drift = numOf(m[1]);
-  m = text.match(/till salu i (\d+) dagar/); if (m) out.days = +m[1];
-  m = text.match(/Utropspris\s+([\d\s ]+) kr/); if (m) out.price = numOf(m[1]);
-  return out;
-}
-function looksBlocked(text) { return /captcha|verify you are human|är du en människa|access denied|unusual traffic/i.test(text); }
-
-/* ---------- The listings store: a private doc of its own, browser storage as fallback ---------- */
+/* ---------- Listings come from the local server, which the Python scraper fills ---------- */
 let LIST = { items: {}, done: {}, lastRun: null };
-let listRef = null, listTimer = null;
-const LIST_KEY = "sthlm-bostadsplan-booli-v1";
-function saveList() {
-  clearTimeout(listTimer);
-  listTimer = setTimeout(async () => {
-    pruneList();
-    try { localStorage.setItem(LIST_KEY, JSON.stringify(LIST)); } catch (e) {}
-    if (listRef) try { await listRef.set({ list: JSON.stringify(LIST), savedAt: new Date().toISOString() }); } catch (e) {}
-  }, 1500);
-}
-function pruneList() {
-  const cutoff = isoLocal(new Date(Date.now() - 2 * 86400e3));
-  for (const [k, p] of Object.entries(LIST.items)) {
-    const last = [p.next, ...(p.shows || []).map((s) => s.start)].filter(Boolean).sort().pop();
-    if (!S.show.visits[k] && (!last || last < cutoff) && Date.now() - Date.parse(p.seen || 0) > 3 * 86400e3) delete LIST.items[k];
-  }
-}
-async function loadList(db, id) {
-  try { const t = localStorage.getItem(LIST_KEY); if (t) LIST = { ...LIST, ...JSON.parse(t) }; } catch (e) {}
-  if (db && id) {
-    listRef = db.collection("data/users/" + id).doc("booli");
-    try {
-      const snap = await Promise.race([listRef.get(), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
-      if (snap.exists) { const d = JSON.parse(snap.data().list); if (!LIST.lastRun || (d.lastRun && d.lastRun > LIST.lastRun)) LIST = { ...LIST, ...d }; }
-    } catch (e) {}
-  }
+const LOCAL = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+async function loadList() {
+  if (!LOCAL) return;
+  try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) LIST = { ...LIST, ...(await r.json()) }; } catch (e) {}
   if (S.tab === "show") refresh();
 }
-function mergeCards(cards, hoodId) {
-  const order = allHoods().map((h) => h[0]);
-  for (const c of cards) {
-    const p = LIST.items[c.key] || (LIST.items[c.key] = { key: c.key, in: [] });
-    Object.assign(p, c, { seen: new Date().toISOString() });
-    if (!p.in.includes(hoodId)) p.in.push(hoodId);
-    p.hood = [...p.in].sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
-  }
+// What the scraper reads: ticked areas in order, the search filter, your max price and the areas you never want
+function scrapeConfig() {
+  return {
+    areas: allHoods().filter(([id]) => hoodOn(id)).map(([id, name]) => [id, name]),
+    query: S.show.filter || budgetFilter(),
+    maxPrice: Math.round(affordability().max),
+    never: Object.keys(S.show.ratings).filter((id) => rating(id) === "never"),
+  };
 }
 
 /* ---------- Booli search links: your budget, or a filter pasted from Booli ---------- */
@@ -1553,84 +1486,32 @@ function filterChips(q) {
   }).join("") || `<span class="chip">No filters</span>`;
 }
 
-/* ---------- The reader ---------- */
-const HOST = "host:claude_browser";
-const CRAWL = { state: "idle", msg: "", tab: null, stop: false };
-let mcpNs = null;
+/* ---------- The scraper's status ---------- */
+const CRAWL = { state: "idle", msg: "" };
+const NO_SERVER = "The local server isn't answering. Start it with: .venv/bin/python server.py";
+let pollTimer = null;
 function setCrawl(state, msg) {
   CRAWL.state = state; CRAWL.msg = msg;
   const b = document.querySelector('#tabs button[data-tab="show"]'); if (b) b.classList.toggle("busy", state === "running");
   if (S.tab === "show") refresh();
 }
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function pauseStep() { const end = Date.now() + pauseMs(); while (Date.now() < end && !CRAWL.stop) await sleep(500); }
-async function hostCall(tool, input) {
-  const r = await mcpNs.callTool(HOST, tool, input, { cache: false });
-  const text = (r.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
-  return text || (typeof r.payload === "string" ? r.payload : JSON.stringify(r.payload ?? ""));
-}
-async function openPage(url) {
-  if (CRAWL.tab) {
-    try { await hostCall("navigate", { url, tabId: CRAWL.tab }); }
-    catch (e) { if (e && e.code === "tool_error") CRAWL.tab = null; else throw e; }
-  }
-  if (!CRAWL.tab) {
-    const t = await hostCall("preview_start", { url });
-    CRAWL.tab = (t.match(/"tabId"\s*:\s*"([^"]+)"/) || [])[1] || null;
-  }
-  await sleep(2500); // let Booli finish drawing the results
-}
-const withTab = (o) => (CRAWL.tab ? { ...o, tabId: CRAWL.tab } : o);
-function needsDetail(p, max) {
-  const soon = isoLocal(new Date(Date.now() + 14 * 86400e3)), nowS = isoLocal(new Date());
-  if (!p.next || p.next < nowS || p.next > soon) return false;
-  if (p.price && p.price > max * 1.15) return false;
-  return !p.detail || Date.now() - Date.parse(p.detail) > DETAIL_MS;
-}
-async function runCrawl(manual) {
-  if (CRAWL.state === "running") return;
-  mcpNs = mcpNs || (await window.claude?.use?.("mcp"));
-  if (!mcpNs) return setCrawl("nohost", "Reading Booli works when the planner is open in the Claude desktop app.");
-  CRAWL.stop = false;
-  setCrawl("running", "Starting…");
+async function pollStatus() {
+  if (!LOCAL) return;
+  clearTimeout(pollTimer);
   try {
-    const hoods = allHoods().filter(([id]) => hoodOn(id) && (manual || !LIST.done[id] || Date.now() - Date.parse(LIST.done[id]) > REFRESH_MS));
-    for (const [id, name] of hoods) {
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        if (CRAWL.stop) return setCrawl("paused", "Paused. Press Start to continue where it stopped.");
-        setCrawl("running", `Reading ${name}${page > 1 ? ", page " + page : ""}`);
-        await openPage(searchUrl([id], page));
-        const text = await hostCall("read_page", withTab({ filter: "all", depth: 40, max_chars: 300000 }));
-        if (looksBlocked(text)) return setCrawl("blocked", "Booli asked for a human check, so reading stopped. Finish it yourself in the browser pane, then press Start.");
-        const res = parseSearch(text, new Date());
-        mergeCards(res.items, id); saveList();
-        if (!res.next || !res.items.length) break;
-        await pauseStep();
-      }
-      LIST.done[id] = new Date().toISOString(); saveList();
-      await pauseStep();
-    }
-    const max = affordability().max;
-    const want = Object.values(LIST.items).filter((p) => !isNever(p) && needsDetail(p, max));
-    for (const [i, p] of want.entries()) {
-      if (CRAWL.stop) return setCrawl("paused", "Paused. Press Start to continue where it stopped.");
-      setCrawl("running", `Reading showing times, ${i + 1} of ${want.length}`);
-      await openPage(`${BOOLI}/${p.key}`);
-      const text = await hostCall("get_page_text", withTab({ max_chars: 20000 }));
-      if (looksBlocked(text)) return setCrawl("blocked", "Booli asked for a human check, so reading stopped. Finish it yourself in the browser pane, then press Start.");
-      const d = parseDetail(text, new Date());
-      Object.assign(p, d, { price: p.price ?? d.price, detail: new Date().toISOString() });
-      saveList();
-      await pauseStep();
-    }
-    LIST.lastRun = new Date().toISOString(); saveList();
-    setCrawl("done", "");
-  } catch (e) {
-    const c = e && e.code;
-    if (["server_not_connected", "not_granted", "capability_disabled", "capability_removed"].includes(c)) setCrawl("nohost", "Reading Booli works when the planner is open in the Claude desktop app.");
-    else if (["not_in_manifest", "approval_required", "cancelled", "consent_required"].includes(c)) setCrawl("denied", "The planner isn't allowed to use the browser yet. Press Start to be asked.");
-    else setCrawl("error", "The browser stopped answering" + (e && e.message ? ` (${String(e.message).slice(0, 120)})` : "") + ". Press Start to try again.");
-  }
+    const st = await (await fetch("/api/status", { cache: "no-store" })).json();
+    const was = CRAWL.state;
+    if (st.running || was === "running") await loadList();
+    setCrawl(st.running ? "running" : st.state || "idle", st.msg || "");
+    if (st.running) pollTimer = setTimeout(pollStatus, 5000);
+  } catch (e) { setCrawl("error", NO_SERVER); }
+}
+async function startScrape() {
+  await flush(); // so the run uses the areas and budget on screen
+  const r = await fetch("/api/scrape", { method: "POST" }).catch(() => null);
+  if (!r) return setCrawl("error", NO_SERVER);
+  setCrawl("running", r.status === 409 ? "Already reading" : "Starting…");
+  pollTimer = setTimeout(pollStatus, 2000);
 }
 
 /* ---------- Showings view ---------- */
@@ -1645,15 +1526,17 @@ function showWindow(mode, now) {
   return [isoLocal(now), isoLocal(end)];
 }
 function showingsIn(p, from, to) {
+  // The estate agent's own times win; Booli's next showing fills in when the agent lists none
   const starts = (p.shows || []).map((s) => ({ ...s }));
-  if (p.next && !starts.some((s) => s.start === p.next)) starts.push({ start: p.next });
+  if (p.next && !starts.length) starts.push({ start: p.next });
   return starts.filter((s) => s.start >= from && s.start < to).sort((a, b) => (a.start < b.start ? -1 : 1));
 }
 function describeListing(p) {
   const bits = [];
   bits.push([p.rooms ? String(p.rooms).replace(".", ",") + " rum" : "Apartment", p.kvm ? String(p.kvm).replace(".", ",") + " m²" : ""].filter(Boolean).join(", "));
   if (p.floor) bits[0] += p.floor === "BV" ? " on the ground floor" : ` on floor ${p.floor}`;
-  const f = (p.feats || []).map((x) => FEATS[x]);
+  // Booli's features first, then what the agent's description adds, at most six so the sentence stays readable
+  const f = [...new Set([...(p.feats || []).map((x) => FEATS[x]), ...(p.extra || [])])].slice(0, 6);
   if (f.length) bits[0] += " with " + (f.length > 1 ? f.slice(0, -1).join(", ") + " and " + f[f.length - 1] : f[0]);
   if (p.built) bits.push(`built ${p.built}`);
   if (p.avgift && p.kvm) {
@@ -1672,14 +1555,14 @@ function ratingSelect(attr, v) {
 function crawlPanel() {
   const st = CRAWL.state, n = Object.keys(LIST.items).length;
   const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
-  const text = st === "running" ? CRAWL.msg : st === "idle" || st === "done" ? (last ? `Last read ${last}. ${n} apartments saved.` : "Not read yet.") : CRAWL.msg;
-  const btn = st === "running" ? `<button class="btn" data-act="crawl-pause">Pause</button>` : st === "nohost" ? "" : `<button class="btn primary" data-act="crawl-start">${last ? "Read again now" : "Start reading Booli"}</button>`;
+  if (!LOCAL) return `<section class="panel"><h3>Booli scraper</h3>
+    <p style="margin:0;font-size:14px">The scraper runs on your Mac. Start the local server and open <strong>http://localhost:8765</strong> to see its listings here.</p></section>`;
+  const text = st === "running" || st === "blocked" || st === "error" ? CRAWL.msg : last ? `Last read ${last}. ${n} apartments saved. ${CRAWL.msg}` : "Not read yet.";
   return `<section class="panel">
-    <h3>Booli reader</h3>
+    <h3>Booli scraper</h3>
     <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}</span></div>
-    <div class="row" style="margin-top:12px">${btn}
-      <label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.auto" ${S.show.auto ? "checked" : ""}> Start when I open the planner</label></div>
-    <p class="dim" style="font-size:12px;margin:10px 0 0">It opens Booli in the desktop app's browser pane, one page every 7 to 14 seconds, and stops if Booli asks for a human check. Each area is read again after 6 hours.</p>
+    ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Scrape now</button></div>`}
+    <p class="dim" style="font-size:12px;margin:10px 0 0">Runs every morning at 06:30 once installed with scripts/install-mac.sh. It loads one page every 4 to 9 seconds and stops if Booli blocks it.</p>
   </section>`;
 }
 function filterPanel() {
@@ -1743,7 +1626,8 @@ function showCard(p, s, a, cr) {
       <div class="row" style="gap:8px"><a href="${BOOLI}/${esc(p.key)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
         <span class="dim">${esc(hoodName(p.hood))}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
       <p>${esc(describeListing(p))}</p>
-      <div class="facts"><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
+      ${p.desc ? `<details class="desc"><summary>${esc(p.agentName)}'s description</summary>${p.desc.split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
+      <div class="facts">${p.agentUrl ? `<a href="${esc(p.agentUrl)}" target="_blank" rel="noopener">${esc(p.agentName)} ↗</a>` : p.broker ? `<span>${esc(p.broker)}</span>` : ""}<span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
       ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.key)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
         <input type="text" data-visit-note="${esc(p.key)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
     </div>
@@ -1765,12 +1649,12 @@ function showView() {
   const days = {};
   for (const r of visible) (days[r.s.start.slice(0, 10)] = days[r.s.start.slice(0, 10)] || []).push(r);
   const list = Object.keys(LIST.items).length === 0
-    ? `<div class="note">No apartments yet. ${CRAWL.state === "nohost" ? "Open the planner in the Claude desktop app and the reader starts on its own." : "The reader fills this list as it goes."}</div>`
+    ? `<div class="note">No apartments yet. ${LOCAL ? "Press Scrape now, or wait for the morning run." : "Open the planner from the local server to see them."}</div>`
     : !visible.length ? `<div class="note">No showings in this period${hidden ? `, apart from ${hidden} in areas you marked Never here` : ""}.</div>`
     : Object.entries(days).map(([d, rs]) => `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${rs.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`).join("");
   return `
     <div class="lead"><h1>Showings</h1>
-    <p>Apartments in innanför tullarna with a visning, read from Booli and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
+    <p>Apartments in innanför tullarna with a visning, read from Booli every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
     <div class="bench show">
       <div class="stack">${crawlPanel()}${filterPanel()}${myAreasPanel()}${areasPanel(counts)}</div>
       <div>
@@ -1809,8 +1693,7 @@ function showChange(t) {
 function showClick(a) {
   const p = LIST.items[a.dataset.key];
   switch (a.dataset.act) {
-    case "crawl-start": runCrawl(true); return true;
-    case "crawl-pause": CRAWL.stop = true; setCrawl("running", "Pausing after this page…"); return true;
+    case "crawl-start": startScrape(); return true;
     case "filter-budget": S.show.filter = ""; S.show.pasteMsg = ""; LIST.done = {}; return false;
     case "copy-filter": {
       const el = document.getElementById("booli-copy");
@@ -1898,8 +1781,8 @@ app.addEventListener("click", (e) => {
 
 render();
 initStore().then(async () => {
-  await loadList(storeDb, storeId);
-  if (S.show.auto) runCrawl(false);
+  await loadList();
+  pollStatus();
 });
 </script>
 </body>
