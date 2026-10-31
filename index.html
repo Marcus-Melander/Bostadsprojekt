@@ -242,9 +242,11 @@ svg text { font-family: var(--f-body); }
 .map-panel .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .leaflet-container { font: 13px var(--f-body); }
 .leaflet-popup-content a { color: var(--data); }
-.leaflet-tile-pane { filter: saturate(.3) brightness(1.04); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); } }
-:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+.leaflet-container { background: var(--raised); }
+.leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--surface) 80%, transparent) !important; color: var(--muted); }
+.leaflet-control-attribution a { color: var(--muted); }
+.leaflet-bar a { background: var(--surface); color: var(--text); border-color: var(--border); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); box-shadow: 0 2px 10px rgb(0 0 0 / .18); }
 @media (max-width: 640px) { #map { height: 300px; } }
 /* Showings */
 .show input[type="text"]:not([data-num]), .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
@@ -1702,8 +1704,18 @@ function drawMap() {
   if (MAP.el !== el) {
     if (MAP.map) MAP.map.remove();
     MAP.map = L.map(el, { scrollWheelZoom: false, zoomControl: true }).setView([59.325, 18.065], 13);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap contributors" }).addTo(MAP.map);
+    MAP.tiles = null;
     Object.assign(MAP, { el, layer: L.layerGroup().addTo(MAP.map), sig: "", fitted: false });
+  }
+  // Stadia Maps' quiet greys over OpenStreetMap data, light or dark; no key is needed on localhost
+  const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  if (MAP.dark !== dark || !MAP.tiles) {
+    if (MAP.tiles) MAP.tiles.remove();
+    MAP.tiles = L.tileLayer(`https://tiles.stadiamaps.com/tiles/${dark ? "alidade_smooth_dark" : "alidade_smooth"}/{z}/{x}/{y}{r}.png`, {
+      maxZoom: 20,
+      attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(MAP.map);
+    MAP.dark = dark; MAP.sig = ""; // redraw the areas in this theme's colours
   }
   const list = apartments().filter((p) => p.lat && (!S.show.hideNever || !isNever(p)));
   const sig = list.map((p) => p.url).join() + JSON.stringify(S.show.ratings);
@@ -1716,23 +1728,24 @@ function drawMap() {
     const c = [ps.reduce((a, p) => a + p.lat, 0) / ps.length, ps.reduce((a, p) => a + p.lon, 0) / ps.length];
     const radius = Math.max(220, ...ps.map((p) => metres(c, [p.lat, p.lon]) + 120));
     const r = rating(name) || rating(ps[0].group), col = ratingColour(r);
-    L.circle(c, { radius, color: col, weight: 1, fillColor: col, fillOpacity: r ? 0.16 : 0.06 })
+    L.circle(c, { radius, stroke: !!r, color: col, weight: 1, opacity: 0.6, fillColor: col, fillOpacity: r ? 0.2 : 0.07 })
       .bindTooltip(`${esc(name)} · ${ratingLabel(r)} · ${ps.length} apartment${ps.length > 1 ? "s" : ""}`, { sticky: true }).addTo(MAP.layer);
   }
   for (const p of list) {
     const r = rating(p.area) || rating(p.group);
-    L.circleMarker([p.lat, p.lon], { radius: 6, color: "#ffffff", weight: 1.5, fillColor: ratingColour(r), fillOpacity: 1 })
+    L.circleMarker([p.lat, p.lon], { radius: 5, color: getComputedStyle(document.documentElement).getPropertyValue("--surface").trim(), weight: 1.5, fillColor: r ? ratingColour(r) : getComputedStyle(document.documentElement).getPropertyValue("--text").trim(), fillOpacity: 0.9 })
       .bindPopup(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Showing " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}<br><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a>`)
       .addTo(MAP.layer);
   }
   if (!MAP.fitted && list.length) { MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08)); MAP.fitted = true; }
 }
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawMap());
 function mapPanel() {
   if (!apartments().some((p) => p.lat)) return "";
   const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Never here"], ["", "Not rated"]];
   return `<section class="panel map-panel">
     <div id="map" role="img" aria-label="Map of the apartments and your rated areas"></div>
-    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--muted)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Each area is drawn around the apartments found in it.</span></div>
+    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Each area is drawn around the apartments found in it.</span></div>
   </section>`;
 }
 function showView() {

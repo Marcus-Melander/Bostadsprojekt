@@ -276,12 +276,14 @@ def read_agent(ag, sh):
             page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
             progress(sh, ag["name"], "(list)")
             cards = agents.discover(ag, page, robots, DATA / "cache", log)
-            want = {u: t for u, t in cards.items() if agents.looks_inner(u, t)
+            want = {u: t for u, t in cards.items() if agents.looks_inner(u, t, ag.get("anywhere"))
                     and not ((c := agents.parse_card(t)).get("price") and f.get("maxPrice") and c["price"] > f["maxPrice"] * 1.15)}
             read = kept = 0
             for n, (url, card) in enumerate(want.items(), 1):
                 with sh["lock"]:
                     old = items.get(url)
+                    if old and (old.get("outside") or old.get("state") == "sold"):
+                        continue  # outside the inner city or sold: nothing more to read
                     if old and old.get("read") and now - dt.datetime.fromisoformat(old["read"]) < READ_EVERY:
                         old["seen"] = stamp()
                         kept += not old.get("outside")

@@ -30,7 +30,7 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 ## Done
 
 - **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.
-- **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here).
+- **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here). Stadia Maps' quiet grey "Alidade Smooth" map, light and dark, which needs no key for a page on localhost.
 - **Save apartments and follow their bidding.** "Save" on a showing (it replaces Track) adds the apartment to Saved. The finder then reads its page on every run, whatever the filter says. It records the highest bid each day and the final price once it's sold, and Saved shows the bid history.
 - **Show whether the daily run is installed.** The finder panel shows "Runs every morning at 06:30, next run tomorrow" when the schedule is installed, and how to switch it on when it isn't.
 - **The planner:** finances, mortgage rates, 5-year budget, area prices, bidding guide, furnishing budget and buying steps.

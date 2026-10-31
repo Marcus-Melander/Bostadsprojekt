@@ -20,7 +20,8 @@ UA = "Bostadsplan/1.0 (personal apartment planner)"
 CACHE_HOURS = 20
 SITEMAP_DAYS = 30   # sitemap entries changed in the last month; older ones are mostly sold
 
-# obj: what a link to one apartment looks like on that site
+# obj: what a link to one apartment looks like on that site. clicks: how many times to press
+# "show more" at most. anywhere: the cards don't name the area, so OpenStreetMap decides.
 AGENTS = [
     {"name": "Alicia Edelman", "lists": ["https://aliciaedelman.se/till-salu"], "obj": r"/bostad/"},
     {"name": "Notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"], "obj": r"/kopa-bostad/objekt/"},
@@ -29,10 +30,8 @@ AGENTS = [
     {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/"},
     {"name": "Södermäklarna", "lists": ["https://www.sodermaklarna.se/till-salu"], "obj": r"/bostad/"},
     {"name": "Stadshem", "lists": ["https://stadshem.se/till-salu"], "obj": r"/objekt/"},
-    {"name": "Bergets Ro", "lists": ["https://www.bergetsro.se/till-salu/"], "obj": r"/houses/",
-     "sitemaps": ["https://www.bergetsro.se/houses-sitemap.xml", "https://www.bergetsro.se/houses-sitemap2.xml"]},
-    {"name": "Bjurfors", "lists": ["https://www.bjurfors.se/sv/tillsalu/stockholm/stockholm/"], "obj": r"/sv/tillsalu/stockholm/stockholm/[^/]+/[^/]+",
-     "sitemaps": ["https://www.bjurfors.se/sitemap.xml"]},
+    {"name": "Bergets Ro", "lists": ["https://www.bergetsro.se/till-salu/"], "obj": r"/houses/", "clicks": 40, "anywhere": True},
+    {"name": "Bjurfors", "lists": ["https://www.bjurfors.se/sv/tillsalu/stockholm/stockholm/"], "obj": r"/sv/tillsalu/stockholm/stockholm/[^/]+/[^/]+"},
     {"name": "Behrer & Partners", "lists": ["https://www.behrer.se/vara-hem/"], "obj": r"/objekt/[^/]+/?$"},
 ]
 
@@ -53,13 +52,14 @@ def ascii_lower(s):
     return "".join(c for c in s if not unicodedata.combining(c))
 
 
-def looks_inner(url, text):
+def looks_inner(url, text, anywhere=False):
     """A card worth opening: it names an inner-city area and nothing clearly outside it.
-    A card with no text (from a sitemap) is opened, and its address decides."""
+    A card with no text (from a sitemap), or from an agent whose cards don't name the area,
+    is opened, and its address decides."""
     hay = ascii_lower(urlparse(url).path.replace("-", " ").replace("/", " ") + " " + text)
     if OUTER.search(hay):
         return False
-    return bool(INNER.search(hay)) or not text
+    return bool(INNER.search(hay)) or not text or anywhere
 
 
 # ---------- Being a polite visitor ----------
@@ -106,9 +106,21 @@ def sitemap_entries(url, cache_dir):
     return out
 
 
-def list_cards(page, url, obj_rx, clicks=8):
-    """Every apartment link on a for-sale list, with its card text. Scrolls, and presses
-    "Ladda fler" / "Visa fler" so lists that load in parts show everything."""
+def _page_cards(page, obj_rx, cards):
+    links = page.eval_on_selector_all(
+        "a[href]", """els => els.map(a => {
+            const card = a.closest('article, li, [class*=card], [class*=object], [class*=item]') || a;
+            return [a.href.split('#')[0], (card.innerText || a.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400)];
+        })""")
+    for h, t in links:
+        if re.search(obj_rx, h) and not re.search(r"/(salda|sold|slutpris)", h, re.I):
+            cards[h] = max(cards.get(h, ""), t, key=len)
+
+
+def list_cards(page, url, obj_rx, clicks=8, max_pages=30):
+    """Every apartment link on a for-sale list, with its card text. Scrolls, presses
+    "Ladda fler" / "Visa fler" so lists that load in parts show everything, and follows
+    numbered page links ("?page=2") for lists split into pages."""
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(2500)
     for _ in range(clicks):
@@ -123,15 +135,27 @@ def list_cards(page, url, obj_rx, clicks=8):
             page.wait_for_timeout(1500)
         except Exception:
             break
-    links = page.eval_on_selector_all(
-        "a[href]", """els => els.map(a => {
-            const card = a.closest('article, li, [class*=card], [class*=object], [class*=item]') || a;
-            return [a.href.split('#')[0], (card.innerText || a.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400)];
-        })""")
     cards = {}
-    for h, t in links:
-        if re.search(obj_rx, h) and not re.search(r"/(salda|sold|slutpris)", h, re.I):
-            cards[h] = max(cards.get(h, ""), t, key=len)
+    _page_cards(page, obj_rx, cards)
+    base = urlparse(url).path
+    pages = {}
+    for h in page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)"):
+        u = urlparse(h)
+        if u.path == base and (m := re.search(r"(?:^|&)page=(\d+)", u.query)) and int(m.group(1)) > 1:
+            pages.setdefault(int(m.group(1)), h)
+    # Page links often skip the middle ("1 2 3 4 5 … 18"), so every page up to the last is visited
+    if pages:
+        last = max(pages)
+        template = pages[last]
+        pages = {n: re.sub(r"((?:^|[?&])page=)\d+", rf"\g<1>{n}", template) for n in range(2, last + 1)}
+    for n in sorted(pages)[:max_pages]:
+        time.sleep(2)
+        try:
+            page.goto(pages[n], wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(2000)
+            _page_cards(page, obj_rx, cards)
+        except Exception:
+            break
     return cards
 
 
@@ -143,7 +167,7 @@ def discover(agent, page, robots, cache_dir, log):
             log(f"{agent['name']}: robots.txt asks visitors not to read {url}, skipped")
             continue
         try:
-            found.update(list_cards(page, url, agent["obj"]))
+            found.update(list_cards(page, url, agent["obj"], clicks=agent.get("clicks", 8)))
         except Exception as e:
             log(f"{agent['name']}: couldn't read {url} ({e})")
         time.sleep(3)
