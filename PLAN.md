@@ -52,7 +52,9 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 
 ## Next
 
-- **Predict the final price.** Once there's enough history: for each agent and area, how far final prices land above asking and how many bids it usually takes. That gives a guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
+- **Predict the final price, two ways, side by side.**
+  - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
+  - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
@@ -64,6 +66,8 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 - **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
 
 ## Done
+
+- **Floor plans (planlösning).** Each apartment card has a Floor plan section that opens the agent's own plan in place. The finder looks for it the way the page offers it: an image named as a floor plan (alt text, caption or lightbox), the images beside a "Planritning" label, the section a "Planritning" link points to, or the page's floor plan button; for agents that don't name them, the last images of the full gallery. Each candidate is checked to be a drawing, not a photo (at least 65 % one flat background colour, with lines), which tells all the floor plans tested from all the photos, including beige and black backgrounds. Every plan is saved in data/floorplans/ with the apartment's address, area, rooms, size, avgift, floor and agent in index.json, as training data (kept on this computer only). Found for 18 of the 20 agents; Länsförsäkringar and Notar show no floor plan on their pages. Apartments found earlier got theirs with `scraper/plans.py --backfill`.
 
 - **Important addresses and travel times.** Add the places that matter in the planner (name, address, and the time you want to arrive on a weekday). Each apartment you save shows the trip there by SL, door to door, from SL's own journey planner (Journey-planner v2 on Trafiklab, open without a key), with the lines and changes on hover. Work and your girlfriend's place are added (the addresses stay in data/, which isn't in git). To keep requests few, `scraper/travel.py` looks up only saved apartments, once per address, a lookup a second, after every finder run and whenever you change an address; answers are kept in data/travel.json and looked up again after 90 days.
 - **A heart on every apartment** saves it (and looks up its trips) in one tap; tap again to unsave.

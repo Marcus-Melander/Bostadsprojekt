@@ -325,6 +325,10 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .show-card .t { font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
 .show-card p { margin: 4px 0 6px; font-size: 14px; }
 .show-card a { color: var(--text); }
+.show-card details.plan { margin: 0 0 8px; font-size: 13px; }
+.show-card details.plan summary { cursor: pointer; font-weight: 600; }
+.show-card details.plan .fill { display: grid; gap: 8px; margin-top: 8px; }
+.show-card details.plan img { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
 .show-card details.desc { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
 .show-card details.desc summary { cursor: pointer; color: var(--text); font-size: 13px; }
 .show-card details.desc p { margin: 6px 0 0; font-size: 13px; }
@@ -1780,6 +1784,7 @@ function showCard(p, s, a, cr) {
       <p>${esc(describeListing(p))}</p>
       ${travelLine(p)}
       ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} photos</summary><div class="strip"></div></details>` : ""}
+      ${(p.plans || []).length ? `<details class="plan" data-fill="plan" data-key="${esc(p.url)}"><summary>Floor plan${p.plans.length > 1 ? "s (" + p.plans.length + ")" : ""}</summary><div class="fill"></div></details>` : ""}
       ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>${esc(p.agent)}'s description</summary><div class="fill"></div></details>` : ""}
       <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
       ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
@@ -1893,7 +1898,8 @@ function fillDetails(d) {
     d.querySelector(".fill").innerHTML = apartments().filter((p) => !(p.shows || []).length && (!S.show.hideNever || !isNever(p))).map((p) => showCard(p, null, a, cr)).join("");
     return;
   }
-  if (d.dataset.fill === "gallery") d.querySelector(".strip").innerHTML = (p.photos || []).slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
+  if (d.dataset.fill === "plan") d.querySelector(".fill").innerHTML = p.plans.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="Open full size"><img src="${esc(u)}" alt="Floor plan of ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
+  else if (d.dataset.fill === "gallery") d.querySelector(".strip").innerHTML = (p.photos || []).slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
   else d.querySelector(".fill").innerHTML = (p.desc || "").split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("");
 }
 const SHOW_STEP = 30; // cards drawn at a time

@@ -495,3 +495,76 @@ def photos(page, limit=15):
             seen.add(k)
             out.append(u)
     return out[:limit]
+
+
+# ---------- Floor plans ----------
+
+PLAN_WORDS = r"planritning|planlösning|plan\s*ritning|floor\s*-?plan|planskiss"
+_PLAN_JS = r"""([rx, minW]) => {
+  const re = new RegExp(rx, "i"), out = [];
+  const big = (u) => u && /^https?:/.test(u) && !/\.svg(\?|$)|\.pdf(\?|$)|logo|icon|instagram|avatar/i.test(u);
+  const src = (el) => el.currentSrc || el.src || el.getAttribute("data-src") || el.getAttribute("data-lazy") || (el.getAttribute("srcset") || "").split(",").pop().trim().split(" ")[0] || "";
+  const add = (u) => { if (big(u) && !out.includes(u)) out.push(u); };
+  // 1. Images and lightbox links named as a floor plan
+  for (const el of document.querySelectorAll("img, a[href], [data-fancybox], [data-lightbox], [data-caption]")) {
+    const label = [el.alt, el.title, el.getAttribute("aria-label"), el.dataset && (el.dataset.fancybox || el.dataset.lightbox || el.dataset.caption), (el.closest("figure") || {}).innerText].filter(Boolean).join(" ");
+    if (!re.test(label)) continue;
+    if (el.tagName === "IMG") { if (!el.naturalWidth || el.naturalWidth >= minW) add(src(el)); }
+    else if (/\.(jpe?g|png|webp|gif)(\?|$)/i.test(el.href || "")) add(el.href);
+  }
+  if (out.length) return out;  // named floor plans are the surest; a section may also hold the gallery's photos
+  const fromSection = (sec) => { for (const img of sec.querySelectorAll("img, source")) if (!img.naturalWidth || img.naturalWidth >= minW) add(src(img)); };
+  // 2. Images in the nearest box around a "Planritning" label that isn't a link (a heading, a folded section)
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (walk.nextNode()) {
+    const n = walk.currentNode;
+    if (!re.test(n.nodeValue) || n.nodeValue.trim().length > 30 || n.parentElement.closest("a, nav, header, footer")) continue;
+    let el = n.parentElement;
+    for (let i = 0; i < 4 && el; i++, el = el.parentElement) {
+      const imgs = [...el.querySelectorAll("img")].filter((img) => !img.naturalWidth || img.naturalWidth >= minW);
+      if (imgs.length) { imgs.slice(0, 3).forEach((img) => add(src(img))); break; }
+    }
+  }
+  if (out.length) return out;
+  // 3. The section the page's own "Planritning" link points to
+  for (const a of document.querySelectorAll('a[href*="#"]')) {
+    if (!re.test(a.innerText || "") && !re.test(a.hash || "")) continue;
+    let target = null;
+    try { target = a.hash && document.querySelector(a.hash); } catch (e) {}
+    if (target && !/bild|image|gallery|galleri/i.test(a.hash)) fromSection(target);
+  }
+  // 4. Sections whose id or class names the floor plan
+  for (const sec of document.querySelectorAll('[id*="plan" i], [class*="planritning" i], [class*="floorplan" i], [class*="floor-plan" i]')) {
+    if (!re.test(sec.id + " " + sec.className) && !/^plan$/i.test(sec.id)) continue;
+    fromSection(sec);
+  }
+  return out;
+}"""
+
+
+def floorplans(page, limit=4):
+    """The listing's floor plans. Most agents name them (alt text, a caption, a "Planritning" section);
+    otherwise the page's floor plan button is pressed and the large images it shows are taken."""
+    found = page.evaluate(_PLAN_JS, [PLAN_WORDS, 300])
+    if not found:
+        before = set(page.eval_on_selector_all("img", "els => els.map(i => i.currentSrc || i.src)"))
+        btn = page.locator("button:visible, a:visible").filter(has_text=re.compile(rf"^\s*(?:visa\s+)?(?:\d+\s+)?(?:{PLAN_WORDS})(?:ar|en|er)?\s*$", re.I))
+        if btn.count():
+            try:
+                btn.first.click(timeout=3000)
+                page.wait_for_timeout(1500)
+                found = page.evaluate(_PLAN_JS, [PLAN_WORDS, 300])
+                if not found:  # a gallery opened at the floor plan: the new large images
+                    found = [u for u in page.eval_on_selector_all(
+                        "img", "els => els.filter(i => i.naturalWidth >= 500 && i.getBoundingClientRect().width > 200).map(i => i.currentSrc || i.src)")
+                        if u not in before and u.startswith("http")][:2]
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
+    out, seen = [], set()
+    for u in found:
+        k = _photo_key(u)
+        if k not in seen:
+            seen.add(k)
+            out.append(u)
+    return out[:limit]

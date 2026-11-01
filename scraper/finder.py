@@ -33,6 +33,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
 import agents
+import plans
 import geo
 from history import History
 
@@ -223,6 +224,10 @@ def read_listing(page, url, card, now, places, opens=()):
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
     AREAS.rename(d)
+    try:  # last, since finding the plan may press the page's floor plan button
+        d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
+    except Exception as e:
+        log(f"Couldn't read the floor plan on {url} ({e})")
     if d["state"] == "sold":
         d["shows"] = []
     d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
