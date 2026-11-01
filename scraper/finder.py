@@ -278,7 +278,10 @@ def follow(page, store, saved, robots, hist):
         try:
             resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(2500)
+            agents.decline_cookies(page)
             text = page.inner_text("body")
+            if not ((resp is not None and resp.status in (403, 429)) or BLOCKED.search(text)):
+                text += "\n" + agents.bid_text(page)  # the bid list, where the agent folds it away
         except PlaywrightError as e:
             log(f"Following {name}: couldn't open the page ({e})")
             continue
@@ -290,6 +293,12 @@ def follow(page, store, saved, robots, hist):
             log(f"Following {name}: the site refused the page")
             continue
         b = agents.parse_bidding(text)
+        # Every bid seen on any day, newest first: agents sometimes shorten their list as bidding goes on
+        seen = {(x["amount"], x["at"]): x for x in f.get("bidList", []) + b.pop("bidList", [])}
+        if seen:
+            f["bidList"] = sorted(seen.values(), key=lambda x: x["at"], reverse=True)
+            b["bids"] = max(b.get("bids") or 0, len(seen))
+            b["bidders"] = len({x["who"] for x in seen.values() if x["who"]}) or None
         f.update(b, read=stamp())
         known = store["items"].get(url) or store.get("left", {}).get(url)
         if known:

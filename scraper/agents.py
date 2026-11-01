@@ -178,7 +178,7 @@ def _page_cards(page, obj_rx, cards):
 MORE_RX = r"^\s*(ladda|visa) fler(?! sålda)"
 # The necessary-cookies-only answer on a cookie banner. Cookiebot's "Allow selection" keeps
 # only necessary cookies, which are the only ones ticked to begin with.
-NO_COOKIES_RX = re.compile(r"^\s*(neka|avvisa|avböj|deny|decline|reject all|endast nödvändiga|bara nödvändiga|"
+NO_COOKIES_RX = re.compile(r"^\s*((?:neka|avvisa|avböj)(?: alla)?|deny( all)?|decline( all)?|reject all|endast nödvändiga|bara nödvändiga|"
                            r"(use )?(only )?necessary( cookies)?( only)?|tillåt urval|allow selection)\s*$", re.I)
 
 
@@ -452,10 +452,63 @@ HIGH_BID_RX = re.compile(r"(?:högsta|aktuellt|senaste|ledande)\s+bud(?:et)?\s*:
 FINAL_RX = re.compile(r"(?:slutpris|såld för|sålt för|köpeskilling)\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr", re.I)
 
 
+# Where a page stops being about this apartment: lists of other apartments, whose "Budgivning pågår" isn't ours
+OTHERS_RX = re.compile(r"^\s*(?:liknande (?:bostäder|objekt)|andra (?:bostäder|har också tittat på)|fler bostäder|"
+                       r"bostäder i närheten|andra objekt|du kanske också gillar|senast sålda|missa inte din drömbostad)\b", re.I | re.M)
+
+BID_AMOUNT = re.compile(r"^(\d{1,3}(?: \d{3}){1,3}) ?kr$")
+BID_WHEN = re.compile(
+    r"^(?:(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})|(?P<d2>\d{1,2})/(?P<m2>\d{1,2})(?:[/-](?P<y2>\d{2,4}))?|"
+    rf"(?P<d3>\d{{1,2}}) (?P<mon>{MONTH_RX})[a-zåäö]*\.?(?: (?P<y3>\d{{4}}))?)"
+    r"(?:,? (?:kl\.? ?)?(?P<H>\d{1,2})[:.](?P<M>\d{2}))?$", re.I)
+BID_WHO = re.compile(r"^(?:budgivare|bidder|budg\.?)? ?(\d{1,3}|[A-Z]\d{0,2})$", re.I)
+
+
+def _when(m, now):
+    g = m.groupdict()
+    d, mo, y = (g["d"] or g["d2"] or g["d3"]), g["m"] or g["m2"], g["y"] or g["y2"] or g["y3"]
+    if g["mon"]:
+        mo = [s[:3] for s in SV_MONTHS].index(g["mon"][:3].lower()) + 1
+    y = int(y) + (2000 if y and len(y) == 2 else 0) if y else now.year
+    try:
+        at = dt.datetime(y, int(mo), int(d), int(g["H"] or 0), int(g["M"] or 0))
+    except ValueError:
+        return None
+    if not (g["y"] or g["y2"] or g["y3"]) and at > now + dt.timedelta(days=2):
+        at = at.replace(year=y - 1)  # "14/10" seen in January is last October
+    return at.isoformat(timespec="minutes")
+
+
+def parse_bid_list(text, now=None):
+    """The agent's own list of bids, where it shows one: [{"amount", "at", "who"}], newest first as the page has it.
+    A row is an amount, a date with a time, and usually a bidder number, in any order and on one to three lines
+    ("3 365 000 kr | Budgivare 4 | 2026-10-21 09:09", "1  14/10 15:24  2 550 000 kr", "4 900 000 kr | 12 aug 2026 kl. 20:46 | 1")."""
+    now = now or dt.datetime.now()
+    cells = [c.strip() for c in re.split(r"[\n\t|]+", re.sub(r"[\u00a0\u202f]", " ", text)) if c.strip()]
+    rows, i = [], 0
+    while i < len(cells):
+        window = cells[i:i + 3]
+        amt = next((j for j, c in enumerate(window) if BID_AMOUNT.match(c)), None)
+        when = next((j for j, c in enumerate(window) if BID_WHEN.match(c) and BID_WHEN.match(c).group("H")), None)
+        if amt is None or when is None or (min(amt, when) > 0 and not BID_WHO.match(window[0])):
+            i += 1  # a row starts at its amount, its time or its bidder, not at a heading before them
+            continue
+        who = next((BID_WHO.match(c).group(1) for j, c in enumerate(window) if j not in (amt, when) and BID_WHO.match(c)), None)
+        at = _when(BID_WHEN.match(window[when]), now)
+        if at:
+            rows.append({"amount": int(BID_AMOUNT.match(window[amt]).group(1).replace(" ", "")), "at": at, "who": who})
+        i += max(amt, when) + 1
+    rows = list({(r["amount"], r["at"], r["who"]): r for r in rows}.values())  # the same list read twice (page and bidding page)
+    # A real list has at least one row; amounts beside dates elsewhere (a showing with a price) are one-offs
+    return rows if len(rows) >= 2 or (rows and re.search(r"budgivare|budg\.|\bbud\b", text, re.I)) else []
+
+
 def parse_bidding(text):
     """Where an apartment is in its sale: for sale, in bidding (with the highest bid and how
     many bids there are) or sold (with the final price, when the agent publishes it)."""
-    t = re.sub(r"[\u00a0\u202f]", " ", text)
+    t = full = re.sub(r"[\u00a0\u202f]", " ", text)
+    if m := OTHERS_RX.search(t):
+        t = t[:m.start()]  # the state is read from this apartment's part of the page only
     out = {"state": "for sale"}
     if m := FINAL_RX.search(t):
         out.update(state="sold", final=int(re.sub(r"\D", "", m.group(1))))
@@ -470,6 +523,9 @@ def parse_bidding(text):
     if "Tidpunkt" in lines:
         rows = lines[lines.index("Tidpunkt") + 1:][:120]
         out["bids"] = sum(1 for l in rows if re.fullmatch(r"\d{1,3}(?: \d{3}){1,3} kr", l))
+    if bl := parse_bid_list(full):  # an opened bid list is often added at the end of the page
+        out.update(state="bidding" if out["state"] == "for sale" else out["state"], bidList=bl, bids=len(bl),
+                   bidders=len({b["who"] for b in bl if b["who"]}) or None, bid=max(out.get("bid") or 0, max(b["amount"] for b in bl)))
     return out
 
 
@@ -568,3 +624,40 @@ def floorplans(page, limit=4):
             seen.add(k)
             out.append(u)
     return out[:limit]
+
+
+# ---------- Bid lists ----------
+
+OPEN_BIDS_RX = re.compile(r"^\s*(?:budgivning pågår\s*[–-]\s*)?(?:visa|se)\s+(?:alla\s+)?(?:bud(?:givning|givningen|historik|en|lista)?)\s*$"
+                          r"|^\s*(?:budhistorik|alla bud|visa/lämna bud)\s*$", re.I)
+
+
+def bid_text(page):
+    """The text of the agent's bid list, opened if it's folded away: a "Visa budgivning" button, or a
+    separate bidding page linked from the apartment (Mäklarhuset's /objekt/budgivning/<id>)."""
+    out = ""
+    btn = page.locator("button:visible, summary:visible, a:visible, [role=button]:visible").filter(has_text=OPEN_BIDS_RX)
+    if btn.count():
+        try:
+            href = btn.first.get_attribute("href") or ""
+            if not href.startswith("http") or urlparse(href).netloc == urlparse(page.url).netloc and "budgivning" not in href:
+                btn.first.click(timeout=3000)
+                page.wait_for_timeout(1500)
+                out = page.inner_text("body")
+                page.keyboard.press("Escape")
+        except Exception:
+            pass
+    # A bidding page of its own: same site, "budgivning" in the address, and this apartment's number in it
+    num = (re.findall(r"\d{5,}", urlparse(page.url).path) or [None])[-1]
+    links = [h for h in page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)")
+             if "budgivning" in h.lower() and urlparse(h).netloc == urlparse(page.url).netloc and num and num in h]
+    if links:
+        here = page.url
+        try:
+            page.goto(links[0], wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(2000)
+            out += "\n" + page.inner_text("body")
+            page.goto(here, wait_until="domcontentloaded", timeout=45000)
+        except Exception:
+            pass
+    return out
