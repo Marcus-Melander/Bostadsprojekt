@@ -224,6 +224,7 @@ def read_listing(page, url, card, now, places, opens=()):
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
     AREAS.rename(d)
+    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"))
     try:  # last, since finding the plan may press the page's floor plan button
         d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
     except Exception as e:
@@ -245,7 +246,7 @@ def follow_left(page, store, robots, hist, started):
         p = left[url]
         if not robots.allowed(url):
             continue
-        status("running", f"Checking apartments that left the lists, {i} of {len(todo)}", started=started)
+        status("running", f"Kollar lägenheter som lämnat listorna, {i} av {len(todo)}", started=started)
         try:
             resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(2000)
@@ -329,7 +330,7 @@ def progress(sh, agent=None, text=None):
             else:
                 sh["busy"][agent] = text
         now = ", ".join(f"{a} {t}" for a, t in sh["busy"].items())
-        status("running", f"Reading estate agents, {sh['done']} of {sh['total']} done" + (f". Now: {now}" if now else ""), started=sh["started"])
+        status("running", f"Läser mäklare, {sh['done']} av {sh['total']} klara" + (f". Nu: {now}" if now else ""), started=sh["started"])
 
 
 def read_agent(ag, sh):
@@ -339,7 +340,7 @@ def read_agent(ag, sh):
         with sync_playwright() as pw:
             browser = launch(pw, sh["show"])
             page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
-            progress(sh, ag["name"], "(list)")
+            progress(sh, ag["name"], "(listan)")
             cards = agents.discover(ag, page, robots, DATA / "cache", log)
             want = {u: t for u, t in cards.items() if agents.looks_inner(u, t, ag.get("anywhere"))
                     and not ((c := agents.parse_card(t)).get("price") and f.get("maxPrice") and c["price"] > f["maxPrice"] * 1.15)}
@@ -360,7 +361,7 @@ def read_agent(ag, sh):
                 if refused:
                     log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
                     with sh["lock"]:
-                        sh["notes"].append(f"{ag['name']} refused a page, so some of its apartments may be missing.")
+                        sh["notes"].append(f"{ag['name']} nekade en sida, så några av deras lägenheter kan saknas.")
                     break
                 read += 1
                 with sh["lock"]:
@@ -376,7 +377,7 @@ def read_agent(ag, sh):
     except Exception as e:  # one agent failing doesn't stop the others
         log(f"{ag['name']}: stopped early ({e!r})")
         with sh["lock"]:
-            sh["notes"].append(f"Reading {ag['name']} stopped early; see data/scraper.log.")
+            sh["notes"].append(f"Läsningen av {ag['name']} stannade i förtid; se data/scraper.log.")
         cards, want, read, kept = {}, {}, 0, 0
     with sh["lock"]:
         sh["report"][ag["name"]] = {"listed": len(cards), "candidates": len(want), "read": read, "inner": kept}
@@ -428,10 +429,11 @@ def find(args):
     if "items" not in store or any(k.startswith(("annons/", "bostad/")) for k in store.get("items", {})):
         store = {"items": {}}  # listings saved by the old Booli scraper are replaced
     items = store["items"]
-    for p in items.values():  # neighbourhoods may have been redrawn since the last run
+    for p in items.values():  # neighbourhoods may have been redrawn, and the red flag rules changed, since the last run
         AREAS.rename(p)
+        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"))
     started, now = stamp(), dt.datetime.now()
-    status("running", "Starting", started=started)
+    status("running", "Startar", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")
     places, robots, hist = geo.Geocoder(DATA, log), agents.Robots(), History(DATA)
     chosen = [a for a in agents.AGENTS if not args.agents or a["name"] in args.agents]
@@ -446,17 +448,17 @@ def find(args):
             browser = launch(pw, args.show)
             page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
             if saved:
-                status("running", f"Following {len(saved)} saved apartment{'s' if len(saved) > 1 else ''}", started=started)
+                status("running", f"Följer {len(saved)} sparade {'lägenheter' if len(saved) > 1 else 'lägenhet'}", started=started)
                 follow(page, store, saved, robots, hist)
             follow_left(page, store, robots, hist, started)
             if not args.no_count:
-                status("running", "Reading Booli's count", started=started)
+                status("running", "Läser Boolis antal", started=started)
                 store["booli"] = booli_count(pw, f) or {**(store.get("booli") or {}), "missing": stamp()}
             browser.close()
     except Exception as e:  # keep what was read, and say what went wrong
         write_json(DATA / "listings.json", store)
         log(f"Failed: {e!r}")
-        status("error", f"The finder stopped early: {str(e)[:160]}", started=started)
+        status("error", f"Bostadsletaren stannade i förtid: {str(e)[:160]}", started=started)
         return 3
     cutoff = (now - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
     for p in items.values():  # past showings drop off
@@ -473,8 +475,8 @@ def find(args):
     hist.close()
     write_json(DATA / "listings.json", store)
     b = store.get("booli") or {}
-    msg = f"Found {store['found']['forSale']} for sale and {store['found']['soon']} coming soon."
-    msg += f" Booli shows {b['forSale']} and {b['soon']}." if b.get("forSale") is not None and not b.get("missing") else " Booli's count wasn't available today."
+    msg = f"Hittade {store['found']['forSale']} till salu och {store['found']['soon']} snart till salu."
+    msg += f" Booli visar {b['forSale']} och {b['soon']}." if b.get("forSale") is not None and not b.get("missing") else " Boolis antal gick inte att läsa i dag."
     log(f"Run finished. {msg}")
     status("partial" if notes else "done", " ".join([msg] + notes), started=started, finished=store["lastRun"])
     return 0

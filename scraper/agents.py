@@ -661,3 +661,93 @@ def bid_text(page):
         except Exception:
             pass
     return out
+
+
+# ---------- Red flags ----------
+
+# Words that turn a sentence around: "inga planerade avgiftshöjningar", "ej tomträtt", "utan stambyte"
+_NEG = re.compile(r"\b(?:inga|ingen|inget|ej|inte|icke|utan|aldrig|slipper|undviker|undvika)\b[^.!?]{0,60}$", re.I)
+_MAYBE = re.compile(r"\b(?:eventuell\w*|kan komma|möjligen|möjligtvis|kanske)\b", re.I)
+_YEAR = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
+
+
+def _sentences(text):
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+
+
+def _hit(rx, sentences):
+    """(sentence, negated?) for the first sentence that matches."""
+    for s in sentences:
+        if m := re.search(rx, s, re.I):  # "inga planerade avgiftshöjningar", or "stambyte kommer inte att ske"
+            return s, bool(_NEG.search(s[:m.start()]) or re.match(r"\W*(?:\w+\W+){0,2}?(?:inte|ej|icke)\b", s[m.end():], re.I))
+    return None, False
+
+
+def red_flags(desc, built=None, now=None):
+    """What the description says about the förening that could cost you, and what reassures:
+    [{"kind": "bad" | "warn" | "good" | "ask", "label", "quote"}]. Each flag quotes the sentence it comes from;
+    "ask" is something to ask the agent about, shown only on saved apartments."""
+    year = (now or dt.datetime.now()).year
+    ss, out = _sentences(re.sub(r"[  ]", " ", desc or "")), []
+    add = lambda kind, label, quote: out.append({"kind": kind, "label": label, "quote": quote[:300]})
+
+    # Stambyte (new pipes): coming is costly, done is good; an old house that never mentions it is worth asking about
+    s, neg = _hit(r"stambyte\w*\s+(?:är\s+|har\s+|blev\s+)?(?:planera|beslut|kommer|ska|skall|inplanera|påbörja|projekter|pågår|förestår)"
+                  r"|(?:planera|beslut|kommande|förestående|stundande)\w*\s+stambyte|relining\s+(?:planera|kommer|ska)", ss)
+    if s and not neg:
+        add("warn", "Stambyte kan komma", s) if _MAYBE.search(s) else add("bad", "Stambyte på gång", s)
+    elif s2 := _hit(r"stamby(?:te|tet|ten|tt)|nya stammar|relin", ss)[0]:
+        ys = [int(y) for y in _YEAR.findall(s2)]
+        if ys and max(ys) > year:
+            add("bad", f"Stambyte {max(ys)}", s2)
+        elif ys or re.search(r"genomför|gjor|utför|klar|färdig|stambytt|nya stammar|redan", s2, re.I):
+            add("good", f"Stambyte gjort{' ' + str(max(ys)) if ys else ''}", s2)
+    elif built and int(built) < 1980:
+        add("ask", "Fråga när stambytet gjordes", f"Byggt {built}; beskrivningen säger inte när stammarna senast byttes.")
+
+    # The avgift going up
+    s, neg = _hit(r"avgift\w*\s+(?:kommer\s+att\s+|ska\s+|planeras\s+att\s+)?(?:höj|justera\w*\s+upp)|(?:höjning|höjd|höjt)\w*\s+(?:av\s+)?(?:års|månads)?avgift|avgiftshöjning", ss)
+    if s:
+        add("good", "Ingen avgiftshöjning planerad", s) if neg else add("warn", "Avgiften kan höjas", s) if _MAYBE.search(s) else add("bad", "Avgiften höjs", s)
+
+    # Tomträtt: the plot is leased from the city, and the ground rent can rise steeply
+    s, neg = _hit(r"tomträtt", ss)
+    if s and not neg and not re.search(r"äger (?:sin |själv |)mark|friköpt", s, re.I):
+        add("bad", "Tomträtt", s)
+    elif (s and neg) or (s := _hit(r"äger (?:sin |själva |själv |)marken|friköpt mark|marken (?:är )?friköpt", ss)[0]):
+        add("good", "Äger marken", s)
+
+    # Äkta or oäkta förening (oäkta changes the tax rules when you sell)
+    s, neg = _hit(r"oäkta\s+(?:bostadsrätts)?förening", ss)
+    if s and not neg:
+        add("bad", "Oäkta förening", s)
+    elif s := _hit(r"\bäkta\s+(?:bostadsrätts)?förening|\bäkta brf", ss)[0]:
+        add("good", "Äkta förening", s)
+
+    # The förening's debt per m² (belåning): under 5 000 kr is low, over 15 000 kr is high
+    s, _ = _hit(r"(?:belåning|skuld|lån)\w*[^.]{0,60}?\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)"
+                r"|\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2)[^.]{0,30}(?:belåning|skuld|lån)", ss)
+    if s and (m := re.search(r"(\d{1,2}[ .]?\d{3})\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)", s, re.I)):
+        v = int(re.sub(r"\D", "", m.group(1)))
+        if v > 15000:
+            add("bad", f"Hög skuld: {v:,} kr/m²".replace(",", " "), s)
+        elif v > 5000:
+            add("warn", f"Måttlig skuld: {v:,} kr/m²".replace(",", " "), s)
+        else:
+            add("good", f"Låg skuld: {v:,} kr/m²".replace(",", " "), s)
+    elif s := _hit(r"skuldfri|helt utan (?:lån|skulder)", ss)[0]:
+        add("good", "Skuldfri förening", s)
+    elif (h := _hit(r"(?:hög|högre)\s+belåning", ss))[0] and not h[1]:
+        add("bad", "Hög skuld", h[0])
+
+    # A small förening: big repairs are shared by few
+    s, _ = _hit(r"(?:omfattar|består av|har|med|totalt)\s+(?:endast\s+|bara\s+|totalt\s+)?(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", ss)
+    if s and (m := re.search(r"(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", s)) and int(m.group(1)) < 12:
+        add("warn", f"Liten förening: {m.group(1)} lägenheter", s)
+
+    # Big works on the building that the förening hasn't paid for yet
+    s, neg = _hit(r"(?:planera|beslut|kommande|förestående|stundande)\w*\s+(?:fasad|tak|fönster|balkong|hiss)\w*renovering|"
+                  r"(?:fasad|tak|fönster)\w*(?:renovering|byte)\w*\s+(?:är\s+)?(?:planera|beslut|kommer|ska)", ss)
+    if s and not neg:
+        add("warn", "Renovering av huset planerad", s)
+    return out

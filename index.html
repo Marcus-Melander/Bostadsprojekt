@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="sv">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -337,6 +337,8 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .place > small { font-size: 11px; }
 .place .btn { padding: 0; width: 32px; justify-content: center; }
 .facts.travel { margin-top: 4px; }
+.show-card .flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+.show-card .flags .chip, .apt-out .chips .chip[title] { cursor: help; }
 .heart { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; padding: 0; }
 .heart svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
 .heart:hover { color: var(--negative); border-color: currentColor; }
@@ -387,13 +389,13 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 <header class="top">
   <div class="wrap topbar">
     <div class="brand-name"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect width="22" height="22" rx="5" fill="var(--data)"/><path d="M4.5 11.5 11 5.5l6.5 6V17h-4.25v-3.5h-4.5V17H4.5z" fill="var(--surface)"/></svg>Bostadsplan</div>
-    <nav class="tabs" role="tablist" id="tabs" aria-label="Sections">
-      <button role="tab" data-sec="show">Showings</button>
-      <button role="tab" data-sec="saved">Saved<span class="count" id="savedCount"></span></button>
-      <button role="tab" data-sec="money">Money</button>
-      <button role="tab" data-sec="buying">Buying</button>
+    <nav class="tabs" role="tablist" id="tabs" aria-label="Avsnitt">
+      <button role="tab" data-sec="show">Visningar</button>
+      <button role="tab" data-sec="saved">Sparade<span class="count" id="savedCount"></span></button>
+      <button role="tab" data-sec="money">Ekonomi</button>
+      <button role="tab" data-sec="buying">Köpa</button>
     </nav>
-    <div class="save-state" id="saveState"><i></i><span>Loading…</span></div>
+    <div class="save-state" id="saveState"><i></i><span>Laddar…</span></div>
   </div>
 </header>
 <main class="wrap" id="app"></main>
@@ -403,11 +405,11 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 const PBB = 59200;                 // prisbasbelopp 2026
 const FEE_TRANSFER = Math.round(PBB * 0.025); // överlåtelseavgift (buyer usually pays)
 const FEE_PLEDGE = Math.round(PBB * 0.01);    // pantsättningsavgift
-const RATES_UPDATED = "29 Oct 2026";
+const RATES_UPDATED = "29 okt 2026";
 const RATES_SOURCE = "https://www.lanupplysningen.se/bolan/bolanerantor/";
 // list rates (%) per binding period + latest 3-month average rate (snittränta, Oct 2026)
 const BANKS = [
-  { name: "Stabelo", url: "https://www.stabelo.se", r: { m3: 2.66, y1: 3.18, y2: 3.57, y3: 3.68, y5: 3.95 }, snitt: 2.74, note: "Sold via partners and brokers" },
+  { name: "Stabelo", url: "https://www.stabelo.se", r: { m3: 2.66, y1: 3.18, y2: 3.57, y3: 3.68, y5: 3.95 }, snitt: 2.74, note: "Säljs via partner och förmedlare" },
   { name: "Landshypotek", url: "https://www.landshypotek.se", r: { m3: 3.04, y1: 3.24, y2: 3.49, y3: 3.60, y5: 3.85 }, snitt: 2.59 },
   { name: "SBAB", url: "https://www.sbab.se", r: { m3: 3.15, y1: 3.72, y2: 4.09, y3: 4.19, y5: 4.39 }, snitt: 2.73 },
   { name: "Hypoteket", url: "https://www.hypoteket.com", r: { m3: 3.31, y1: 3.99, y2: 4.30, y3: 4.39, y5: 4.48 }, snitt: null },
@@ -423,86 +425,95 @@ const BANKS = [
   { name: "SEB", url: "https://seb.se", r: { m3: 3.94, y1: 3.64, y2: 3.89, y3: 3.99, y5: 4.19 }, snitt: 2.66 },
   { name: "Ålandsbanken", url: "https://www.alandsbanken.se", r: { m3: 4.00, y1: 4.30, y2: 4.60, y3: 4.70, y5: 4.75 }, snitt: null },
 ];
-const BINDINGS = [["m3", "3 months"], ["y1", "1 year"], ["y2", "2 years"], ["y3", "3 years"], ["y5", "5 years"]];
+const BINDINGS = [["m3", "3 mån"], ["y1", "1 år"], ["y2", "2 år"], ["y3", "3 år"], ["y5", "5 år"]];
 
 const FURNITURE = [
-  ["Kitchen", [
-    ["pots", "Pots, pans & lids", [600, 1800, 5000], 1, true],
-    ["knives", "Knives & cutting board", [300, 900, 2500], 1, true],
-    ["plates", "Plates, bowls & glasses (6 people)", [500, 1500, 4000], 1, true],
-    ["cutlery", "Cutlery set", [200, 600, 1800], 1, true],
-    ["kettle", "Kettle & toaster", [400, 1200, 3000], 1, true],
-    ["coffee", "Coffee maker", [300, 1500, 6000], 1, false],
-    ["micro", "Microwave", [700, 1500, 3000], 1, false],
-    ["table", "Dining table", [1500, 4000, 12000], 1, true],
-    ["chairs", "Dining chairs", [300, 900, 2500], 2, true],
-    ["kstore", "Jars, storage & tea towels", [300, 800, 2000], 1, false],
+  ["Kök", [
+    ["pots", "Kastruller, stekpanna och lock", [600, 1800, 5000], 1, true],
+    ["knives", "Knivar och skärbräda", [300, 900, 2500], 1, true],
+    ["plates", "Tallrikar, skålar och glas (6 personer)", [500, 1500, 4000], 1, true],
+    ["cutlery", "Bestick", [200, 600, 1800], 1, true],
+    ["kettle", "Vattenkokare och brödrost", [400, 1200, 3000], 1, true],
+    ["coffee", "Kaffebryggare", [300, 1500, 6000], 1, false],
+    ["micro", "Mikrovågsugn", [700, 1500, 3000], 1, false],
+    ["table", "Matbord", [1500, 4000, 12000], 1, true],
+    ["chairs", "Stolar", [300, 900, 2500], 2, true],
+    ["kstore", "Burkar, förvaring och kökshanddukar", [300, 800, 2000], 1, false],
   ]],
-  ["Living room", [
-    ["sofa", "Sofa", [4500, 12000, 35000], 1, true],
-    ["ctable", "Coffee table", [600, 2500, 8000], 1, false],
-    ["rug", "Rug", [800, 3000, 10000], 1, false],
+  ["Vardagsrum", [
+    ["sofa", "Soffa", [4500, 12000, 35000], 1, true],
+    ["ctable", "Soffbord", [600, 2500, 8000], 1, false],
+    ["rug", "Matta", [800, 3000, 10000], 1, false],
     ["tv", "TV", [3500, 8000, 20000], 1, false],
-    ["tvbench", "TV bench", [900, 2500, 7000], 1, false],
-    ["shelf", "Bookshelf", [700, 2000, 6000], 1, false],
-    ["lamp", "Floor & ceiling lamps", [400, 1500, 5000], 2, true],
-    ["curtains", "Curtains & rods", [400, 1200, 4000], 1, true],
+    ["tvbench", "TV-bänk", [900, 2500, 7000], 1, false],
+    ["shelf", "Bokhylla", [700, 2000, 6000], 1, false],
+    ["lamp", "Golv- och taklampor", [400, 1500, 5000], 2, true],
+    ["curtains", "Gardiner och stänger", [400, 1200, 4000], 1, true],
   ]],
-  ["Bedroom", [
-    ["bed", "Bed frame", [2000, 6000, 15000], 1, true],
-    ["mattress", "Mattress & top mattress", [3000, 8000, 25000], 1, true],
-    ["duvet", "Duvet & pillows", [600, 1800, 5000], 1, true],
-    ["sheets", "Bed linen (2 sets)", [400, 1200, 3000], 1, true],
-    ["wardrobe", "Wardrobe", [2000, 5000, 15000], 1, true],
-    ["night", "Bedside tables", [300, 1000, 3000], 2, false],
-    ["blackout", "Blackout blinds (for June nights)", [300, 1000, 3000], 1, true],
+  ["Sovrum", [
+    ["bed", "Säng", [2000, 6000, 15000], 1, true],
+    ["mattress", "Madrass och bäddmadrass", [3000, 8000, 25000], 1, true],
+    ["duvet", "Täcke och kuddar", [600, 1800, 5000], 1, true],
+    ["sheets", "Sängkläder (2 set)", [400, 1200, 3000], 1, true],
+    ["wardrobe", "Garderob", [2000, 5000, 15000], 1, true],
+    ["night", "Sängbord", [300, 1000, 3000], 2, false],
+    ["blackout", "Mörkläggningsgardiner (för juninätterna)", [300, 1000, 3000], 1, true],
   ]],
-  ["Bathroom", [
-    ["towels", "Towels", [300, 900, 2500], 1, true],
-    ["bathmat", "Shower curtain & bath mat", [200, 500, 1500], 1, true],
-    ["bstore", "Bathroom storage", [300, 800, 2500], 1, false],
-    ["basics", "Toiletries starter kit", [300, 600, 1200], 1, true],
+  ["Badrum", [
+    ["towels", "Handdukar", [300, 900, 2500], 1, true],
+    ["bathmat", "Duschdraperi och badrumsmatta", [200, 500, 1500], 1, true],
+    ["bstore", "Badrumsförvaring", [300, 800, 2500], 1, false],
+    ["basics", "Hygienartiklar att börja med", [300, 600, 1200], 1, true],
   ]],
-  ["Hallway", [
-    ["shoes", "Shoe rack", [300, 1000, 3000], 1, true],
-    ["hooks", "Coat hooks & hangers", [200, 700, 2000], 1, true],
-    ["mirror", "Mirror", [300, 1000, 3500], 1, false],
-    ["doormat", "Doormat", [150, 400, 1000], 1, true],
+  ["Hall", [
+    ["shoes", "Skohylla", [300, 1000, 3000], 1, true],
+    ["hooks", "Krokar och galgar", [200, 700, 2000], 1, true],
+    ["mirror", "Spegel", [300, 1000, 3500], 1, false],
+    ["doormat", "Dörrmatta", [150, 400, 1000], 1, true],
   ]],
-  ["Home office", [
-    ["desk", "Desk", [800, 3000, 9000], 1, false],
-    ["chair", "Office chair", [1000, 3500, 10000], 1, false],
-    ["screen", "Monitor", [1500, 3000, 7000], 1, false],
+  ["Hemmakontor", [
+    ["desk", "Skrivbord", [800, 3000, 9000], 1, false],
+    ["chair", "Kontorsstol", [1000, 3500, 10000], 1, false],
+    ["screen", "Skärm", [1500, 3000, 7000], 1, false],
   ]],
-  ["Home basics", [
-    ["vacuum", "Vacuum cleaner", [1000, 3000, 7000], 1, true],
-    ["clean", "Mop, bucket & cleaning supplies", [300, 600, 1200], 1, true],
-    ["safety", "Smoke alarm & fire extinguisher", [300, 600, 1000], 1, true],
-    ["tools", "Drill/driver & basic tools", [600, 1500, 3500], 1, true],
-    ["bulbs", "Light bulbs & power strips", [300, 600, 1200], 1, true],
-    ["laundry", "Laundry basket & drying rack", [300, 800, 2000], 1, false],
+  ["Hemmet i övrigt", [
+    ["vacuum", "Dammsugare", [1000, 3000, 7000], 1, true],
+    ["clean", "Mopp, hink och städgrejer", [300, 600, 1200], 1, true],
+    ["safety", "Brandvarnare och brandsläckare", [300, 600, 1000], 1, true],
+    ["tools", "Skruvdragare och verktyg", [600, 1500, 3500], 1, true],
+    ["bulbs", "Glödlampor och grenuttag", [300, 600, 1200], 1, true],
+    ["laundry", "Tvättkorg och torkställning", [300, 800, 2000], 1, false],
   ]],
-  ["Moving", [
-    ["movers", "Moving company or van hire", [3000, 9000, 18000], 1, true],
-    ["boxes", "Moving boxes & tape", [400, 800, 1500], 1, true],
+  ["Flytt", [
+    ["movers", "Flyttfirma eller hyrbil", [3000, 9000, 18000], 1, true],
+    ["boxes", "Flyttkartonger och tejp", [400, 800, 1500], 1, true],
   ]],
 ];
-const TIERS = [["budget", "Budget"], ["mid", "Mid-range"], ["premium", "Premium"]];
+const TIERS = [["budget", "Budget"], ["mid", "Mellan"], ["premium", "Premium"]];
 
 const STEPS = [
-  ["credit", "Check your credit and clean up debts", "Pay off or close small loans and unused credit cards. Banks count your total debt against your income, and CSN counts too."],
-  ["save", "Save the kontantinsats plus a buffer", "At least 10 % of the price in cash (since 1 April 2026), plus fees, moving and furniture."],
-  ["promise", "Get a lånelöfte from two or three banks", "A loan commitment shows brokers you can pay. It is usually valid 3–6 months. Rate shopping within a short window counts as one inquiry in practice, but ask each bank whether they use UC."],
-  ["watch", "Follow the market, study sold prices", "Look at slutpriser for similar apartments in your area to see what they actually sold for, not just the asking price."],
-  ["view", "Go to viewings and ask for documents", "Ask the broker for the förening's årsredovisning, stadgar, planned renovations (stambyte, fönster, tak) and the energy declaration."],
-  ["forening", "Review the bostadsrättsförening", "Look at debt per kvm, whether the avgift was recently raised or is about to be, whether it is an äkta förening, and if the land is owned or leased (tomträtt)."],
-  ["bid", "Bid", "Bids are not legally binding in Sweden until the contract is signed. Decide your walk-away price before bidding starts."],
-  ["contract", "Sign the contract and pay the handpenning", "Usually 10 % of the price, paid to the broker within a few days of signing. This is where the kontantinsats goes."],
-  ["member", "Get approved as a member of the förening", "The board approves new members. The purchase depends on this."],
-  ["rate", "Negotiate and lock your rate", "Use your best competing offer. Compare against each bank's snittränta, which shows what customers actually pay."],
-  ["access", "Tillträde: pay the rest and get the keys", "The bank pays the seller. You pay the överlåtelseavgift and pantsättningsavgift to the förening."],
-  ["after", "Move in and set things up", "Change address at Skatteverket within a week, sign up for electricity and broadband, and add a bostadsrättstillägg to your home insurance."],
+  ["credit", "Se över krediter och betala av skulder", "Betala av eller säg upp små lån och kreditkort du inte använder. Banken räknar alla skulder mot din inkomst, och CSN räknas också."],
+  ["save", "Spara ihop kontantinsatsen och en buffert", "Minst 10 % av priset kontant (sedan 1 april 2026), plus avgifter, flytt och möbler."],
+  ["promise", "Skaffa lånelöfte från två eller tre banker", "Lånelöftet visar mäklaren att du kan betala. Det gäller oftast 3–6 månader. Flera förfrågningar under kort tid brukar räknas som en, men fråga varje bank om de tar en UC."],
+  ["watch", "Följ marknaden och kolla slutpriser", "Titta på slutpriser för liknande lägenheter i området, så ser du vad de faktiskt såldes för och inte bara utgångspriset."],
+  ["view", "Gå på visningar och be om handlingar", "Be mäklaren om föreningens årsredovisning, stadgar, planerade renoveringar (stambyte, fönster, tak) och energideklarationen."],
+  ["forening", "Granska bostadsrättsföreningen", "Titta på skuld per kvm, om avgiften nyss höjts eller ska höjas, om föreningen är äkta och om marken är ägd eller tomträtt."],
+  ["bid", "Lägg bud", "Bud är inte bindande i Sverige förrän kontraktet är skrivet. Bestäm ditt maxpris innan budgivningen börjar."],
+  ["contract", "Skriv kontrakt och betala handpenningen", "Oftast 10 % av priset, till mäklaren inom några dagar efter påskrift. Det är hit kontantinsatsen går."],
+  ["member", "Bli godkänd som medlem i föreningen", "Styrelsen godkänner nya medlemmar, och köpet hänger på det."],
+  ["rate", "Förhandla och bind räntan", "Använd ditt bästa konkurrerande erbjudande. Jämför med varje banks snittränta, som visar vad kunderna faktiskt betalar."],
+  ["access", "Tillträde: betala resten och få nycklarna", "Banken betalar säljaren. Du betalar överlåtelseavgift och pantsättningsavgift till föreningen."],
+  ["after", "Flytta in och ordna det praktiska", "Anmäl flytt till Skatteverket inom en vecka, teckna el och bredband, och lägg till bostadsrättstillägg i hemförsäkringen."],
 ];
+
+// Saved plans keep these values as they were stored; only how they read on screen is Swedish
+const STATUS_SV = { "Watching": "Bevakar", "Viewing booked": "Visning bokad", "Viewed": "Har varit på visning", "Bidding": "Budgivning", "Passed": "Avstått", "Won": "Vunnen" };
+// The finder names features in English (they're stored that way in the price history)
+const FEATURE_SV = { "balcony": "balkong", "lift": "hiss", "washing machine": "tvättmaskin", "dishwasher": "diskmaskin", "high ceilings": "högt i tak",
+  "storage": "förråd", "tiled bathroom": "helkaklat badrum", "herringbone parquet": "fiskbensparkett", "quiet courtyard side": "läge mot innergård",
+  "fireplace": "kakelugn eller öppen spis", "renovated kitchen": "renoverat kök", "corner flat": "hörnläge", "patio": "uteplats",
+  "stambyte done": "stambyte gjort", "water view": "sjöutsikt", "renovated bathroom": "renoverat badrum", "stambyte coming": "stambyte på gång" };
+const SCEN_SV = { "Steady": "Oförändrad", "Rates rise": "Räntan stiger", "Rates fall": "Räntan sjunker", "2022-style shock": "Chock som 2022" };
 
 /* ---------- State ---------- */
 const DEFAULT = () => ({
@@ -530,8 +541,8 @@ const DEFAULT = () => ({
   rates: { binding: "m3", mode: "list", offer: 2.75, sort: "rate" },
   search: { area: "115341", minRooms: 2, minArea: 40, maxAvgift: 5000, headroom: 8 },
   apts: [
-    { id: "a1", example: true, address: "Example: Ringvägen 42, Södermalm", price: 3150000, bid: 3350000, avgift: 3600, kvm: 44, rooms: 2, debtKvm: 6200, link: "", status: "Viewing booked" },
-    { id: "a2", example: true, address: "Example: Sankt Göransgatan 9, Kungsholmen", price: 2795000, bid: 2950000, avgift: 2900, kvm: 37, rooms: 1.5, debtKvm: 14800, link: "", status: "Watching" },
+    { id: "a1", example: true, address: "Exempel: Ringvägen 42, Södermalm", price: 3150000, bid: 3350000, avgift: 3600, kvm: 44, rooms: 2, debtKvm: 6200, link: "", status: "Viewing booked" },
+    { id: "a2", example: true, address: "Exempel: Sankt Göransgatan 9, Kungsholmen", price: 2795000, bid: 2950000, avgift: 2900, kvm: 37, rooms: 1.5, debtKvm: 14800, link: "", status: "Watching" },
   ],
   furn: { tier: "mid", essentialsOnly: false, items: {}, extra: [] },
   steps: {},
@@ -539,10 +550,10 @@ const DEFAULT = () => ({
     avgiftExtra: 1, pick: "rising",
     // rate change vs today's plan rate, in percentage points, for years 1–5
     scen: {
-      stable:  { name: "Steady",           dr: [0, 0, 0, 0, 0] },
-      rising:  { name: "Rates rise",       dr: [0, 1, 1.75, 2, 2] },
-      falling: { name: "Rates fall",       dr: [0, -0.5, -0.75, -1, -1] },
-      shock:   { name: "2022-style shock", dr: [0, 3, 3, 2, 1.5] },
+      stable:  { name: "Oförändrad",       dr: [0, 0, 0, 0, 0] },
+      rising:  { name: "Räntan stiger",    dr: [0, 1, 1.75, 2, 2] },
+      falling: { name: "Räntan sjunker",   dr: [0, -0.5, -0.75, -1, -1] },
+      shock:   { name: "Chock som 2022",   dr: [0, 3, 3, 2, 1.5] },
     },
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
@@ -563,6 +574,7 @@ function migrate() {
     if (S.search.area === "1" || S.search.area === "2") S.search.area = "115341";
   }
   if (!AREAS[S.value.area]) S.value.area = "centrala-stockholm";
+  for (const sc of Object.values(S.five.scen)) if (SCEN_SV[sc.name]) sc.name = SCEN_SV[sc.name]; // the default scenarios, now in Swedish
   migrateShow(); // Booli's areas and filter become our own
   S.v = 3;
 }
@@ -589,7 +601,7 @@ function lsRead() { try { const t = localStorage.getItem(LS_KEY); return t ? JSO
 function lsWrite() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
 function scheduleSave() {
   clearTimeout(saveTimer);
-  setSaveState("Unsaved changes", false);
+  setSaveState("Ändringar inte sparade", false);
   saveTimer = setTimeout(flush, 1200);
 }
 async function flush() {
@@ -598,28 +610,28 @@ async function flush() {
     try {
       const r = await fetch("/api/plan", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: S, scrape: scrapeConfig() }) });
       if (!r.ok) throw new Error(r.status);
-      setSaveState("Saved on this computer", true);
-    } catch (e) { setSaveState(local ? "Saved in this browser only, the server isn't answering" : "Not saved", local); }
+      setSaveState("Sparat på den här datorn", true);
+    } catch (e) { setSaveState(local ? "Sparat bara i webbläsaren, servern svarar inte" : "Inte sparat", local); }
     return;
   }
-  if (!docRef) { setSaveState(local ? "Saved in this browser" : "Not saved (storage blocked)", local); return; }
+  if (!docRef) { setSaveState(local ? "Sparat i webbläsaren" : "Inte sparat (lagring blockerad)", local); return; }
   if (saving) { pending = true; return; }
   saving = true;
-  try { await docRef.set({ plan: JSON.stringify(S), savedAt: new Date().toISOString() }); setSaveState("Saved to your account", true); }
-  catch (e) { setSaveState(local ? "Saved in this browser" : "Not saved", local); }
+  try { await docRef.set({ plan: JSON.stringify(S), savedAt: new Date().toISOString() }); setSaveState("Sparat på ditt konto", true); }
+  catch (e) { setSaveState(local ? "Sparat i webbläsaren" : "Inte sparat", local); }
   saving = false;
   if (pending) { pending = false; flush(); }
 }
 async function initStore() {
   const local = lsRead();
   if (local) { S = merge(DEFAULT(), local); migrate(); render(); }
-  setSaveState(local ? "Saved in this browser" : "Example plan", !!local);
+  setSaveState(local ? "Sparat i webbläsaren" : "Exempelplan", !!local);
   if (LOCAL) {
     try {
       const r = await fetch("/api/plan", { cache: "no-store" });
       if (r.ok) { S = merge(DEFAULT(), await r.json()); migrate(); render(); }
       await flush(); // moves a browser-only plan to the server and gives the scraper this plan's areas and budget
-    } catch (e) { setSaveState("The local server isn't answering, saving in this browser", !!local); }
+    } catch (e) { setSaveState("Den lokala servern svarar inte, sparar i webbläsaren", !!local); }
     return;
   }
   try {
@@ -632,9 +644,9 @@ async function initStore() {
     if (snap.exists) {
       const d = snap.data();
       try { S = merge(DEFAULT(), JSON.parse(d.plan)); migrate(); render(); } catch (e) {}
-      setSaveState("Saved to your account", true);
+      setSaveState("Sparat på ditt konto", true);
     } else {
-      setSaveState(local ? "Saved in this browser" : "Example plan, saves to your account when you edit", !!local);
+      setSaveState(local ? "Sparat i webbläsaren" : "Exempelplan, sparas på ditt konto när du ändrar", !!local);
     }
   } catch (e) { docRef = docRef || null; }
 }
@@ -658,14 +670,14 @@ function bestRate(binding) {
 }
 function chosenRate() {
   const r = S.rates;
-  if (r.mode === "offer" && r.offer > 0) return { rate: r.offer, label: "your offer" };
+  if (r.mode === "offer" && r.offer > 0) return { rate: r.offer, label: "ditt erbjudande" };
   if (r.mode === "snitt") {
     const big = BANKS.filter((b) => b.snitt != null && ["SBAB", "Swedbank", "Handelsbanken", "SEB", "Länsförsäkringar"].includes(b.name));
     const avg = big.reduce((a, b) => a + b.snitt, 0) / big.length;
-    return { rate: avg, label: "big-bank average rate (snittränta)" };
+    return { rate: avg, label: "storbankernas snittränta" };
   }
   const b = BINDINGS.find((x) => x[0] === r.binding)[1];
-  return { rate: bestRate(r.binding), label: "best list rate, " + b };
+  return { rate: bestRate(r.binding), label: "bästa listränta, " + b };
 }
 function furnitureTotal(tierOverride) {
   const f = S.furn, ti = TIERS.findIndex((t) => t[0] === (tierOverride || f.tier));
@@ -748,13 +760,13 @@ function affordability() {
   const byKalp = kalpSurplus(0, 0) < 0 ? 0 : lo;
   const multTxt = String(mult).replace(".", ",");
   const limits = [
-    { key: "cash", label: "Cash (10 % insats)", value: byCash, hint: "Your savings after buffer, fees" + (f.reserveFurniture ? " and furniture" : "") + " must cover 10 % of the price." },
+    { key: "cash", label: "Kontanter (10 % insats)", value: byCash, hint: "Ditt sparande efter buffert, avgifter" + (f.reserveFurniture ? " och möbler" : "") + " måste täcka 10 % av priset." },
   ];
   // A real lånelöfte replaces the two estimates; they stay visible for comparison
-  if (offer) limits.push({ key: "offer", label: "Your lånelöfte", value: cash + offer, hint: "Your bank offered to lend " + kr(offer) + ", so that sets the loan." });
+  if (offer) limits.push({ key: "offer", label: "Ditt lånelöfte", value: cash + offer, hint: "Banken har lovat att låna ut " + kr(offer) + ", och det sätter lånet." });
   limits.push(
-    { key: "income", label: (offer ? "Estimate: " : "") + "Income (" + multTxt + "× gross)", value: byIncome, unused: !!offer, hint: "Banks lend up to about " + multTxt + " times your yearly gross income, minus other debt. Some go higher." },
-    { key: "kalp", label: (offer ? "Estimate: " : "") + "Bank stress test", value: byKalp, unused: !!offer, hint: "The bank's KALP check: at a " + String(f.stress).replace(".", ",") + " % stress rate" + (f.kalpDeduction ? " after ränteavdrag" : "") + ", your net income must still cover loan, avgift and living costs." },
+    { key: "income", label: (offer ? "Uppskattning: " : "") + "Inkomst (" + multTxt + "× brutto)", value: byIncome, unused: !!offer, hint: "Bankerna lånar ut upp till ungefär " + multTxt + " gånger din årsinkomst före skatt, minus andra skulder. Vissa går högre." },
+    { key: "kalp", label: (offer ? "Uppskattning: " : "") + "Bankens KALP", value: byKalp, unused: !!offer, hint: "Bankens kvar att leva på-kalkyl: med " + String(f.stress).replace(".", ",") + " % kalkylränta" + (f.kalpDeduction ? " efter ränteavdrag" : "") + " måste nettoinkomsten fortfarande räcka till lån, avgift och levnadskostnader." },
   );
   const used = limits.filter((l) => !l.unused);
   const binding = used.reduce((a, b) => (b.value < a.value ? b : a));
@@ -876,7 +888,7 @@ function set(path, val) {
 function exampleBanner(text) {
   // Always one slot, so the page keeps its shape when the banner goes away mid-typing
   if (!S.example) return `<div class="ex-slot"></div>`;
-  return `<div class="ex-slot"><div class="banner-ex"><span class="chip ex">Example</span><span>${text}</span><button class="btn" data-act="clear-example">Start with my own numbers</button></div></div>`;
+  return `<div class="ex-slot"><div class="banner-ex"><span class="chip ex">Exempel</span><span>${text}</span><button class="btn" data-act="clear-example">Börja med mina egna siffror</button></div></div>`;
 }
 
 const VIEWS = {
@@ -892,80 +904,80 @@ const VIEWS = {
     const maxShown = a.max;
     const searchTo = Math.floor(maxShown * (1 - S.search.headroom / 100) / 50000) * 50000;
     return `
-      <div class="lead"><h1>Overview</h1>
-      <p>${({ cash: "Your cash", offer: "Your lånelöfte", income: "Your income", kalp: "The bank's stress test" })[a.binding.key]} sets the limit: you can likely bid up to <strong>${mkr(a.max)}</strong>, and a ${mkr(target)} apartment costs <strong>${kr(mc.total)}</strong> a month.</p></div>
-      ${exampleBanner("These are sample figures so you can see how the plan works. Replace them with your own.")}
+      <div class="lead"><h1>Översikt</h1>
+      <p>${({ cash: "Dina kontanter", offer: "Ditt lånelöfte", income: "Din inkomst", kalp: "Bankens KALP" })[a.binding.key]} sätter gränsen: du kan troligen bjuda upp till <strong>${mkr(a.max)}</strong>, och en lägenhet för ${mkr(target)} kostar <strong>${kr(mc.total)}</strong> i månaden.</p></div>
+      ${exampleBanner("Det här är exempelsiffror så att du ser hur planen fungerar. Byt ut dem mot dina egna.")}
       <div class="hero">
         <section class="panel">
-          <span class="eyebrow">Highest price you can likely bid</span>
+          <span class="eyebrow">Högsta pris du troligen kan bjuda</span>
           <div class="bigfig" data-out="max">${kr(maxShown).replace(" kr", "")}<small> kr</small></div>
-          <p class="dim" style="margin:6px 0 16px">Limited by <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>. ${esc(a.binding.hint)}</p>
+          <p class="dim" style="margin:6px 0 16px">Begränsas av <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>. ${esc(a.binding.hint)}</p>
           <div class="limits">${a.limits.map((l) => `
             <div class="limit ${l === a.binding ? "binding" : ""}"><span>${l.label}</span><div class="bar"><b style="width:${Math.min(100, (a.max / Math.max(l.value, 1)) * 100).toFixed(1)}%"></b></div><span class="mono">${l.value > 25e6 ? "25+ Mkr" : mkr(l.value)}</span></div>`).join("")}
           </div>
-          <p class="note" style="margin:16px 0 0">The shortest bar's limit decides your max. A bank makes the real decision in your <strong>lånelöfte</strong>, so treat this as a planning estimate.</p>
+          <p class="note" style="margin:16px 0 0">Den kortaste stapeln bestämmer ditt max. Det är banken som avgör på riktigt i ditt <strong>lånelöfte</strong>, så se det här som en uppskattning att planera efter.</p>
         </section>
         <section class="panel">
-          <span class="eyebrow">Target apartment</span>
-          <div class="row" style="margin:6px 0 10px">${numField("fin.targetPrice", "Price you're aiming for", "kr", "", "50000")}</div>
+          <span class="eyebrow">Målet</span>
+          <div class="row" style="margin:6px 0 10px">${numField("fin.targetPrice", "Pris du siktar på", "kr", "", "50000")}</div>
           <dl class="kv">
             <dt>Kontantinsats (10 %)</dt><dd>${kr(target * 0.10)}</dd>
-            <dt>Fees to the förening</dt><dd>${kr(closingFees())}</dd>
-            <dt>Furniture and moving</dt><dd>${kr(furn.total)}</dd>
-            <dt>Buffer you keep</dt><dd>${kr(S.fin.buffer)}</dd>
-            <dt class="total">Cash needed</dt><dd class="total">${kr(needCash)}</dd>
-            <dt>Your savings</dt><dd>${kr(S.fin.savings)}</dd>
-            <dt class="total">${gap > 0 ? "Still to save" : "Ahead of target by"}</dt><dd class="total" style="color:${gap > 0 ? "var(--warn)" : "var(--good)"}">${kr(Math.abs(gap))}</dd>
+            <dt>Avgifter till föreningen</dt><dd>${kr(closingFees())}</dd>
+            <dt>Möbler och flytt</dt><dd>${kr(furn.total)}</dd>
+            <dt>Buffert du behåller</dt><dd>${kr(S.fin.buffer)}</dd>
+            <dt class="total">Kontanter som behövs</dt><dd class="total">${kr(needCash)}</dd>
+            <dt>Ditt sparande</dt><dd>${kr(S.fin.savings)}</dd>
+            <dt class="total">${gap > 0 ? "Kvar att spara" : "Över målet med"}</dt><dd class="total" style="color:${gap > 0 ? "var(--warn)" : "var(--good)"}">${kr(Math.abs(gap))}</dd>
           </dl>
-          <p class="dim" style="margin:10px 0 0;font-size:.86rem">${gap > 0 ? (months ? `At ${kr(S.fin.monthlySave)} a month you reach it in about <strong style="color:var(--ink)">${months} months</strong>.` : "Set a monthly savings amount in My finances to see when you get there.") : "You have the cash for this target."} ${target > a.max ? `<span class="chip bad">Above your max</span>` : `<span class="chip good">Within your max</span>`}</p>
+          <p class="dim" style="margin:10px 0 0;font-size:.86rem">${gap > 0 ? (months ? `Med ${kr(S.fin.monthlySave)} i månaden är du där om ungefär <strong style="color:var(--ink)">${months} månader</strong>.` : "Fyll i hur mycket du sparar i månaden under Privatekonomi, så ser du när du är där.") : "Du har kontanterna för det här målet."} ${target > a.max ? `<span class="chip bad">Över ditt max</span>` : `<span class="chip good">Inom ditt max</span>`}</p>
         </section>
       </div>
       <div class="tiles" style="margin-top:20px">
-        <button class="tile" data-goto="rates"><span class="eyebrow">Monthly cost at target</span><span class="v">${kr(mc.total)}</span><span class="s">After ränteavdrag, at ${pct(cr.rate)} (${esc(cr.label)})</span></button>
-        <button class="tile" data-goto="rates"><span class="eyebrow">Best 3-month list rate</span><span class="v">${pct(bestRate("m3"))}</span><span class="s">${esc(BANKS.find((b) => b.r.m3 === bestRate("m3")).name)}, updated ${RATES_UPDATED}</span></button>
-        <button class="tile" data-goto="five"><span class="eyebrow">Tightest month in 5 years</span><span class="v">${kr(Math.min(...Object.values(S.five.scen).flatMap((sc) => projectFive(sc).map((r) => r.left))))}</span><span class="s">Left over in the worst scenario</span></button>
-        <button class="tile" data-goto="show"><span class="eyebrow">Showings search up to</span><span class="v">${mkr(+S.show.f.maxPrice || searchTo)}</span><span class="s">${apartments().length} apartments found, ${S.apts.length} saved</span></button>
-        <button class="tile" data-goto="furnish"><span class="eyebrow">Furnishing budget</span><span class="v">${kr(furn.total)}</span><span class="s">${furn.count} items to buy, ${TIERS.find((t) => t[0] === S.furn.tier)[1].toLowerCase()}</span></button>
-        <button class="tile" data-goto="steps"><span class="eyebrow">Buying steps</span><span class="v">${doneSteps} / ${STEPS.length}</span><span class="s">${doneSteps < STEPS.length ? "Next: " + esc(STEPS.find((s) => !S.steps[s[0]])[1]) : "All done. Welcome home."}</span></button>
+        <button class="tile" data-goto="rates"><span class="eyebrow">Månadskostnad för målet</span><span class="v">${kr(mc.total)}</span><span class="s">Efter ränteavdrag, med ${pct(cr.rate)} (${esc(cr.label)})</span></button>
+        <button class="tile" data-goto="rates"><span class="eyebrow">Bästa listränta 3 mån</span><span class="v">${pct(bestRate("m3"))}</span><span class="s">${esc(BANKS.find((b) => b.r.m3 === bestRate("m3")).name)}, uppdaterad ${RATES_UPDATED}</span></button>
+        <button class="tile" data-goto="five"><span class="eyebrow">Tightaste månaden på 5 år</span><span class="v">${kr(Math.min(...Object.values(S.five.scen).flatMap((sc) => projectFive(sc).map((r) => r.left))))}</span><span class="s">Kvar i det sämsta scenariot</span></button>
+        <button class="tile" data-goto="show"><span class="eyebrow">Visningar söker upp till</span><span class="v">${mkr(+S.show.f.maxPrice || searchTo)}</span><span class="s">${apartments().length} lägenheter hittade, ${S.apts.length} sparade</span></button>
+        <button class="tile" data-goto="furnish"><span class="eyebrow">Möbelbudget</span><span class="v">${kr(furn.total)}</span><span class="s">${furn.count} saker att köpa, ${TIERS.find((t) => t[0] === S.furn.tier)[1].toLowerCase()}</span></button>
+        <button class="tile" data-goto="steps"><span class="eyebrow">Steg i köpet</span><span class="v">${doneSteps} / ${STEPS.length}</span><span class="s">${doneSteps < STEPS.length ? "Nästa: " + esc(STEPS.find((s) => !S.steps[s[0]])[1]) : "Allt klart. Välkommen hem."}</span></button>
       </div>`;
   },
 
   money() {
     const f = S.fin, two = f.buyers === 2;
     return `
-      <div class="lead"><h1>My finances</h1>
-      <p>Banks check three things: your cash for the kontantinsats, your income against total debt, and a stress test (KALP) of your monthly budget at a higher rate.</p></div>
-      ${exampleBanner("Sample finances. Enter your own salary and savings.")}
+      <div class="lead"><h1>Privatekonomi</h1>
+      <p>Banken tittar på tre saker: dina kontanter till kontantinsatsen, din inkomst mot alla skulder, och en kvar att leva på-kalkyl (KALP) av din månadsbudget med högre ränta.</p></div>
+      ${exampleBanner("Exempel på ekonomi. Fyll i din egen lön och ditt sparande.")}
       <div class="bench">
         <div class="stack">
-          <section class="panel"><h3>Income</h3>
-            <div class="field"><label>Buying</label><div class="seg">
-              <button data-set="fin.buyers" data-val="1" aria-pressed="${!two}">Alone</button>
-              <button data-set="fin.buyers" data-val="2" aria-pressed="${two}">Together</button></div></div>
-            ${numField("fin.gross1", two ? "Your gross salary / month" : "Gross salary / month", "kr", "Before tax (bruttolön).")}
-            ${f.netAuto ? "" : numField("fin.net1", two ? "Your net salary / month" : "Net salary / month", "kr", "What lands in your account (nettolön).")}
-            ${two ? numField("fin.gross2", "Partner's gross / month") + (f.netAuto ? "" : numField("fin.net2", "Partner's net / month")) : ""}
+          <section class="panel"><h3>Inkomst</h3>
+            <div class="field"><label>Köper</label><div class="seg">
+              <button data-set="fin.buyers" data-val="1" aria-pressed="${!two}">Ensam</button>
+              <button data-set="fin.buyers" data-val="2" aria-pressed="${two}">Tillsammans</button></div></div>
+            ${numField("fin.gross1", two ? "Din bruttolön / mån" : "Bruttolön / mån", "kr", "Före skatt.")}
+            ${f.netAuto ? "" : numField("fin.net1", two ? "Din nettolön / mån" : "Nettolön / mån", "kr", "Det som kommer in på kontot.")}
+            ${two ? numField("fin.gross2", "Partnerns bruttolön / mån") + (f.netAuto ? "" : numField("fin.net2", "Partnerns nettolön / mån")) : ""}
             <div id="out-net">${VIEWS.netOut()}</div>
-            <div class="field"><label for="f-netauto">Calculate net salary from gross</label><input id="f-netauto" type="checkbox" data-check="fin.netAuto" ${f.netAuto ? "checked" : ""}></div>
-            ${f.netAuto ? `<div class="field"><label for="f-church">Member of Svenska kyrkan</label><input id="f-church" type="checkbox" data-check="fin.church" ${f.church ? "checked" : ""}><small>Adds kyrkoavgift, about 1 % in Stockholm.</small></div>` : ""}
+            <div class="field"><label for="f-netauto">Räkna ut nettolönen från bruttolönen</label><input id="f-netauto" type="checkbox" data-check="fin.netAuto" ${f.netAuto ? "checked" : ""}></div>
+            ${f.netAuto ? `<div class="field"><label for="f-church">Medlem i Svenska kyrkan</label><input id="f-church" type="checkbox" data-check="fin.church" ${f.church ? "checked" : ""}><small>Lägger till kyrkoavgift, ungefär 1 % i Stockholm.</small></div>` : ""}
           </section>
-          <section class="panel"><h3>Savings and debts</h3>
-            ${numField("fin.savings", "Savings available", "kr", "Cash, ISK and funds you'll sell for the purchase.", "10000")}
-            ${numField("fin.buffer", "Buffer to keep", "kr", "Emergency money you won't spend on the apartment.", "5000")}
-            ${numField("fin.monthlySave", "You save each month", "kr", "", "500")}
-            ${numField("fin.otherDebt", "Other debt (CSN, car, loans)", "kr", "", "10000")}
-            ${numField("fin.otherDebtMonthly", "Monthly payments on that debt", "kr", "", "100")}
-            <div class="field"><label for="f-resf">Reserve furniture budget from savings</label><input id="f-resf" type="checkbox" data-check="fin.reserveFurniture" ${f.reserveFurniture ? "checked" : ""}></div>
+          <section class="panel"><h3>Sparande och skulder</h3>
+            ${numField("fin.savings", "Sparande att använda", "kr", "Kontanter, ISK och fonder du säljer till köpet.", "10000")}
+            ${numField("fin.buffer", "Buffert att behålla", "kr", "Pengar för oförutsett som inte går till lägenheten.", "5000")}
+            ${numField("fin.monthlySave", "Du sparar varje månad", "kr", "", "500")}
+            ${numField("fin.otherDebt", "Andra skulder (CSN, bil, lån)", "kr", "", "10000")}
+            ${numField("fin.otherDebtMonthly", "Månadsbetalning på de skulderna", "kr", "", "100")}
+            <div class="field"><label for="f-resf">Avsätt möbelbudgeten från sparandet</label><input id="f-resf" type="checkbox" data-check="fin.reserveFurniture" ${f.reserveFurniture ? "checked" : ""}></div>
           </section>
-          <section class="panel"><h3>Bank's budget assumptions</h3>
-            ${numField("fin.living", "Living costs / month", "kr", "Food, transport, clothes, phone. Banks use standard amounts of about 8–10 000 kr per adult" + (two ? ", so roughly 18 000 kr for two." : "."), "500")}
-            ${numField("fin.targetAvgift", "Expected avgift", "kr/mån", "Monthly fee to the förening.", "100")}
-            ${numField("fin.stress", "Stress-test rate", "%", "Banks test at a higher rate than you'll pay, usually 6–7 %.", "0.5")}
-            ${numField("fin.incomeMult", "Max loan, times yearly gross", "×", "Many banks stop near 5.5×; some lend 6× or more.", "0.25")}
-            <div class="field"><label for="f-kded">Count ränteavdrag in the stress test</label><input id="f-kded" type="checkbox" data-check="fin.kalpDeduction" ${f.kalpDeduction ? "checked" : ""}><small>Banks differ. Off is the stricter test.</small></div>
+          <section class="panel"><h3>Bankens kalkyl</h3>
+            ${numField("fin.living", "Levnadskostnader / mån", "kr", "Mat, resor, kläder, telefon. Bankerna räknar med schablonbelopp på ungefär 8–10 000 kr per vuxen" + (two ? ", alltså runt 18 000 kr för två." : "."), "500")}
+            ${numField("fin.targetAvgift", "Väntad avgift", "kr/mån", "Månadsavgiften till föreningen.", "100")}
+            ${numField("fin.stress", "Kalkylränta", "%", "Bankerna räknar med högre ränta än du betalar, oftast 6–7 %.", "0.5")}
+            ${numField("fin.incomeMult", "Största lån, gånger årsinkomsten", "×", "Många banker stannar runt 5,5×; vissa lånar ut 6× eller mer.", "0.25")}
+            <div class="field"><label for="f-kded">Räkna med ränteavdrag i KALP</label><input id="f-kded" type="checkbox" data-check="fin.kalpDeduction" ${f.kalpDeduction ? "checked" : ""}><small>Bankerna gör olika. Av är det strängare.</small></div>
           </section>
-          <section class="panel"><h3>Your bank's answer</h3>
-            ${numField("fin.bankOffer", "A bank offered to lend me", "kr", "Enter the amount in your lånelöfte. It replaces the income and stress-test estimates. Leave empty to use the estimates.", "50000")}
+          <section class="panel"><h3>Bankens besked</h3>
+            ${numField("fin.bankOffer", "En bank har lovat att låna ut", "kr", "Fyll i beloppet i ditt lånelöfte. Det ersätter uppskattningarna från inkomst och KALP. Lämna tomt för att använda uppskattningarna.", "50000")}
           </section>
         </div>
         <div class="stack" id="out-money">${VIEWS.moneyOut()}</div>
@@ -976,10 +988,10 @@ const VIEWS = {
     if (!f.netAuto) return "";
     const row = (label, g) => `<dt>${label}</dt><dd>${kr(netOf(g))}</dd>`;
     return `<div class="field" style="display:block"><dl class="kv">
-      ${row(two ? "Your net salary / month" : "Net salary / month", f.gross1)}
-      ${two ? row("Partner's net / month", f.gross2) : ""}
-      <dt>Tax / month</dt><dd>${kr(monthlyTax(+f.gross1 || 0, f.church) + (two ? monthlyTax(+f.gross2 || 0, f.church) : 0))}</dd>
-    </dl><small style="display:block;margin-top:6px">From Skatteverket's 2026 tax table for Stockholm (${String(TAX.kommun).replace(".", ",")} % plus begravningsavgift), with grundavdrag and jobbskatteavdrag.</small></div>`;
+      ${row(two ? "Din nettolön / mån" : "Nettolön / mån", f.gross1)}
+      ${two ? row("Partnerns nettolön / mån", f.gross2) : ""}
+      <dt>Skatt / mån</dt><dd>${kr(monthlyTax(+f.gross1 || 0, f.church) + (two ? monthlyTax(+f.gross2 || 0, f.church) : 0))}</dd>
+    </dl><small style="display:block;margin-top:6px">Från Skatteverkets skattetabell 2026 för Stockholm (${String(TAX.kommun).replace(".", ",")} % plus begravningsavgift), med grundavdrag och jobbskatteavdrag.</small></div>`;
   },
   moneyOut() {
     const a = affordability(), h = household(), f = S.fin, cr = chosenRate();
@@ -988,35 +1000,35 @@ const VIEWS = {
     const surplus = kalpSurplus(loanAtMax, a.max);
     return `
       <section class="panel">
-        <span class="eyebrow">Your max price</span>
+        <span class="eyebrow">Ditt maxpris</span>
         <div class="bigfig">${kr(a.max).replace(" kr", "")}<small> kr</small></div>
-        <p class="dim" style="margin:4px 0 14px">Set by <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>.</p>
+        <p class="dim" style="margin:4px 0 14px">Sätts av <strong style="color:var(--ink)">${a.binding.label.toLowerCase()}</strong>.</p>
         <div class="limits">${a.limits.map((l) => `
           <div class="limit ${l === a.binding ? "binding" : ""}"><span>${l.label}</span><div class="bar"><b style="width:${Math.min(100, (a.max / Math.max(l.value, 1)) * 100).toFixed(1)}%"></b></div><span class="mono">${l.value > 25e6 ? "25+ Mkr" : mkr(l.value)}</span></div>`).join("")}</div>
       </section>
-      <section class="panel"><h3>How the money adds up at your max</h3>
+      <section class="panel"><h3>Så går pengarna ihop vid ditt max</h3>
         <dl class="kv">
-          <dt>Savings</dt><dd>${kr(f.savings)}</dd>
-          <dt>− Buffer</dt><dd>${kr(-f.buffer)}</dd>
-          <dt>− Fees to the förening (överlåtelse + pantsättning)</dt><dd>${kr(-closingFees())}</dd>
-          ${f.reserveFurniture ? `<dt>− Furniture &amp; moving</dt><dd>${kr(-furnitureTotal().total)}</dd>` : ""}
-          <dt class="total">Cash for kontantinsats</dt><dd class="total">${kr(a.cash)}</dd>
-          <dt>Mortgage (bolån)</dt><dd>${kr(loanAtMax)}</dd>
-          <dt>Loan-to-value (belåningsgrad)</dt><dd>${pct(a.max ? loanAtMax / a.max * 100 : 0, 1)}</dd>
-          <dt>Debt-to-income (skuldkvot)</dt><dd>${h.gross ? ((loanAtMax + (+f.otherDebt || 0)) / (h.gross * 12)).toFixed(1).replace(".", ",") + "×" : "–"}</dd>
+          <dt>Sparande</dt><dd>${kr(f.savings)}</dd>
+          <dt>− Buffert</dt><dd>${kr(-f.buffer)}</dd>
+          <dt>− Avgifter till föreningen (överlåtelse + pantsättning)</dt><dd>${kr(-closingFees())}</dd>
+          ${f.reserveFurniture ? `<dt>− Möbler och flytt</dt><dd>${kr(-furnitureTotal().total)}</dd>` : ""}
+          <dt class="total">Kontanter till kontantinsats</dt><dd class="total">${kr(a.cash)}</dd>
+          <dt>Bolån</dt><dd>${kr(loanAtMax)}</dd>
+          <dt>Belåningsgrad</dt><dd>${pct(a.max ? loanAtMax / a.max * 100 : 0, 1)}</dd>
+          <dt>Skuldkvot</dt><dd>${h.gross ? ((loanAtMax + (+f.otherDebt || 0)) / (h.gross * 12)).toFixed(1).replace(".", ",") + "×" : "–"}</dd>
         </dl>
       </section>
-      <section class="panel"><h3>Monthly cost at your max</h3>
+      <section class="panel"><h3>Månadskostnad vid ditt max</h3>
         <dl class="kv">
-          <dt>Interest at ${pct(cr.rate)} after 30 % ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
-          <dt>Amortering (${(amortRate(mc.ltv) * 100).toFixed(0)} % a year)</dt><dd>${kr(mc.amort)}</dd>
+          <dt>Ränta ${pct(cr.rate)} efter 30 % ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
+          <dt>Amortering (${(amortRate(mc.ltv) * 100).toFixed(0)} % per år)</dt><dd>${kr(mc.amort)}</dd>
           <dt>Avgift</dt><dd>${kr(mc.avgift)}</dd>
-          <dt>Electricity, insurance, broadband</dt><dd>${kr(mc.running)}</dd>
-          <dt class="total">Total per month</dt><dd class="total">${kr(mc.total)}</dd>
-          <dt>Left after housing and living costs</dt><dd style="color:${h.net - mc.total - f.living - f.otherDebtMonthly < 0 ? "var(--bad)" : "var(--good)"}">${kr(h.net - mc.total - f.living - f.otherDebtMonthly)}</dd>
-          <dt>Stress-test margin at ${f.stress} %</dt><dd>${kr(surplus)}</dd>
+          <dt>El, försäkring, bredband</dt><dd>${kr(mc.running)}</dd>
+          <dt class="total">Totalt per månad</dt><dd class="total">${kr(mc.total)}</dd>
+          <dt>Kvar efter boende och levnadskostnader</dt><dd style="color:${h.net - mc.total - f.living - f.otherDebtMonthly < 0 ? "var(--bad)" : "var(--good)"}">${kr(h.net - mc.total - f.living - f.otherDebtMonthly)}</dd>
+          <dt>Marginal i KALP med ${f.stress} %</dt><dd>${kr(surplus)}</dd>
         </dl>
-        <p class="note" style="margin:14px 0 0">Rules used: <strong>bolånetak 90 %</strong> (10 % cash) and amortering of 2 % above 70 % LTV and 1 % between 50–70 %, in force since 1 April 2026. Ränteavdrag is 30 % of interest up to 100 000 kr a year, 21 % above that. Banks' own limits vary.</p>
+        <p class="note" style="margin:14px 0 0">Regler som används: <strong>bolånetak 90 %</strong> (10 % kontant) och amortering på 2 % över 70 % belåningsgrad och 1 % mellan 50 och 70 %, som gäller sedan 1 april 2026. Ränteavdraget är 30 % av räntan upp till 100 000 kr om året och 21 % över det. Bankernas egna gränser varierar.</p>
       </section>`;
   },
 
@@ -1030,20 +1042,20 @@ const VIEWS = {
     rows.sort((x, y) => r.sort === "snitt" ? (x.snitt ?? 99) - (y.snitt ?? 99) : r.sort === "name" ? x.name.localeCompare(y.name, "sv") : x.rate - y.rate);
     const best = Math.min(...rows.map((b) => b.rate));
     return `
-      <div class="lead"><h1>Mortgage rates</h1>
-      <p>List rates (listränta) are the starting price. The average rate (snittränta) is what customers actually paid last month, which tells you how much room there is to negotiate.</p></div>
+      <div class="lead"><h1>Bolåneräntor</h1>
+      <p>Listräntan är utgångspriset. Snitträntan är vad kunderna faktiskt betalade förra månaden, och den visar hur mycket utrymme det finns att förhandla.</p></div>
       <div class="row" style="margin-bottom:14px">
-        <span class="eyebrow">Binding period</span>
+        <span class="eyebrow">Bindningstid</span>
         <div class="seg">${BINDINGS.map(([k, l]) => `<button data-set="rates.binding" data-val="${k}" aria-pressed="${r.binding === k}">${l}</button>`).join("")}</div>
       </div>
       <div class="tablewrap">
         <table>
           <thead><tr>
             <th data-sort="name" ${r.sort === "name" ? 'aria-sort="ascending"' : ""}>Bank</th>
-            <th data-sort="rate" ${r.sort === "rate" ? 'aria-sort="ascending"' : ""}>List rate</th>
-            <th data-sort="snitt" ${r.sort === "snitt" ? 'aria-sort="ascending"' : ""}>Avg rate 3 mån</th>
-            <th>Interest / month</th>
-            <th>After ränteavdrag</th>
+            <th data-sort="rate" ${r.sort === "rate" ? 'aria-sort="ascending"' : ""}>Listränta</th>
+            <th data-sort="snitt" ${r.sort === "snitt" ? 'aria-sort="ascending"' : ""}>Snittränta 3 mån</th>
+            <th>Ränta / mån</th>
+            <th>Efter ränteavdrag</th>
           </tr></thead>
           <tbody>${rows.map((b) => `
             <tr class="${b.rate === best ? "best" : ""}">
@@ -1056,30 +1068,30 @@ const VIEWS = {
           </tbody>
         </table>
       </div>
-      <p class="dim" style="font-size:.8rem;margin:8px 0 20px">Rates from <a href="${RATES_SOURCE}" target="_blank" rel="noopener">lanupplysningen.se</a>, updated ${RATES_UPDATED}. Interest shown for a ${kr(loan)} loan (your target price minus your cash). Check each bank's own page before you decide. Specialist lenders (Bluestep, Marginalen, Nordax, Svea) are left out.</p>
+      <p class="dim" style="font-size:.8rem;margin:8px 0 20px">Räntor från <a href="${RATES_SOURCE}" target="_blank" rel="noopener">lanupplysningen.se</a>, uppdaterade ${RATES_UPDATED}. Räntan visas för ett lån på ${kr(loan)} (ditt målpris minus dina kontanter). Kolla varje banks egen sida innan du bestämmer dig. Specialbanker (Bluestep, Marginalen, Nordax, Svea) är inte med.</p>
       <div class="bench">
-        <section class="panel"><h3>Rate used in your plan</h3>
+        <section class="panel"><h3>Räntan i din plan</h3>
           <div class="seg" style="margin-bottom:10px">
-            <button data-set="rates.mode" data-val="list" aria-pressed="${r.mode === "list"}">Best list rate</button>
-            <button data-set="rates.mode" data-val="snitt" aria-pressed="${r.mode === "snitt"}">Avg rate</button>
-            <button data-set="rates.mode" data-val="offer" aria-pressed="${r.mode === "offer"}">My offer</button>
+            <button data-set="rates.mode" data-val="list" aria-pressed="${r.mode === "list"}">Bästa listränta</button>
+            <button data-set="rates.mode" data-val="snitt" aria-pressed="${r.mode === "snitt"}">Snittränta</button>
+            <button data-set="rates.mode" data-val="offer" aria-pressed="${r.mode === "offer"}">Mitt erbjudande</button>
           </div>
-          ${r.mode === "offer" ? numField("rates.offer", "Rate a bank offered you", "%", "", "0.01") : ""}
-          <p class="dim" style="font-size:.86rem;margin:8px 0 12px">Using <strong style="color:var(--ink)">${pct(cr.rate)}</strong>, ${esc(cr.label)}.</p>
+          ${r.mode === "offer" ? numField("rates.offer", "Räntan en bank har erbjudit dig", "%", "", "0.01") : ""}
+          <p class="dim" style="font-size:.86rem;margin:8px 0 12px">Räknar med <strong style="color:var(--ink)">${pct(cr.rate)}</strong>, ${esc(cr.label)}.</p>
           <dl class="kv">
-            <dt>Loan at ${mkr(price)}</dt><dd>${kr(mc.loan)}</dd>
-            <dt>Interest after ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
+            <dt>Lån vid ${mkr(price)}</dt><dd>${kr(mc.loan)}</dd>
+            <dt>Ränta efter ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
             <dt>Amortering</dt><dd>${kr(mc.amort)}</dd>
-            <dt class="total">Mortgage per month</dt><dd class="total">${kr(mc.interestNet + mc.amort)}</dd>
+            <dt class="total">Bolån per månad</dt><dd class="total">${kr(mc.interestNet + mc.amort)}</dd>
           </dl>
         </section>
-        <section class="panel"><h3>How to get below the list rate</h3>
+        <section class="panel"><h3>Så kommer du under listräntan</h3>
           <ul style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.9rem">
-            <li>Get lånelöften from two or three banks, then ask your favourite to beat the best one in writing.</li>
-            <li>The big banks' average rates sit about 1–1,3 points below their list rates. Your first offer should be close to that.</li>
-            <li>Lower loan-to-value usually means a better rate. Some banks have rate steps at 60 % and 50 %.</li>
-            <li>Floating (3 months) has been cheapest. Binding gives a fixed cost but you can't move banks for free during the period.</li>
-            <li>Salary account, insurance and savings in the same bank are common bargaining chips.</li>
+            <li>Skaffa lånelöften från två eller tre banker och be sedan din favorit slå det bästa skriftligt.</li>
+            <li>Storbankernas snitträntor ligger ungefär 1–1,3 procentenheter under listräntorna. Ditt första erbjudande bör ligga nära det.</li>
+            <li>Lägre belåningsgrad ger oftast bättre ränta. Vissa banker har räntetrappor vid 60 % och 50 %.</li>
+            <li>Rörlig ränta (3 mån) har varit billigast. Bunden ränta ger en fast kostnad, men du kan inte byta bank gratis under bindningstiden.</li>
+            <li>Lönekonto, försäkringar och sparande i samma bank är vanliga förhandlingskort.</li>
           </ul>
         </section>
       </div>`;
@@ -1087,32 +1099,32 @@ const VIEWS = {
 
   five() {
     const F = S.five, cr = chosenRate();
-    const cell = (k, y) => `<td><span class="num">${numInput(`aria-label="${esc(F.scen[k].name)} year ${y + 1}" data-five="${k}" data-y="${y}"`, F.scen[k].dr[y], "4.2em")}<span>pp</span></span></td>`;
+    const cell = (k, y) => `<td><span class="num">${numInput(`aria-label="${esc(F.scen[k].name)} år ${y + 1}" data-five="${k}" data-y="${y}"`, F.scen[k].dr[y], "4.2em")}<span>pp</span></span></td>`;
     return `
-      <div class="lead"><h1>5-year budget</h1>
-      <p>Starts from your wage, your target apartment and today's plan rate of ${pct(cr.rate)}. Everything is in today's money: your wage and everyday costs are assumed to rise together with inflation, so only the mortgage rate and the avgift change.</p></div>
-      ${exampleBanner("Based on the sample finances. Enter your own wage in My finances.")}
+      <div class="lead"><h1>Budget på 5 år</h1>
+      <p>Utgår från din lön, din mållägenhet och dagens ränta i planen, ${pct(cr.rate)}. Allt är i dagens penningvärde: lönen och vardagskostnaderna antas följa inflationen, så det är bara bolåneräntan och avgiften som ändras.</p></div>
+      ${exampleBanner("Bygger på exempelekonomin. Fyll i din egen lön under Privatekonomi.")}
       <div class="bench">
         <div class="stack">
-          <section class="panel"><h3>Your assumptions</h3>
-            ${S.fin.netAuto ? numField("fin.gross1", S.fin.buyers === 2 ? "Your gross salary / month" : "Gross salary / month", "kr", "Net after tax: " + kr(household().net) + " a month" + (S.fin.buyers === 2 ? " for both of you" : "") + ".", "500") : numField("fin.net1", S.fin.buyers === 2 ? "Your net wage / month" : "Net wage / month", "kr", "Edit gross and partner's wage in My finances.", "500")}
-            ${numField("fin.living", "Living costs / month", "kr", "", "500")}
-            ${numField("fin.targetPrice", "Apartment price", "kr", "", "50000")}
-            ${numField("fin.targetAvgift", "Avgift today", "kr/mån", "", "100")}
-            ${numField("five.avgiftExtra", "Avgift rises above your wage by", "% / year", "Föreningar pass their own loan costs on, so avgifter have often risen faster than wages.", "0.25")}
+          <section class="panel"><h3>Dina antaganden</h3>
+            ${S.fin.netAuto ? numField("fin.gross1", S.fin.buyers === 2 ? "Din bruttolön / mån" : "Bruttolön / mån", "kr", "Netto efter skatt: " + kr(household().net) + " i månaden" + (S.fin.buyers === 2 ? " för er båda" : "") + ".", "500") : numField("fin.net1", S.fin.buyers === 2 ? "Din nettolön / mån" : "Nettolön / mån", "kr", "Ändra bruttolön och partnerns lön under Privatekonomi.", "500")}
+            ${numField("fin.living", "Levnadskostnader / mån", "kr", "", "500")}
+            ${numField("fin.targetPrice", "Lägenhetens pris", "kr", "", "50000")}
+            ${numField("fin.targetAvgift", "Avgift i dag", "kr/mån", "", "100")}
+            ${numField("five.avgiftExtra", "Avgiften stiger mer än lönen med", "% / år", "Föreningar för vidare sina egna lånekostnader, så avgifterna har ofta stigit snabbare än lönerna.", "0.25")}
           </section>
-          <section class="panel"><h3>Apartment value</h3>
-            <p class="dim" style="margin:-4px 0 8px;font-size:.86rem">${S.value.mode === "manual" ? `Fixed growth of ${pct(+S.value.manual, 1)} a year.` : `Trend from ${esc(regress(S.value.area, +S.value.win).A.name)} prices: <strong style="color:var(--ink)">${pct(valueGrowth() * 100, 1)}</strong> a year.`}</p>
-            <button class="btn" data-goto="value">Change area or method</button>
+          <section class="panel"><h3>Lägenhetens värde</h3>
+            <p class="dim" style="margin:-4px 0 8px;font-size:.86rem">${S.value.mode === "manual" ? `Fast ökning på ${pct(+S.value.manual, 1)} per år.` : `Trend från priserna i ${esc(regress(S.value.area, +S.value.win).A.name)}: <strong style="color:var(--ink)">${pct(valueGrowth() * 100, 1)}</strong> per år.`}</p>
+            <button class="btn" data-goto="value">Byt område eller metod</button>
           </section>
         </div>
         <div class="stack" id="out-five">${VIEWS.fiveOut()}</div>
       </div>
       <div id="out-five-table" style="margin-top:var(--gap)">${VIEWS.fiveTable()}</div>
-      <section class="panel" style="margin-top:20px"><h3>Edit the rate scenarios</h3>
-        <p class="dim" style="margin:-6px 0 12px;font-size:.85rem">Change in percentage points compared with today's ${pct(cr.rate)}. The shock row is modelled on 2022–23, when the 3-month rate rose about 3 points in a year.</p>
+      <section class="panel" style="margin-top:20px"><h3>Ändra räntescenarierna</h3>
+        <p class="dim" style="margin:-6px 0 12px;font-size:.85rem">Ändring i procentenheter jämfört med dagens ${pct(cr.rate)}. Chockraden bygger på 2022–23, då tremånadersräntan steg ungefär 3 procentenheter på ett år.</p>
         <div class="tablewrap"><table>
-          <thead><tr><th>Scenario</th>${[1, 2, 3, 4, 5].map((y) => `<th>Year ${y}</th>`).join("")}</tr></thead>
+          <thead><tr><th>Scenario</th>${[1, 2, 3, 4, 5].map((y) => `<th>År ${y}</th>`).join("")}</tr></thead>
           <tbody>${Object.keys(F.scen).map((k, i) => `
             <tr><td><span class="sw" style="background:${k === F.pick ? "var(--data)" : "var(--chart-2)"}"></span>${esc(F.scen[k].name)}</td>${[0, 1, 2, 3, 4].map((y) => cell(k, y)).join("")}</tr>`).join("")}
           </tbody></table></div>
@@ -1131,21 +1143,21 @@ const VIEWS = {
     lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
     const x = (i) => L + (i * (W - L - R)) / 4, yv = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
     const ticks = []; for (let v = lo; v <= hi + 1e-6; v += step) ticks.push(v);
-    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Money left each month per scenario" style="width:100%;height:auto;display:block">
+    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pengar kvar varje månad per scenario" style="width:100%;height:auto;display:block">
       ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${yv(v)}" y2="${yv(v)}" stroke="${v === 0 ? "var(--muted)" : "var(--line)"}" stroke-width="${v === 0 ? 1.5 : 1}"/><text x="${L - 8}" y="${yv(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${nf.format(v)}</text>`).join("")}
-      ${[0, 1, 2, 3, 4].map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">Year ${i + 1}</text>`).join("")}
+      ${[0, 1, 2, 3, 4].map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">År ${i + 1}</text>`).join("")}
       ${all.map((rows, si) => { const on = keys[si] === pick; const c = on ? "var(--data)" : "var(--chart-2)"; return `<polyline fill="none" stroke="${c}" stroke-width="${on ? 2.5 : 1.5}" points="${rows.map((r, i) => `${x(i)},${yv(r.left)}`).join(" ")}"/>${on ? rows.map((r, i) => `<circle cx="${x(i)}" cy="${yv(r.left)}" r="3.5" fill="${c}"/>`).join("") : ""}`; }).join("")}
       ${(() => { const ls = all.map((rows, si) => ({ y: yv(rows[4].left), name: F.scen[keys[si]].name, on: keys[si] === pick })).sort((a, b) => a.y - b.y); for (let i = 1; i < ls.length; i++) ls[i].y = Math.max(ls[i].y, ls[i - 1].y + 14); return ls.map((l) => `<text x="${x(4) + 10}" y="${l.y + 4}" font-size="12" fill="${l.on ? "var(--text)" : "var(--muted)"}" font-weight="${l.on ? 500 : 400}">${esc(l.name)}</text>`).join(""); })()}
     </svg>`;
     const sum = all.map((rows, i) => ({ k: keys[i], min: Math.min(...rows.map((r) => r.left)), end: rows[4] }));
     return `
       <section class="panel">
-        <span class="eyebrow">Money left each month after all costs</span>
+        <span class="eyebrow">Pengar kvar varje månad efter alla kostnader</span>
         <div class="seg" style="margin:8px 0 10px">${keys.map((k, i) => `<button data-set="five.pick" data-val="${k}" aria-pressed="${k === pick}"><span class="sw" style="background:${k === pick ? "var(--data)" : "var(--chart-2)"}"></span>${esc(F.scen[k].name)}</button>`).join("")}</div>
         <div style="overflow-x:auto">${svg}</div>
         <div class="tiles" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${sum.map((w, i) => `
           <div class="tile" style="cursor:default"><span class="eyebrow"><span class="sw" style="background:${w.k === pick ? "var(--data)" : "var(--chart-2)"}"></span>${esc(F.scen[w.k].name)}</span>
-          <span class="v" style="font-size:1.1rem;color:${w.min < 0 ? "var(--bad)" : w.min < 3000 ? "var(--warn)" : "var(--ink)"}">${kr(w.min)}</span><span class="s">in the tightest month; ${kr(w.end.saved)} saved by year 5</span></div>`).join("")}</div>
+          <span class="v" style="font-size:1.1rem;color:${w.min < 0 ? "var(--bad)" : w.min < 3000 ? "var(--warn)" : "var(--ink)"}">${kr(w.min)}</span><span class="s">den tightaste månaden; ${kr(w.end.saved)} sparat till år 5</span></div>`).join("")}</div>
       </section>
       `;
   },
@@ -1153,29 +1165,29 @@ const VIEWS = {
     const F = S.five, keys = Object.keys(F.scen), pick = keys.includes(F.pick) ? F.pick : keys[0];
     const P = projectFive(F.scen[pick]);
     return `
-      <section class="panel"><h3>${esc(F.scen[pick].name)}, year by year</h3>
+      <section class="panel"><h3>${esc(F.scen[pick].name)}, år för år</h3>
         <div class="tablewrap"><table>
-          <thead><tr><th>Year</th><th>Rate</th><th>Interest*/mån</th><th>Amortering/mån</th><th>Avgift/mån</th><th>Left over/mån</th><th>Loan</th><th>Apartment value</th><th>Equity</th></tr></thead>
-          <tbody>${P.map((r) => `<tr><td>Year ${r.y}</td><td class="mono">${pct(r.rate)}</td><td class="mono">${kr(r.interestNet)}</td><td class="mono">${kr(r.amort)}</td><td class="mono">${kr(r.avgift)}</td><td class="mono" style="font-weight:600;color:${r.left < 0 ? "var(--bad)" : "var(--ink)"}">${kr(r.left)}</td><td class="mono">${kr(r.loan)}</td><td class="mono">${kr(r.value)}</td><td class="mono">${kr(r.equity)}</td></tr>`).join("")}</tbody>
+          <thead><tr><th>År</th><th>Ränta</th><th>Ränta*/mån</th><th>Amortering/mån</th><th>Avgift/mån</th><th>Kvar/mån</th><th>Lån</th><th>Lägenhetens värde</th><th>Eget kapital</th></tr></thead>
+          <tbody>${P.map((r) => `<tr><td>År ${r.y}</td><td class="mono">${pct(r.rate)}</td><td class="mono">${kr(r.interestNet)}</td><td class="mono">${kr(r.amort)}</td><td class="mono">${kr(r.avgift)}</td><td class="mono" style="font-weight:600;color:${r.left < 0 ? "var(--bad)" : "var(--ink)"}">${kr(r.left)}</td><td class="mono">${kr(r.loan)}</td><td class="mono">${kr(r.value)}</td><td class="mono">${kr(r.equity)}</td></tr>`).join("")}</tbody>
         </table></div>
-        <p class="dim" style="font-size:.8rem;margin:8px 0 0">*After ränteavdrag. Assumes every krona left over goes to savings. ${S.value.mode === "manual" ? "" : `In year 5 the trend's 95 % range for the apartment's value is ${kr(P[4].valueLo)} to ${kr(P[4].valueHi)}.`} Historic prices are in nominal kronor, so in today's money the value growth is roughly 2 points lower.</p>
+        <p class="dim" style="font-size:.8rem;margin:8px 0 0">*Efter ränteavdrag. Antar att varje krona som blir över sparas. ${S.value.mode === "manual" ? "" : `År 5 är trendens 95 %-intervall för lägenhetens värde ${kr(P[4].valueLo)} till ${kr(P[4].valueHi)}.`} Historiska priser är i nominella kronor, så i dagens penningvärde är värdeökningen ungefär 2 procentenheter lägre.</p>
       </section>`;
   },
 
   value() {
     const V = S.value;
     return `
-      <div class="lead"><h1>Area prices</h1>
-      <p>Inner-city areas only, innanför tullarna. Yearly average price per kvm for bostadsrätter, from <a href="${PRICE_SOURCE}" target="_blank" rel="noopener">Svensk Mäklarstatistik</a> (to 2025). A log-linear regression gives the average yearly growth over the period you pick and a 95 % range for the next five years. A trend describes the past: Stockholm prices fell about 10 % in 2017–18 and again in 2022–23.</p></div>
+      <div class="lead"><h1>Områdespriser</h1>
+      <p>Bara områden innanför tullarna. Genomsnittligt pris per kvm för bostadsrätter per år, från <a href="${PRICE_SOURCE}" target="_blank" rel="noopener">Svensk Mäklarstatistik</a> (till 2025). En log-linjär regression ger den genomsnittliga årliga ökningen under perioden du väljer och ett 95 %-intervall för de kommande fem åren. En trend beskriver det som har varit: priserna i Stockholm föll ungefär 10 % 2017–18 och igen 2022–23.</p></div>
       <div class="bench">
-        <div class="stack"><section class="panel"><h3>Area and method</h3>
-          <div class="field"><label for="f-varea">Area</label><select id="f-varea" data-path="value.area">${Object.entries(AREAS).map(([k, a]) => `<option value="${k}" ${V.area === k ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
-          <div class="field"><label>Years in the regression</label><div class="seg">${[[0, "All"], [15, "15"], [10, "10"], [5, "5"]].map(([w, l]) => `<button data-set="value.win" data-val="${w}" aria-pressed="${+V.win === w}">${l}</button>`).join("")}</div>
-          <small>Older years include the 2005–2017 boom. Recent years reflect today's higher rates.</small></div>
-          <div class="field"><label>Growth used in your 5-year budget</label><div class="seg">
+        <div class="stack"><section class="panel"><h3>Område och metod</h3>
+          <div class="field"><label for="f-varea">Område</label><select id="f-varea" data-path="value.area">${Object.entries(AREAS).map(([k, a]) => `<option value="${k}" ${V.area === k ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div>
+          <div class="field"><label>År i regressionen</label><div class="seg">${[[0, "Alla"], [15, "15"], [10, "10"], [5, "5"]].map(([w, l]) => `<button data-set="value.win" data-val="${w}" aria-pressed="${+V.win === w}">${l}</button>`).join("")}</div>
+          <small>Äldre år innehåller uppgången 2005–2017. De senaste åren speglar dagens högre räntor.</small></div>
+          <div class="field"><label>Ökning i din femårsbudget</label><div class="seg">
             <button data-set="value.mode" data-val="regression" aria-pressed="${V.mode !== "manual"}">Regression</button>
-            <button data-set="value.mode" data-val="manual" aria-pressed="${V.mode === "manual"}">Fixed</button></div></div>
-          ${V.mode === "manual" ? numField("value.manual", "Fixed growth", "% / year", "", "0.5") : ""}
+            <button data-set="value.mode" data-val="manual" aria-pressed="${V.mode === "manual"}">Fast</button></div></div>
+          ${V.mode === "manual" ? numField("value.manual", "Fast ökning", "% / år", "", "0.5") : ""}
         </section>
         <div id="out-growth">${VIEWS.growthOut()}</div></div>
         <div class="stack" id="out-value">${VIEWS.valueOut()}</div>
@@ -1183,9 +1195,9 @@ const VIEWS = {
   },
   growthOut() {
     const V = S.value;
-    const wins = [[0, "All years"], [15, "15 years"], [10, "10 years"], [5, "5 years"]].map(([w, l]) => ({ w, l, r: regress(V.area, w) }));
-    return `      <section class="panel"><h3>Growth depends on the period you look at</h3>
-        <dl class="kv">${wins.map((o) => `<dt>${o.l} (${o.r.pts[0][0]}–${o.r.pts.at(-1)[0]})</dt><dd>${pct(o.r.g * 100, 1)} / year</dd>`).join("")}</dl>
+    const wins = [[0, "Alla år"], [15, "15 år"], [10, "10 år"], [5, "5 år"]].map(([w, l]) => ({ w, l, r: regress(V.area, w) }));
+    return `      <section class="panel"><h3>Ökningen beror på vilken period du tittar på</h3>
+        <dl class="kv">${wins.map((o) => `<dt>${o.l} (${o.r.pts[0][0]}–${o.r.pts.at(-1)[0]})</dt><dd>${pct(o.r.g * 100, 1)} / år</dd>`).join("")}</dl>
 
       </section>`;
   },
@@ -1203,7 +1215,7 @@ const VIEWS = {
     const xt = []; for (let yr = Math.ceil(x0 / 5) * 5; yr <= x1; yr += 5) xt.push(yr);
     const fitFrom = R.pts[0][0], fit = []; for (let yr = fitFrom; yr <= BUY_YEAR - 1; yr++) fit.push([yr, R.pred(yr).mid]);
     const band = proj.map(([yr, p]) => `${x(yr)},${y(p.hi)}`).join(" ") + " " + proj.slice().reverse().map(([yr, p]) => `${x(yr)},${y(p.lo)}`).join(" ");
-    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price per kvm history and trend for ${esc(A.name)}" style="width:100%;height:auto;display:block">
+    const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pris per kvm över tid och trend för ${esc(A.name)}" style="width:100%;height:auto;display:block">
       ${ticks.map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v ? nf.format(v / 1000) + "k" : "0"}</text>`).join("")}
       ${xt.map((yr) => `<text x="${x(yr)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${yr}</text>`).join("")}
       <rect x="${x(fitFrom) - 4}" y="${T}" width="${x(BUY_YEAR - 1) - x(fitFrom) + 8}" height="${H - T - B}" fill="var(--accent-soft)" opacity=".5"/>
@@ -1218,14 +1230,14 @@ const VIEWS = {
     const v5 = valueAt(price, 5), pR = R.pred(x1);
     return `
       <section class="panel">
-        <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="eyebrow">${esc(A.name)} · kr/kvm</span><span class="dim" style="font-size:.78rem">Dots: actual · line: fitted trend · dashed: projection with 95 % range</span></div>
+        <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="eyebrow">${esc(A.name)} · kr/kvm</span><span class="dim" style="font-size:.78rem">Prickar: verkliga priser · linje: anpassad trend · streckad: prognos med 95 %-intervall</span></div>
         <div style="overflow-x:auto">${svg}</div>
       </section>
       <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-        <div class="tile" style="cursor:default"><span class="eyebrow">Trend growth</span><span class="v">${pct(R.g * 100, 1)}</span><span class="s">a year, ${R.pts[0][0]}–${R.pts.at(-1)[0]} · R² ${R.r2.toFixed(2).replace(".", ",")}</span></div>
-        <div class="tile" style="cursor:default"><span class="eyebrow">Last 3 months</span><span class="v">${nf.format(A.now)}</span><span class="s">kr/kvm, to 8 Oct 2026</span></div>
-        <div class="tile" style="cursor:default"><span class="eyebrow">Area in ${x1}</span><span class="v">${nf.format(pR.mid)}</span><span class="s">kr/kvm, range ${nf.format(pR.lo)}–${nf.format(pR.hi)}</span></div>
-        <div class="tile" style="cursor:default"><span class="eyebrow">Your ${mkr(price)} apartment in ${x1}</span><span class="v">${mkr(v5.mid)}</span><span class="s">range ${mkr(v5.lo)}–${mkr(v5.hi)}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Trendökning</span><span class="v">${pct(R.g * 100, 1)}</span><span class="s">per år, ${R.pts[0][0]}–${R.pts.at(-1)[0]} · R² ${R.r2.toFixed(2).replace(".", ",")}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Senaste 3 månaderna</span><span class="v">${nf.format(A.now)}</span><span class="s">kr/kvm, till 8 okt 2026</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Området ${x1}</span><span class="v">${nf.format(pR.mid)}</span><span class="s">kr/kvm, intervall ${nf.format(pR.lo)}–${nf.format(pR.hi)}</span></div>
+        <div class="tile" style="cursor:default"><span class="eyebrow">Din lägenhet för ${mkr(price)} år ${x1}</span><span class="v">${mkr(v5.mid)}</span><span class="s">intervall ${mkr(v5.lo)}–${mkr(v5.hi)}</span></div>
       </div>
 `;
   },
@@ -1233,39 +1245,39 @@ const VIEWS = {
   bid() {
     const B = S.bid;
     return `
-      <div class="lead"><h1>Bidding</h1>
-      <p>Research on Swedish and Norwegian bidding gives a mixed answer. A big jump bid can scare off rivals and win you the apartment, but auctions with jump bids also tend to end at a higher price. The bigger risk is psychological: getting carried away and bidding past what you can afford.</p></div>
+      <div class="lead"><h1>Budgivning</h1>
+      <p>Forskningen om svenska och norska budgivningar ger ett blandat svar. Ett stort hoppbud kan skrämma bort konkurrenter och ge dig lägenheten, men budgivningar med hoppbud brukar också sluta på ett högre pris. Den större risken är psykologisk: att ryckas med och bjuda mer än du har råd med.</p></div>
       <div class="bench">
         <div class="stack">
-          <section class="panel"><h3>Your bidding plan</h3>
-            ${numField("bid.ask", "Asking price (utgångspris)", "kr", "", "25000")}
-            ${numField("bid.walk", "Your walk-away price", "kr", "The most you'll pay. Decide it before bidding starts and don't change it during the bidding.", "25000")}
-            ${numField("bid.step", "Normal increment", "kr", "Stockholm brokers usually expect at least 10 000–25 000 kr per bid.", "5000")}
+          <section class="panel"><h3>Din budplan</h3>
+            ${numField("bid.ask", "Utgångspris", "kr", "", "25000")}
+            ${numField("bid.walk", "Ditt maxbud", "kr", "Det mesta du betalar. Bestäm det innan budgivningen börjar och ändra det inte under tiden.", "25000")}
+            ${numField("bid.step", "Vanlig höjning", "kr", "Mäklare i Stockholm brukar vänta sig minst 10 000–25 000 kr per bud.", "5000")}
             ${numField("fin.targetAvgift", "Avgift", "kr/mån", "", "100")}
-            <div class="row" style="margin-top:10px"><button class="btn" data-act="walk-max">Set walk-away to my max</button></div>
+            <div class="row" style="margin-top:10px"><button class="btn" data-act="walk-max">Sätt maxbudet till mitt maxpris</button></div>
           </section>
-          <section class="panel"><h3>Before you place the first bid</h3>
+          <section class="panel"><h3>Innan du lägger första budet</h3>
             <ul style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.9rem">
-              <li>Write your walk-away price down, and tell it to someone who will hold you to it.</li>
-              <li>Look up what similar apartments in the förening and nearby actually sold for (slutpriser). Ignore the asking price: it is often set low to draw bidders.</li>
-              <li>Ask the broker how the bidding works: deadlines, whether they take bids before the viewing, and when the seller decides.</li>
-              <li>Have your lånelöfte ready and check that it covers your walk-away price.</li>
-              <li>Check the förening's årsredovisning before bidding, not after you've won.</li>
-              <li>Agree beforehand who answers the broker's texts, if you buy together. Two people bidding from two phones is how plans slip.</li>
-              <li>Ask how long each round stays open. A deadline is the broker's tool for pressure; you can still take ten minutes before you answer.</li>
+              <li>Skriv ner ditt maxbud och berätta det för någon som håller dig till det.</li>
+              <li>Kolla vad liknande lägenheter i föreningen och i närheten faktiskt såldes för (slutpriser). Strunta i utgångspriset: det sätts ofta lågt för att locka budgivare.</li>
+              <li>Fråga mäklaren hur budgivningen går till: tidsgränser, om de tar emot bud före visningen och när säljaren bestämmer sig.</li>
+              <li>Ha lånelöftet klart och kolla att det räcker till ditt maxbud.</li>
+              <li>Läs föreningens årsredovisning innan du bjuder, inte efter att du har vunnit.</li>
+              <li>Bestäm i förväg vem som svarar på mäklarens sms om ni köper tillsammans. Två personer som bjuder från två telefoner är hur planer spricker.</li>
+              <li>Fråga hur länge varje runda är öppen. En tidsgräns är mäklarens sätt att sätta press; du kan ändå ta tio minuter innan du svarar.</li>
             </ul>
           </section>
         </div>
         <div class="stack" id="out-bid">${VIEWS.bidOut()}</div>
       </div>
-      <section class="panel" style="margin-top:20px"><h3>What the research says</h3>
+      <section class="panel" style="margin-top:20px"><h3>Vad forskningen säger</h3>
         <div class="evid">
-          <div><span class="chip warn">Stockholm apartments</span><p><strong>Large jumps reduce competition</strong>, but a higher average bid increment goes with a higher final price. A low asking price did not attract more bidders or raise the price. 629 inner-city sales, 2010–11.</p><a href="https://www.emerald.com/jerer/article-abstract/11/2/202/215521/An-analysis-of-auction-strategies-in-apartment" target="_blank" rel="noopener">Hungria-Gunnelin, Journal of European Real Estate Research, 2018 ↗</a></div>
-          <div><span class="chip warn">Norway</span><p>Auctions with jump bids ended <strong>about 2.8–9.3 % higher</strong> than auctions with only small steps. Bidders said they jump to intimidate and to signal, and some rivals dropped out because they felt intimidated. Data from 1 142 bid logs and a survey of 1 803 bidders.</p><a href="https://ntnuopen.ntnu.no/ntnu-xmlui/handle/11250/2675844" target="_blank" rel="noopener">Khazal, Sønstebø, Olaussen &amp; Oust, Journal of Property Research, 2020 ↗</a></div>
-          <div><span class="chip info">Swedish houses</span><p>A jump bid during the auction raised both the price and <strong>the jump bidder's chance of winning</strong>, but it rarely ended the auction.</p><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4517555" target="_blank" rel="noopener">Gunnelin, Hungria-Gunnelin, MacGregor &amp; Wersing, SSRN working paper ↗</a></div>
-          <div><span class="chip bad">Psychology</span><p><strong>Auction fever</strong>: rivalry, time pressure and other people watching all push people to bid more than they planned. That describes a Stockholm bidding round, with SMS updates arriving one after another until a deadline.</p><span class="dim" style="font-size:.82rem">Ku, Malhotra &amp; Murnighan, Organizational Behavior and Human Decision Processes 96, 2005</span></div>
+          <div><span class="chip warn">Lägenheter i Stockholm</span><p><strong>Stora hopp minskar konkurrensen</strong>, men större genomsnittliga budhöjningar hänger ihop med högre slutpris. Ett lågt utgångspris lockade inte fler budgivare och höjde inte priset. 629 försäljningar i innerstaden 2010–11.</p><a href="https://www.emerald.com/jerer/article-abstract/11/2/202/215521/An-analysis-of-auction-strategies-in-apartment" target="_blank" rel="noopener">Hungria-Gunnelin, Journal of European Real Estate Research, 2018 ↗</a></div>
+          <div><span class="chip warn">Norge</span><p>Budgivningar med hoppbud slutade <strong>ungefär 2,8–9,3 % högre</strong> än budgivningar med bara små steg. Budgivarna sa att de hoppar för att skrämma och signalera, och vissa konkurrenter hoppade av för att de kände sig skrämda. Underlag: 1 142 budlistor och en enkät med 1 803 budgivare.</p><a href="https://ntnuopen.ntnu.no/ntnu-xmlui/handle/11250/2675844" target="_blank" rel="noopener">Khazal, Sønstebø, Olaussen &amp; Oust, Journal of Property Research, 2020 ↗</a></div>
+          <div><span class="chip info">Svenska villor</span><p>Ett hoppbud under budgivningen höjde både priset och <strong>hoppbudgivarens chans att vinna</strong>, men avslutade sällan budgivningen.</p><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4517555" target="_blank" rel="noopener">Gunnelin, Hungria-Gunnelin, MacGregor &amp; Wersing, SSRN working paper ↗</a></div>
+          <div><span class="chip bad">Psykologi</span><p><strong>Budgivningsfeber</strong>: rivalitet, tidspress och att andra tittar på får folk att bjuda mer än de tänkt. Det beskriver en budgivning i Stockholm, med sms som kommer ett efter ett fram till en tidsgräns.</p><span class="dim" style="font-size:.82rem">Ku, Malhotra &amp; Murnighan, Organizational Behavior and Human Decision Processes 96, 2005</span></div>
         </div>
-        <p class="note" style="margin:14px 0 0"><strong>The rules:</strong> in Sweden a bid binds nobody. Only a written contract signed by both sides makes the sale binding (bostadsrättslagen 6 kap. 4 §). You can withdraw, and the seller can pick any bidder or stop the sale. The broker must keep a budlista and hand it to the buyer and seller, so ask for it. See <a href="https://seb.se/privat/bolan/bostadsguide/budgivning-och-kontrakt" target="_blank" rel="noopener">SEB's guide to bidding and contracts</a> and <a href="https://www.hemnet.se/guider/dolt-bud" target="_blank" rel="noopener">Hemnet on hidden bids</a>.</p>
+        <p class="note" style="margin:14px 0 0"><strong>Reglerna:</strong> i Sverige är ett bud inte bindande för någon. Först ett skriftligt kontrakt som båda parter skrivit under gör köpet bindande (bostadsrättslagen 6 kap. 4 §). Du kan dra dig ur, och säljaren kan välja vilken budgivare som helst eller avbryta försäljningen. Mäklaren måste föra en budlista och lämna den till köpare och säljare, så be om den. Läs <a href="https://seb.se/privat/bolan/bostadsguide/budgivning-och-kontrakt" target="_blank" rel="noopener">SEB:s guide om budgivning och kontrakt</a> och <a href="https://www.hemnet.se/guider/dolt-bud" target="_blank" rel="noopener">Hemnet om dolda bud</a>.</p>
       </section>`;
   },
   bidOut() {
@@ -1280,27 +1292,27 @@ const VIEWS = {
     // Suggested plan: open near asking, small steps through the middle, one firm jump to around 90 % of the walk-away price, then stop at the walk-away price
     const jumpTo = Math.floor((ask + over * 0.9) / 5000) * 5000;
     const plan = over <= 0 ? [] : [
-      ["Opening", "Bid at or just above the asking price, if bidding hasn't started.", ask],
-      ["Middle", `Raise by about ${kr(step)} at a time. Don't answer within seconds: waiting a few minutes before each bid stops you reacting on impulse, and doesn't show how eager you are.`, Math.min(walk, ask + step * 4)],
-      ["Late jump (optional)", "If only one or two rivals are left, one firm jump can signal you'll go further. Research suggests it can help you win, but it raises the price.", Math.max(ask, jumpTo)],
-      ["Walk-away", "Stop here. A bid binds nobody, so the seller may still come back to you if the winner drops out.", walk],
+      ["Öppning", "Bjud utgångspriset eller strax över, om budgivningen inte har börjat.", ask],
+      ["Mitten", `Höj med ungefär ${kr(step)} i taget. Svara inte inom sekunder: att vänta några minuter före varje bud hindrar dig från att agera på impuls och visar inte hur ivrig du är.`, Math.min(walk, ask + step * 4)],
+      ["Sent hopp (om du vill)", "Om bara en eller två konkurrenter är kvar kan ett bestämt hopp visa att du tänker gå längre. Forskningen tyder på att det kan hjälpa dig att vinna, men det höjer priset.", Math.max(ask, jumpTo)],
+      ["Maxbud", "Stanna här. Ett bud är inte bindande, så säljaren kan fortfarande höra av sig till dig om vinnaren hoppar av.", walk],
     ];
     return `
       <section class="panel">
-        <span class="eyebrow">Room between asking and walk-away</span>
+        <span class="eyebrow">Utrymme mellan utgångspris och maxbud</span>
         <div class="bigfig" style="color:${over < 0 ? "var(--bad)" : "var(--ink)"}">${over >= 0 ? "+" : ""}${kr(over).replace(" kr", "")}<small> kr</small></div>
-        <p class="dim" style="margin:4px 0 0">${ask ? pct(over / ask * 100, 1) + " above asking. " : ""}${over < 0 ? "The asking price is already above your walk-away price. Skip this one, or wait and see if it doesn't sell." : `Monthly cost at your walk-away price: <strong style="color:var(--ink)">${kr(monthlyCost(walk, S.fin.targetAvgift, cr.rate).total)}</strong>.`}</p>
+        <p class="dim" style="margin:4px 0 0">${ask ? pct(over / ask * 100, 1) + " över utgångspriset. " : ""}${over < 0 ? "Utgångspriset är redan över ditt maxbud. Hoppa över den här, eller vänta och se om den inte blir såld." : `Månadskostnad vid ditt maxbud: <strong style="color:var(--ink)">${kr(monthlyCost(walk, S.fin.targetAvgift, cr.rate).total)}</strong>.`}</p>
       </section>
-      ${plan.length ? `<section class="panel"><h3>A suggested bidding plan</h3>
+      ${plan.length ? `<section class="panel"><h3>Ett förslag på budplan</h3>
         <ol class="steps">${plan.map(([t, d, v], i) => `<li class="step"><div><h4>${t}</h4><p>${d}</p></div><span class="mono" style="font-weight:700;white-space:nowrap">${kr(v)}</span></li>`).join("")}</ol>
       </section>` : ""}
-      <section class="panel"><h3>What each extra bid really costs</h3>
-        <p class="dim" style="margin:-6px 0 10px;font-size:.86rem">During the bidding, 50 000 kr can feel like a small step. Here is what it adds at your plan rate of ${pct(cr.rate)}.</p>
+      <section class="panel"><h3>Vad varje extra bud faktiskt kostar</h3>
+        <p class="dim" style="margin:-6px 0 10px;font-size:.86rem">Under budgivningen kan 50 000 kr kännas som ett litet steg. Så här mycket lägger det till med räntan i din plan, ${pct(cr.rate)}.</p>
         <div class="tablewrap"><table>
-          <thead><tr><th>Bid higher by</th><th>Per month</th><th>Interest over 5 years</th><th>More cash at contract</th></tr></thead>
+          <thead><tr><th>Bjud mer med</th><th>Per månad</th><th>Ränta på 5 år</th><th>Mer kontant vid kontrakt</th></tr></thead>
           <tbody>${steps.map((r) => `<tr><td class="mono">+${kr(r.d)}</td><td class="mono">+${kr(r.month)}</td><td class="mono">+${kr(r.five)}</td><td class="mono">+${kr(r.cash)}</td></tr>`).join("")}</tbody>
         </table></div>
-        <p class="dim" style="font-size:.8rem;margin:8px 0 0">The monthly cost includes interest after ränteavdrag and amortering. The 5-year column counts interest only, since amortering goes back into your own equity.</p>
+        <p class="dim" style="font-size:.8rem;margin:8px 0 0">Månadskostnaden räknar med ränta efter ränteavdrag och amortering. Femårskolumnen räknar bara räntan, eftersom amorteringen går tillbaka till ditt eget kapital.</p>
       </section>`;
   },
 
@@ -1309,28 +1321,28 @@ const VIEWS = {
     const searchTo = Math.floor(a.max * (1 - s.headroom / 100) / 50000) * 50000;
     const using = +S.show.f.maxPrice === searchTo;
     return `
-      <div class="lead"><h1>Saved apartments</h1>
-      <p>What each one costs per month, how healthy the förening looks and, once bidding starts, how it goes bid by bid. Save one from Showings with the heart, or add it here with a link to the agent's page.</p></div>
+      <div class="lead"><h1>Sparade lägenheter</h1>
+      <p>Vad varje lägenhet kostar i månaden, hur frisk föreningen ser ut och, när budgivningen börjar, hur den går bud för bud. Spara en från Visningar med hjärtat, eller lägg till den här med en länk till mäklarens sida.</p></div>
       <div class="bench rev">
         <div>
-          <div class="row" style="margin:0 0 12px"><span class="dim" style="font-size:13px">${S.apts.length} saved</span><span class="spacer"></span><button class="btn" data-act="add-apt">Add apartment</button></div>
-          <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">Nothing saved yet. Press Save on a showing to follow it here.</div>`}</div>
+          <div class="row" style="margin:0 0 12px"><span class="dim" style="font-size:13px">${S.apts.length} sparade</span><span class="spacer"></span><button class="btn" data-act="add-apt">Lägg till lägenhet</button></div>
+          <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">Inget sparat än. Tryck på hjärtat på en visning för att följa den här.</div>`}</div>
         </div>
         <div class="stack">
-          <section class="panel"><h3>How high to search</h3>
-            ${numField("search.headroom", "Room for bidding above asking", "%", "Stockholm apartments often sell above the asking price, so search below your max.", "1")}
-            <span class="eyebrow">Search asking prices up to</span>
+          <section class="panel"><h3>Hur högt du ska söka</h3>
+            ${numField("search.headroom", "Utrymme för bud över utgångspriset", "%", "Lägenheter i Stockholm säljs ofta över utgångspriset, så sök under ditt max.", "1")}
+            <span class="eyebrow">Sök utgångspriser upp till</span>
             <div class="bigfig">${kr(searchTo).replace(" kr", "")}<small> kr</small></div>
-            <p class="dim" style="margin:4px 0 14px">${s.headroom} % below your max of ${kr(a.max)}. Showings searches up to ${kr(S.show.f.maxPrice)}.</p>
-            ${using ? `<span class="chip good">Showings uses this</span>` : `<button class="btn" data-act="use-searchto">Use it in Showings</button>`}
+            <p class="dim" style="margin:4px 0 14px">${s.headroom} % under ditt max på ${kr(a.max)}. Visningar söker upp till ${kr(S.show.f.maxPrice)}.</p>
+            ${using ? `<span class="chip good">Används i Visningar</span>` : `<button class="btn" data-act="use-searchto">Använd det i Visningar</button>`}
           </section>
-          <section class="panel"><h3>What to check in the förening</h3>
+          <section class="panel"><h3>Det här ska du kolla i föreningen</h3>
             <dl class="kv" style="font-size:.86rem">
-              <dt>Debt per kvm (belåning/kvm)</dt><dd>&lt; 5 000 good · &gt; 15 000 risky</dd>
-              <dt>Avgift per kvm per year</dt><dd>&lt; 700 kr is low for Stockholm</dd>
-              <dt>Stambyte (pipes)</dt><dd>Done, or planned and paid for?</dd>
-              <dt>Äkta förening</dt><dd>Needed for normal tax rules</dd>
-              <dt>Tomträtt</dt><dd>Leased land can raise the avgift</dd>
+              <dt>Skuld per kvm (belåning/kvm)</dt><dd>&lt; 5 000 bra · &gt; 15 000 riskabelt</dd>
+              <dt>Avgift per kvm och år</dt><dd>&lt; 700 kr är lågt för Stockholm</dd>
+              <dt>Stambyte</dt><dd>Gjort, eller planerat och betalt?</dd>
+              <dt>Äkta förening</dt><dd>Krävs för vanliga skatteregler</dd>
+              <dt>Tomträtt</dt><dd>Hyrd mark kan höja avgiften</dd>
             </dl>
           </section>
         </div>
@@ -1341,11 +1353,11 @@ const VIEWS = {
     const f = S.furn, ft = furnitureTotal();
     const ti = TIERS.findIndex((t) => t[0] === f.tier);
     return `
-      <div class="lead"><h1>Furnishing</h1>
-      <p>Prices are typical Swedish 2026 prices for each level. Tick what you already own, change quantities, or type your own price. ${S.fin.reserveFurniture ? "This total is set aside from your savings in your max-price calculation." : ""}</p></div>
+      <div class="lead"><h1>Möbler</h1>
+      <p>Priserna är vanliga svenska priser 2026 för varje nivå. Kryssa i det du redan har, ändra antal eller skriv in ett eget pris. ${S.fin.reserveFurniture ? "Summan avsätts från ditt sparande när ditt maxpris räknas ut." : ""}</p></div>
       <div class="row" style="margin-bottom:16px">
         <div class="seg">${TIERS.map(([k, l]) => `<button data-set="furn.tier" data-val="${k}" aria-pressed="${f.tier === k}">${l}</button>`).join("")}</div>
-        <label class="row" style="gap:6px;font-size:.9rem"><input type="checkbox" data-check="furn.essentialsOnly" ${f.essentialsOnly ? "checked" : ""}> Essentials only</label>
+        <label class="row" style="gap:6px;font-size:.9rem"><input type="checkbox" data-check="furn.essentialsOnly" ${f.essentialsOnly ? "checked" : ""}> Bara det nödvändiga</label>
         <span class="spacer"></span>
         <div id="out-furn" class="row">${VIEWS.furnOut()}</div>
       </div>
@@ -1356,39 +1368,39 @@ const VIEWS = {
           ${shown.map(([id, name, prices, qty0, ess]) => {
             const st = f.items[id] || {};
             return `<div class="item ${st.have ? "have" : ""}">
-              <input type="checkbox" title="I already have this" aria-label="Already have ${esc(name)}" data-have="${id}" ${st.have ? "checked" : ""}>
-              <span class="nm">${esc(name)} ${ess ? '<span class="ess">Essential</span>' : ""}</span>
-              <span class="num" title="Quantity">${numInput(`aria-label="Quantity" data-qty="${id}"`, st.qty ?? qty0, "2.6em")}<span>st</span></span>
-              <span class="num">${numInput(`aria-label="Price each" data-price="${id}"${st.price != null ? ' data-custom' : ""}`, st.price ?? prices[ti])}<span>kr</span></span>
+              <input type="checkbox" title="Jag har redan det här" aria-label="Har redan ${esc(name)}" data-have="${id}" ${st.have ? "checked" : ""}>
+              <span class="nm">${esc(name)} ${ess ? '<span class="ess">Nödvändig</span>' : ""}</span>
+              <span class="num" title="Antal">${numInput(`aria-label="Antal" data-qty="${id}"`, st.qty ?? qty0, "2.6em")}<span>st</span></span>
+              <span class="num">${numInput(`aria-label="Pris styck" data-price="${id}"${st.price != null ? ' data-custom' : ""}`, st.price ?? prices[ti])}<span>kr</span></span>
             </div>`;
           }).join("")}
         </section>`;
       }).join("")}
-        <section class="panel room"><h4>Your own items<span>${kr(f.extra.reduce((a, x) => a + (x.have ? 0 : (+x.price || 0) * (+x.qty || 1)), 0))}</span></h4>
+        <section class="panel room"><h4>Egna saker<span>${kr(f.extra.reduce((a, x) => a + (x.have ? 0 : (+x.price || 0) * (+x.qty || 1)), 0))}</span></h4>
           ${f.extra.map((x) => `<div class="item ${x.have ? "have" : ""}">
-            <input type="checkbox" aria-label="Already have" data-xhave="${x.id}" ${x.have ? "checked" : ""}>
-            <input type="text" aria-label="Item name" data-xname="${x.id}" value="${esc(x.name)}" placeholder="Item">
-            <span class="num">${numInput(`aria-label="Price" data-xprice="${x.id}"`, x.price)}<span>kr</span></span>
-            <button class="btn ghost" data-act="del-extra" data-id="${x.id}" >Remove</button>
+            <input type="checkbox" aria-label="Har redan" data-xhave="${x.id}" ${x.have ? "checked" : ""}>
+            <input type="text" aria-label="Namn" data-xname="${x.id}" value="${esc(x.name)}" placeholder="Sak">
+            <span class="num">${numInput(`aria-label="Pris" data-xprice="${x.id}"`, x.price)}<span>kr</span></span>
+            <button class="btn ghost" data-act="del-extra" data-id="${x.id}" >Ta bort</button>
           </div>`).join("")}
-          <button class="btn" style="margin-top:8px" data-act="add-extra">Add item</button>
+          <button class="btn" style="margin-top:8px" data-act="add-extra">Lägg till sak</button>
         </section>
       </div>
-      <p class="dim" style="font-size:.8rem;margin-top:14px">Tip: Blocket, Sellpy and Facebook Marketplace often sell solid furniture for a third of the new price. IKEA delivery in Stockholm costs extra, so plan for it in moving.</p>`;
+      <p class="dim" style="font-size:.8rem;margin-top:14px">Tips: på Blocket, Sellpy och Facebook Marketplace finns ofta bra möbler för en tredjedel av nypriset. IKEA:s leverans i Stockholm kostar extra, så räkna med den i flytten.</p>`;
   },
   furnOut() {
     const ft = furnitureTotal();
     const byTier = TIERS.map(([k, l]) => `${l}: ${kr(furnitureTotal(k).total)}`).join(" · ");
-    return `<div style="text-align:right"><div class="eyebrow">To buy</div><div class="mono" style="font-size:1.5rem;font-weight:500">${kr(ft.total)}</div><div class="dim" style="font-size:.78rem">${byTier}${ft.have ? " · you already own " + kr(ft.have) : ""}</div></div>`;
+    return `<div style="text-align:right"><div class="eyebrow">Att köpa</div><div class="mono" style="font-size:1.5rem;font-weight:500">${kr(ft.total)}</div><div class="dim" style="font-size:.78rem">${byTier}${ft.have ? " · du har redan för " + kr(ft.have) : ""}</div></div>`;
   },
 
   steps() {
     const done = STEPS.filter((s) => S.steps[s[0]]).length;
     return `
-      <div class="lead"><h1>Buying steps</h1>
-      <p>The order a bostadsrätt purchase in Stockholm usually follows. Tick each step as you go.</p></div>
+      <div class="lead"><h1>Steg i köpet</h1>
+      <p>Ordningen ett köp av en bostadsrätt i Stockholm brukar följa. Kryssa i varje steg när du är klar med det.</p></div>
       <div class="panel">
-        <div class="row" style="margin-bottom:6px"><span class="mono">${done} of ${STEPS.length} done</span></div>
+        <div class="row" style="margin-bottom:6px"><span class="mono">${done} av ${STEPS.length} klara</span></div>
         <div class="progress"><b style="width:${(done / STEPS.length * 100).toFixed(0)}%"></b></div>
         <ol class="steps two" style="margin-top:8px">${STEPS.map(([id, t, d], i) => `
           <li class="step ${S.steps[id] ? "done" : ""}"><input type="checkbox" aria-label="${esc(t)}" data-step="${id}" ${S.steps[id] ? "checked" : ""}><div><h4>${esc(t)}</h4><p>${esc(d)}</p></div></li>`).join("")}
@@ -1411,24 +1423,24 @@ function aptCard(p) {
   const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num">${numInput(`data-apt="${p.id}" data-k="${k}" aria-label="${esc(label)}"`, p[k])}<span>${unit}</span></span></label>`;
   const photo = p.photo || ((LIST.items[p.link] || {}).photos || [])[0];
   return `<article class="apt ${photo ? "has-photo" : ""}">
-    ${photo ? `<a class="apt-photo" href="${esc(p.link || photo)}" target="_blank" rel="noopener"><img src="${esc(photo)}" alt="Photo of ${esc(p.address)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
+    ${photo ? `<a class="apt-photo" href="${esc(p.link || photo)}" target="_blank" rel="noopener"><img src="${esc(photo)}" alt="Foto på ${esc(p.address)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="apt-head">
-      ${p.example ? '<span class="chip ex">Example</span>' : ""}
-      <input type="text" aria-label="Address" data-apt="${p.id}" data-k="address" value="${esc(p.address)}" placeholder="Address, area">
-      <select aria-label="Status" data-apt="${p.id}" data-k="status">${["Watching", "Viewing booked", "Viewed", "Bidding", "Passed", "Won"].map((s) => `<option ${p.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
-      <button class="btn ghost" data-act="del-apt" data-id="${p.id}">Remove</button>
+      ${p.example ? '<span class="chip ex">Exempel</span>' : ""}
+      <input type="text" aria-label="Adress" data-apt="${p.id}" data-k="address" value="${esc(p.address)}" placeholder="Adress, område">
+      <select aria-label="Status" data-apt="${p.id}" data-k="status">${Object.entries(STATUS_SV).map(([s, l]) => `<option value="${s}" ${p.status === s ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <button class="btn ghost" data-act="del-apt" data-id="${p.id}">Ta bort</button>
     </div>
     <div class="stack" style="gap:10px">
       <div class="apt-grid">
-        ${f("price", "Asking price", "kr", "25000")}
-        ${f("bid", "Your expected final price", "kr", "25000")}
+        ${f("price", "Utgångspris", "kr", "25000")}
+        ${f("bid", "Väntat slutpris", "kr", "25000")}
         ${f("avgift", "Avgift", "kr/mån", "100")}
-        ${f("kvm", "Living area", "kvm", "1")}
-        ${f("rooms", "Rooms", "rok", "0.5")}
-        ${f("debtKvm", "Förening debt per kvm", "kr", "500")}
+        ${f("kvm", "Boarea", "kvm", "1")}
+        ${f("rooms", "Rum", "rok", "0.5")}
+        ${f("debtKvm", "Föreningens skuld per kvm", "kr", "500")}
       </div>
       ${p.link ? travelLine({ url: p.link }) : ""}
-      <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Listing link<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="The estate agent's page"></label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Länk till annonsen<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="Mäklarens sida"></label>
     </div>
     <div class="apt-out" id="out-${p.id}">${aptOut(p)}</div>
     ${p.link && (LIST.followed || {})[p.link] ? `<div class="apt-bids">${bidChart(p, LIST.followed[p.link])}</div>` : ""}
@@ -1438,17 +1450,17 @@ function aptCard(p) {
 function followBlock(p) {
   const f = (LIST.followed || {})[p.link];
   if (!p.link || !/^https?:/.test(p.link)) return "";
-  if (!f) return `<p class="dim" style="font-size:12px;margin:0 0 10px">The finder follows this apartment from its next run.</p>`;
+  if (!f) return `<p class="dim" style="font-size:12px;margin:0 0 10px">Bostadsletaren följer den här lägenheten från nästa körning.</p>`;
   const ask = +p.price || 0;
-  const head = f.state === "sold" ? `<span class="chip">Sold${f.final ? " for " + kr(f.final) : ""}</span>${f.final && ask ? `<span class="dim" style="font-size:12px">${f.final >= ask ? "+" : ""}${kr(f.final - ask)} on asking</span>` : ""}`
-    : f.state === "bidding" ? `<span class="chip warn">Bidding${f.bid ? ": " + kr(f.bid) : ""}</span>${f.bid && ask && !bidChart(p, f) ? `<span class="dim" style="font-size:12px">${f.bid >= ask ? "+" : ""}${kr(f.bid - ask)} on asking${f.bids ? ", " + f.bids + " bids" : ""}</span>` : ""}`
-    : f.state === "gone" ? `<span class="chip">Taken down by the agent</span>` : `<span class="chip info">For sale, no bids yet</span>`;
+  const head = f.state === "sold" ? `<span class="chip">Såld${f.final ? " för " + kr(f.final) : ""}</span>${f.final && ask ? `<span class="dim" style="font-size:12px">${f.final >= ask ? "+" : ""}${kr(f.final - ask)} mot utgångspriset</span>` : ""}`
+    : f.state === "bidding" ? `<span class="chip warn">Budgivning${f.bid ? ": " + kr(f.bid) : ""}</span>${f.bid && ask && !bidChart(p, f) ? `<span class="dim" style="font-size:12px">${f.bid >= ask ? "+" : ""}${kr(f.bid - ask)} mot utgångspriset${f.bids ? ", " + f.bids + " bud" : ""}</span>` : ""}`
+    : f.state === "gone" ? `<span class="chip">Borttagen av mäklaren</span>` : `<span class="chip info">Till salu, inga bud än</span>`;
   return `<div class="follow"><div class="row" style="gap:8px">${head}</div></div>`;
 }
 // How the bidding has gone: each bid as a step over time, coloured by bidder, against the asking price and your max.
 // From the agent's own bid list where it shows one, else from the highest bid the finder read each day.
 const mn = (v) => (v / 1e6).toFixed(2).replace(".", ",") + " mn";
-const fmtWhen = (s) => new Date(s).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtWhen = (s) => new Date(s).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 function bidChart(p, f) {
   // Oldest first; bids in the same minute, lower first
   let pts = (f.bidList || []).slice().sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.amount - b.amount)).map((b) => ({ t: +new Date(b.at), at: b.at, v: b.amount, who: b.who }));
@@ -1477,25 +1489,25 @@ function bidChart(p, f) {
     const line = i ? `<line class="day" x1="${x(i - 0.5)}" x2="${x(i - 0.5)}" y1="${T}" y2="${H - B}"/>` : "";
     if (x(i) - lastX < 48) return line;
     lastX = x(i);
-    return `${line}<text class="ax" x="${x(i)}" y="${H - 8}" text-anchor="${i ? "middle" : "start"}">${new Date(q.t).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</text>`;
+    return `${line}<text class="ax" x="${x(i)}" y="${H - 8}" text-anchor="${i ? "middle" : "start"}">${new Date(q.t).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}</text>`;
   }).join("");
-  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bids from ${mn(first.v)} to ${mn(last.v)} kr">
+  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bud från ${mn(first.v)} till ${mn(last.v)} kr">
     ${ticks.map((v) => `<g><line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${mn(v)}</text></g>`).join("")}
-    ${ask ? ref(ask, "Asking", "ask") : ""}${showMax ? ref(max, "Your max", "max") : ""}
+    ${ask ? ref(ask, "Utgångspris", "ask") : ""}${showMax ? ref(max, "Ditt max", "max") : ""}
     <path class="steps" d="${path}"/>
-    ${pts.map((q, i) => `<g class="pt"><circle class="hit" cx="${x(i)}" cy="${y(q.v)}" r="11"/><circle class="dot b${daily ? 0 : slot(q.who)}" cx="${x(i)}" cy="${y(q.v)}" r="4.5"/><title>${kr(q.v)}${q.who ? ", bidder " + q.who : ""}, ${daily ? fmtShort(q.at) : fmtWhen(q.at)}</title></g>`).join("")}
+    ${pts.map((q, i) => `<g class="pt"><circle class="hit" cx="${x(i)}" cy="${y(q.v)}" r="11"/><circle class="dot b${daily ? 0 : slot(q.who)}" cx="${x(i)}" cy="${y(q.v)}" r="4.5"/><title>${kr(q.v)}${q.who ? ", budgivare " + q.who : ""}, ${daily ? fmtShort(q.at) : fmtWhen(q.at)}</title></g>`).join("")}
     <text class="lastv" x="${x(n - 1)}" y="${y(last.v) - 10}" text-anchor="end">${mn(last.v)}</text>
     ${days}
   </svg>`;
   const over = ask ? last.v - ask : 0;
   const bidders = order.length;
-  const facts = [daily ? `Highest bid on ${pts.length} days` : `${pts.length} bids${bidders ? ` from ${bidders} bidder${bidders > 1 ? "s" : ""}` : ""}`,
-    ask ? `${over >= 0 ? "+" : ""}${kr(over)} (${over >= 0 ? "+" : ""}${Math.round((over / ask) * 100)} %) on asking` : "",
-    daily ? `latest ${fmtShort(last.at)}` : `latest ${fmtWhen(last.at)}${last.who ? " by bidder " + last.who : ""}`,
-    showMax ? (last.v > max ? `<strong>${kr(last.v - max)} over your max</strong>` : `${kr(max - last.v)} left to your max`) : ""].filter(Boolean);
-  const legend = !daily && bidders > 1 ? `<div class="bid-legend">${order.slice(0, 8).map((w) => `<span><i class="b${slot(w)}"></i>Bidder ${esc(w)}</span>`).join("")}${bidders > 8 ? `<span><i class="b0"></i>Others</span>` : ""}</div>` : "";
+  const facts = [daily ? `Högsta bud under ${pts.length} dagar` : `${pts.length} bud${bidders ? ` från ${bidders} budgivare` : ""}`,
+    ask ? `${over >= 0 ? "+" : ""}${kr(over)} (${over >= 0 ? "+" : ""}${Math.round((over / ask) * 100)} %) mot utgångspriset` : "",
+    daily ? `senast ${fmtShort(last.at)}` : `senast ${fmtWhen(last.at)}${last.who ? " av budgivare " + last.who : ""}`,
+    showMax ? (last.v > max ? `<strong>${kr(last.v - max)} över ditt max</strong>` : `${kr(max - last.v)} kvar till ditt max`) : ""].filter(Boolean);
+  const legend = !daily && bidders > 1 ? `<div class="bid-legend">${order.slice(0, 8).map((w) => `<span><i class="b${slot(w)}"></i>Budgivare ${esc(w)}</span>`).join("")}${bidders > 8 ? `<span><i class="b0"></i>Övriga</span>` : ""}</div>` : "";
   const rows = pts.slice().reverse();
-  const table = `<details class="bid-table"><summary>${daily ? "Each day" : "All bids"}</summary><table><thead><tr><th>${daily ? "Day" : "Time"}</th>${daily ? "" : "<th>Bidder</th>"}<th>Bid</th><th>Raise</th></tr></thead><tbody>${rows.map((q, i) => {
+  const table = `<details class="bid-table"><summary>${daily ? "Varje dag" : "Alla bud"}</summary><table><thead><tr><th>${daily ? "Dag" : "Tid"}</th>${daily ? "" : "<th>Budgivare</th>"}<th>Bud</th><th>Höjning</th></tr></thead><tbody>${rows.map((q, i) => {
       const prev = rows[i + 1];
       return `<tr><td>${daily ? fmtShort(q.at) : fmtWhen(q.at)}</td>${daily ? "" : `<td>${esc(q.who || "–")}</td>`}<td>${kr(q.v)}</td><td>${prev ? (q.v - prev.v >= 0 ? "+" : "") + kr(q.v - prev.v) : ""}</td></tr>`;
     }).join("")}</tbody></table></details>`;
@@ -1506,33 +1518,35 @@ function aptOut(p) {
   const price = +p.bid || +p.price || 0;
   const mc = monthlyCost(price, p.avgift, cr.rate);
   const chips = [];
-  if (!price) chips.push(`<span class="chip info">Add a price</span>`);
-  else if (price <= a.max) chips.push(`<span class="chip good">Within budget</span>`);
-  else chips.push(`<span class="chip bad">${kr(price - a.max)} over max</span>`);
+  if (!price) chips.push(`<span class="chip info">Lägg till ett pris</span>`);
+  else if (price <= a.max) chips.push(`<span class="chip good">Inom budget</span>`);
+  else chips.push(`<span class="chip bad">${kr(price - a.max)} över max</span>`);
   const d = +p.debtKvm;
-  if (d) chips.push(d < 5000 ? `<span class="chip good">Low förening debt</span>` : d <= 15000 ? `<span class="chip warn">Moderate förening debt</span>` : `<span class="chip bad">High förening debt</span>`);
+  if (d) chips.push(d < 5000 ? `<span class="chip good">Låg skuld i föreningen</span>` : d <= 15000 ? `<span class="chip warn">Måttlig skuld i föreningen</span>` : `<span class="chip bad">Hög skuld i föreningen</span>`);
   const avgKvm = p.kvm ? (p.avgift * 12) / p.kvm : 0;
-  if (avgKvm) chips.push(avgKvm < 700 ? `<span class="chip good">Low avgift/kvm</span>` : avgKvm < 1000 ? `<span class="chip warn">Average avgift/kvm</span>` : `<span class="chip bad">High avgift/kvm</span>`);
-  return `${followBlock(p)}<div class="row" style="justify-content:space-between"><span class="eyebrow">Per month</span><span class="mono" style="font-size:1.3rem;font-weight:500">${kr(mc.total)}</span></div>
+  if (avgKvm) chips.push(avgKvm < 700 ? `<span class="chip good">Låg avgift/kvm</span>` : avgKvm < 1000 ? `<span class="chip warn">Normal avgift/kvm</span>` : `<span class="chip bad">Hög avgift/kvm</span>`);
+  // What the description says about the förening; the debt you typed in wins over the description's
+  chips.push(...flagChips(((LIST.items[p.link] || {}).flags || []).filter((f) => !(d && /skuld/i.test(f.label))), true));
+  return `${followBlock(p)}<div class="row" style="justify-content:space-between"><span class="eyebrow">Per månad</span><span class="mono" style="font-size:1.3rem;font-weight:500">${kr(mc.total)}</span></div>
     <dl class="kv" style="font-size:.82rem">
-      <dt>Interest after avdrag</dt><dd>${kr(mc.interestNet)}</dd>
+      <dt>Ränta efter avdrag</dt><dd>${kr(mc.interestNet)}</dd>
       <dt>Amortering</dt><dd>${kr(mc.amort)}</dd>
-      <dt>Avgift + running costs</dt><dd>${kr(mc.avgift + mc.running)}</dd>
-      <dt>Price per kvm</dt><dd>${p.kvm && price ? kr(price / p.kvm) : "–"}</dd>
-      <dt>Avgift per kvm/year</dt><dd>${avgKvm ? kr(avgKvm) : "–"}</dd>
-      <dt>Cash at contract (10 %)</dt><dd>${kr(price * 0.1)}</dd>
-      <dt>Value in 5 years (area trend)</dt><dd>${price ? kr(valueAt(price, 5).mid) : "–"}</dd>
+      <dt>Avgift + driftkostnader</dt><dd>${kr(mc.avgift + mc.running)}</dd>
+      <dt>Pris per kvm</dt><dd>${p.kvm && price ? kr(price / p.kvm) : "–"}</dd>
+      <dt>Avgift per kvm och år</dt><dd>${avgKvm ? kr(avgKvm) : "–"}</dd>
+      <dt>Kontant vid kontrakt (10 %)</dt><dd>${kr(price * 0.1)}</dd>
+      <dt>Värde om 5 år (områdets trend)</dt><dd>${price ? kr(valueAt(price, 5).mid) : "–"}</dd>
     </dl>
     <div class="chips">${chips.join("")}</div>
-    ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:.85rem">${esc(p.agent || "Open listing")} ↗</a>` : ""}`;
+    ${p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:.85rem">${esc(p.agent || "Öppna annonsen")} ↗</a>` : ""}`;
 }
 
 // Four sections in the menu; the less used pages sit under Money and Buying as sub-tabs
 const SECTIONS = {
-  show: ["Showings", [["show", "Showings"]]],
-  saved: ["Saved", [["search", "Saved apartments"]]],
-  money: ["Money", [["overview", "Overview"], ["money", "Finances"], ["rates", "Mortgage rates"], ["five", "5-year budget"]]],
-  buying: ["Buying", [["bid", "Bidding guide"], ["value", "Area prices"], ["furnish", "Furnishing"], ["steps", "Buying steps"]]],
+  show: ["Visningar", [["show", "Visningar"]]],
+  saved: ["Sparade", [["search", "Sparade lägenheter"]]],
+  money: ["Ekonomi", [["overview", "Översikt"], ["money", "Privatekonomi"], ["rates", "Bolåneräntor"], ["five", "Budget på 5 år"]]],
+  buying: ["Köpa", [["bid", "Budgivning"], ["value", "Områdespriser"], ["furnish", "Möbler"], ["steps", "Steg i köpet"]]],
 };
 const sectionOf = (tab) => Object.keys(SECTIONS).find((k) => SECTIONS[k][1].some(([t]) => t === tab)) || "show";
 function subnav() {
@@ -1671,7 +1685,7 @@ async function lookUpTrips() {
 
 /* ---------- The finder's status ---------- */
 const CRAWL = { state: "idle", msg: "", scheduled: null };
-const NO_SERVER = "The local server isn't answering. Start it with: .venv/bin/python server.py";
+const NO_SERVER = "Den lokala servern svarar inte. Starta den med: .venv/bin/python server.py";
 let pollTimer = null;
 function setCrawl(state, msg) {
   CRAWL.state = state; CRAWL.msg = msg;
@@ -1698,7 +1712,7 @@ async function startScrape() {
   await flush(); // so the run uses the filter on screen
   const r = await fetch("/api/scrape", { method: "POST" }).catch(() => null);
   if (!r) return setCrawl("error", NO_SERVER);
-  setCrawl("running", r.status === 409 ? "Already running" : "Starting…");
+  setCrawl("running", r.status === 409 ? "Körs redan" : "Startar…");
   pollTimer = setTimeout(pollStatus, 2000);
 }
 
@@ -1718,56 +1732,56 @@ function showingsIn(p, from, to) {
 }
 function describeListing(p) {
   const bits = [];
-  bits.push([p.rooms ? String(p.rooms).replace(".", ",") + " rum" : "Apartment", p.kvm ? String(p.kvm).replace(".", ",") + " m²" : ""].filter(Boolean).join(", "));
-  if (p.floor) bits[0] += p.floor === "BV" ? " on the ground floor" : ` on floor ${String(p.floor).replace(".", ",")}`;
-  const f = (p.extra || []).slice(0, 6); // at most six, so the sentence stays readable
-  if (f.length) bits[0] += " with " + (f.length > 1 ? f.slice(0, -1).join(", ") + " and " + f[f.length - 1] : f[0]);
-  if (p.built) bits.push(`built ${p.built}`);
+  bits.push([p.rooms ? String(p.rooms).replace(".", ",") + " rum" : "Lägenhet", p.kvm ? String(p.kvm).replace(".", ",") + " m²" : ""].filter(Boolean).join(", "));
+  if (p.floor) bits[0] += p.floor === "BV" ? " på bottenvåningen" : ` på våning ${String(p.floor).replace(".", ",")}`;
+  const f = (p.extra || []).slice(0, 6).map((x) => FEATURE_SV[x] || x); // at most six, so the sentence stays readable
+  if (f.length) bits[0] += " med " + (f.length > 1 ? f.slice(0, -1).join(", ") + " och " + f[f.length - 1] : f[0]);
+  if (p.built) bits.push(`byggd ${p.built}`);
   if (p.avgift && p.kvm) {
     const y = p.avgift * 12 / p.kvm;
-    if (y < 650) bits.push("low avgift for its size"); else if (y > 1000) bits.push("high avgift for its size");
+    if (y < 650) bits.push("låg avgift för storleken"); else if (y > 1000) bits.push("hög avgift för storleken");
   }
   return bits.join(", ") + ".";
 }
-const fmtDay = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-const fmtShort = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const fmtDay = (s) => { const t = new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" }); return t[0].toUpperCase() + t.slice(1); };
+const fmtShort = (s) => new Date(s.slice(0, 10) + "T12:00").toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
 function ratingSelect(attr, v) {
-  const opts = [["", "Not rated"], ["5", "5 · love it"], ["4", "4"], ["3", "3"], ["2", "2"], ["1", "1"], ["never", "Never here"]];
+  const opts = [["", "Inte betygsatt"], ["5", "5 · älskar det"], ["4", "4"], ["3", "3"], ["2", "2"], ["1", "1"], ["never", "Aldrig här"]];
   return `<select ${attr}>${opts.map(([k, l]) => `<option value="${k}" ${String(v) === k ? "selected" : ""}>${l}</option>`).join("")}</select>`;
 }
 function crawlPanel() {
   const st = CRAWL.state, found = LIST.found, b = LIST.booli || {};
-  const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
-  if (!LOCAL) return `<section class="panel"><h3>Apartment finder</h3>
-    <p style="margin:0;font-size:14px">The finder runs on your Mac. Start the local server and open <strong>http://localhost:8765</strong> to see the apartments here.</p></section>`;
-  const text = st === "running" || st === "error" ? CRAWL.msg : last ? `Last run ${last}.` : "Not run yet.";
+  const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("sv-SE", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
+  if (!LOCAL) return `<section class="panel"><h3>Bostadsletaren</h3>
+    <p style="margin:0;font-size:14px">Bostadsletaren körs på din Mac. Starta den lokala servern och öppna <strong>http://localhost:8765</strong> för att se lägenheterna här.</p></section>`;
+  const text = st === "running" || st === "error" ? CRAWL.msg : last ? `Senast körd ${last}.` : "Inte körd än.";
   const key = found ? `<div class="answer">
-      <div><span class="v">${found.forSale}</span><span class="s">for sale found</span></div>
-      <div><span class="v">${found.soon}</span><span class="s">coming soon found</span></div>
-      ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale} · ${b.soon}</span><span class="s">on Booli${b.missing ? ", from " + fmtShort(b.at) : ""}</span></div>` : ""}
-    </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Booli's count for the same filter in Stockholms innerstad is the answer key: the gap is what the finder doesn't cover yet.</p>` : ""}` : "";
+      <div><span class="v">${found.forSale}</span><span class="s">till salu hittade</span></div>
+      <div><span class="v">${found.soon}</span><span class="s">snart till salu hittade</span></div>
+      ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale} · ${b.soon}</span><span class="s">på Booli${b.missing ? ", från " + fmtShort(b.at) : ""}</span></div>` : ""}
+    </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Boolis antal för samma filter i Stockholms innerstad är facit: skillnaden är det bostadsletaren inte täcker än.</p>` : ""}` : "";
   const ag = LIST.agents ? Object.entries(LIST.agents) : [];
   return `<section class="panel">
-    <h3>Apartment finder</h3>
+    <h3>Bostadsletaren</h3>
     <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}${st !== "running" && CRAWL.msg && st !== "error" ? " " + esc(CRAWL.msg) : ""}</span></div>
     ${key}
-    ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Price history: ${LIST.history.apartments} apartments, ${LIST.history.readings} daily readings, ${LIST.history.withBids} with bids and ${LIST.history.finalPrices} final prices so far. Saved in data/history.sqlite, with CSV files beside it.</p>` : ""}
-    ${ag.length ? `<details class="agents"><summary>${ag.length} estate agents read</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} in the inner city</td></tr>`).join("")}</table></details>` : ""}
-    ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Run now</button></div>`}
-    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Runs every morning at 06:30; next run ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 30) ? "today" : "tomorrow"} at 06:30.` : `Not scheduled yet, so it only runs when you press Run now. To run it every morning at 06:30, run <span class="mono">scripts/install-mac.sh</span> once.`} It follows each site's robots.txt and stops reading a site that blocks it.</p>
+    ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Prishistorik: ${LIST.history.apartments} lägenheter, ${LIST.history.readings} dagliga avläsningar, ${LIST.history.withBids} med bud och ${LIST.history.finalPrices} slutpriser hittills. Sparas i data/history.sqlite, med CSV-filer bredvid.</p>` : ""}
+    ${ag.length ? `<details class="agents"><summary>${ag.length} mäklare lästa</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} i innerstaden</td></tr>`).join("")}</table></details>` : ""}
+    ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Kör nu</button></div>`}
+    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:30; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 30) ? "i dag" : "i morgon"} 06:30.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:30.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
   </section>`;
 }
 function filterPanel() {
   const f = S.show.f;
   const chk = (k, label) => `<label class="dim" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" data-check="show.f.${k}" ${f[k] ? "checked" : ""}> ${label}</label>`;
   return `<section class="panel">
-    <h3>Search filter</h3>
-    ${numField("show.f.maxPrice", "Max price", "kr", "The asking price to search up to.")}
-    ${numField("show.f.minRooms", "Min rooms", "rum")}
-    ${numField("show.f.minArea", "Min size", "m²")}
-    ${numField("show.f.maxAvgift", "Max avgift", "kr/mån", "Leave a field empty for no limit.")}
-    ${chk("notGround", "Not on the ground floor")}
-    ${chk("includeSoon", "Include apartments coming soon")}
+    <h3>Sökfilter</h3>
+    ${numField("show.f.maxPrice", "Maxpris", "kr", "Utgångspriset att söka upp till.")}
+    ${numField("show.f.minRooms", "Minst antal rum", "rum")}
+    ${numField("show.f.minArea", "Minsta storlek", "m²")}
+    ${numField("show.f.maxAvgift", "Högsta avgift", "kr/mån", "Lämna ett fält tomt för ingen gräns.")}
+    ${chk("notGround", "Inte på bottenvåningen")}
+    ${chk("includeSoon", "Ta med lägenheter som snart är till salu")}
   </section>`;
 }
 function areaGroups(list) {
@@ -1782,10 +1796,10 @@ function areaGroups(list) {
 function areaRow(name, count, label, district) {
   const r = S.show.ratings[name] || {}, inherit = district && !r.r ? rating(district) : "";
   return `<div class="hood-row ${r.r === "never" || inherit === "never" ? "never" : ""} ${district ? "child" : "parent"}">
-    <span>${esc(label || name)}${inherit ? `<small class="dim"> · uses ${esc(district)}'s ${inherit === "never" ? "Never here" : inherit + "/5"}</small>` : ""}</span>
-    <span class="dim" title="Apartments">${count || ""}</span>
-    ${ratingSelect(`data-hood-r="${esc(name)}" aria-label="Rating for ${esc(name)}"`, r.r ?? "")}
-    ${r.r || r.note ? `<input type="text" data-hood-note="${esc(name)}" value="${esc(r.note || "")}" placeholder="Note about ${esc(name)}">` : ""}
+    <span>${esc(label || name)}${inherit ? `<small class="dim"> · använder ${esc(district)}s ${inherit === "never" ? "Aldrig här" : inherit + "/5"}</small>` : ""}</span>
+    <span class="dim" title="Lägenheter">${count || ""}</span>
+    ${ratingSelect(`data-hood-r="${esc(name)}" aria-label="Betyg för ${esc(name)}"`, r.r ?? "")}
+    ${r.r || r.note ? `<input type="text" data-hood-note="${esc(name)}" value="${esc(r.note || "")}" placeholder="Anteckning om ${esc(name)}">` : ""}
   </div>`;
 }
 // Two levels: a district (Södermalm) and its neighbourhoods. Every neighbourhood on the map is listed,
@@ -1798,12 +1812,12 @@ function areasPanel(list) {
   if (!Object.keys(tree).length) return "";
   const busy = (d) => [d, ...tree[d]].some((n) => (S.show.ratings[n] || {}).r || (S.show.ratings[n] || {}).note);
   return `<section class="panel">
-    <h3>Areas</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">Rate a whole district, then any neighbourhood in it that differs; one you haven't rated takes its district's rating. <strong>Never here</strong> hides every apartment there.</p>
+    <h3>Områden</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 4px">Betygsätt en hel stadsdel och sedan de delar av den som skiljer sig; en del du inte betygsatt får stadsdelens betyg. <strong>Aldrig här</strong> döljer alla lägenheter där.</p>
     ${Object.keys(tree).sort((a, b) => a.localeCompare(b, "sv")).map((d) => {
       const total = list.filter((p) => p.group === d).length;
       return `<details class="hood-group" ${busy(d) ? "open" : ""}><summary><span>${esc(d)}</span><span class="dim">${total || ""}</span>${rating(d) ? `<span class="chip ${rating(d) === "never" ? "bad" : +rating(d) >= 4 ? "good" : +rating(d) <= 2 ? "warn" : ""}">${ratingLabel(rating(d))}</span>` : ""}</summary>
-        ${areaRow(d, total, `All of ${d}`)}
+        ${areaRow(d, total, `Hela ${d}`)}
         ${[...tree[d]].filter((n) => n !== d).sort((a, b) => a.localeCompare(b, "sv")).map((n) => areaRow(n, list.filter((p) => p.area === n).length, n, d)).join("")}
       </details>`;
     }).join("")}
@@ -1814,37 +1828,46 @@ function myAreasPanel() {
   const visits = Object.entries(S.show.visits);
   const all = new Set([...Object.keys(S.show.ratings).filter((n) => { const r = S.show.ratings[n]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.area).filter(Boolean)]);
   const names = new Set([...all].filter((n) => rating(n) !== "never")), nevers = all.size - names.size;
-  const left = nevers ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${nevers} area${nevers > 1 ? "s" : ""} marked Never here ${nevers > 1 ? "are" : "is"} left out; change ${nevers > 1 ? "them" : "it"} under Areas.</p>` : "";
-  if (!names.size && nevers) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">No rated areas apart from Never here.</p>${left}</section>`;
-  if (!names.size) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">After a showing, press <strong>I went</strong> on the apartment. Your rating and notes for it and its area collect here.</p></section>`;
+  const left = nevers ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${nevers} ${nevers > 1 ? "områden" : "område"} med Aldrig här visas inte; ändra under Områden.</p>` : "";
+  if (!names.size && nevers) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:13px;margin:0">Inga betygsatta områden förutom Aldrig här.</p>${left}</section>`;
+  if (!names.size) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:13px;margin:0">Efter en visning trycker du på <strong>Jag var där</strong> på lägenheten. Ditt betyg och dina anteckningar om den och området samlas här.</p></section>`;
   const score = (n) => { const r = rating(n); return r === "never" ? -1 : r === "" ? 0 : +r; };
-  return `<section class="panel"><h3>Your areas</h3>${[...names].sort((a, b) => score(b) - score(a)).map((n) => {
+  return `<section class="panel"><h3>Dina områden</h3>${[...names].sort((a, b) => score(b) - score(a)).map((n) => {
     const r = S.show.ratings[n] || {}, vs = visits.filter(([, v]) => v.area === n);
     return `<div class="my-area">
-      <strong>${esc(n)}</strong>${ratingSelect(`data-hood-r="${esc(n)}" aria-label="Rating for ${esc(n)}"`, r.r ?? "")}
-      <input type="text" data-hood-note="${esc(n)}" value="${esc(r.note || "")}" placeholder="Note">
-      ${vs.length ? `<details><summary>${vs.length} showing${vs.length > 1 ? "s" : ""} visited</summary><ul>${vs.map(([, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul></details>` : ""}
+      <strong>${esc(n)}</strong>${ratingSelect(`data-hood-r="${esc(n)}" aria-label="Betyg för ${esc(n)}"`, r.r ?? "")}
+      <input type="text" data-hood-note="${esc(n)}" value="${esc(r.note || "")}" placeholder="Anteckning">
+      ${vs.length ? `<details><summary>${vs.length} ${vs.length > 1 ? "visningar" : "visning"} besökta</summary><ul>${vs.map(([, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "aldrig" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul></details>` : ""}
     </div>`;
   }).join("")}${left}</section>`;
 }
 // Work, your girlfriend's place and so on: each apartment shows the SL trip to each, arriving by its time on a weekday
 function placesPanel() {
   const pl = S.show.places || [], known = TRAVEL.places || {};
-  return `<section class="panel"><h3>Important addresses</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">Each apartment you save (♥) shows the trip there by SL, arriving by the time you set, on a weekday.</p>
+  return `<section class="panel"><h3>Viktiga adresser</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 4px">Varje lägenhet du sparar (♥) visar resan dit med SL, framme senast den tid du anger, en vardag.</p>
     ${pl.map((x) => {
       const k = known[(x.addr || "").trim().toLowerCase()];
-      const found = !x.addr ? "" : k === undefined ? (TRAVEL.running ? "Looking it up…" : "Not looked up yet") : k === null ? "SL can't find this address. Try street, number and town." : "SL: " + esc(k.name);
+      const found = !x.addr ? "" : k === undefined ? (TRAVEL.running ? "Letar…" : "Inte sökt än") : k === null ? "SL hittar inte adressen. Prova gata, nummer och ort." : "SL: " + esc(k.name);
       return `<div class="place">
-        <input type="text" data-place="${x.id}" data-k="name" value="${esc(x.name || "")}" placeholder="Name" aria-label="Name of the place">
-        <input type="time" data-place="${x.id}" data-k="arrive" value="${esc(x.arrive || "08:00")}" aria-label="Arrive by">
-        <button class="btn ghost" data-act="del-place" data-id="${x.id}" aria-label="Remove ${esc(x.name || "this address")}">×</button>
-        <input type="text" data-place="${x.id}" data-k="addr" value="${esc(x.addr || "")}" placeholder="Street and number, town" aria-label="Address">
+        <input type="text" data-place="${x.id}" data-k="name" value="${esc(x.name || "")}" placeholder="Namn" aria-label="Platsens namn">
+        <input type="time" data-place="${x.id}" data-k="arrive" value="${esc(x.arrive || "08:00")}" aria-label="Framme senast">
+        <button class="btn ghost" data-act="del-place" data-id="${x.id}" aria-label="Ta bort ${esc(x.name || "adressen")}">×</button>
+        <input type="text" data-place="${x.id}" data-k="addr" value="${esc(x.addr || "")}" placeholder="Gata och nummer, ort" aria-label="Adress">
         <small class="dim">${found}</small>
       </div>`;
     }).join("")}
-    <div class="row" style="margin-top:8px"><button class="btn" data-act="add-place">Add address</button>${TRAVEL.running ? `<span class="dim" style="font-size:12px">Looking up trips with SL…</span>` : ""}</div>
+    <div class="row" style="margin-top:8px"><button class="btn" data-act="add-place">Lägg till adress</button>${TRAVEL.running ? `<span class="dim" style="font-size:12px">Letar resor hos SL…</span>` : ""}</div>
   </section>`;
+}
+// Red flags from the description, worst first, each with the sentence it comes from on hover.
+// Reassurances are capped at three on a showing; "ask" notes show only on saved apartments.
+function flagChips(flags, saved = false) {
+  const order = { bad: 0, warn: 1, ask: 2, good: 3 };
+  const fs = flags.filter((f) => saved || f.kind !== "ask").sort((a, b) => order[a.kind] - order[b.kind]);
+  let goods = 0;
+  return fs.filter((f) => f.kind !== "good" || saved || ++goods <= 3)
+    .map((f) => `<span class="chip ${f.kind === "ask" ? "info" : f.kind}" title="${esc(f.quote)}">${f.kind === "bad" ? "⚠ " : f.kind === "ask" ? "? " : ""}${esc(f.label)}</span>`);
 }
 function travelLine(p) {
   const t = (TRAVEL.trips || {})[p.url] || {}, n = (TRAVEL.near || {})[p.url] || {}, bits = [];
@@ -1852,39 +1875,40 @@ function travelLine(p) {
   for (const pl of saved ? S.show.places || [] : []) {
     const x = t[pl.id];
     if (!pl.addr || !x || x.min == null) continue;
-    const how = (x.lines || []).join(", ") || "On foot";
-    bits.push(`<span title="${esc(how)}${x.changes ? `, ${x.changes} change${x.changes > 1 ? "s" : ""}` : ""}, arriving by ${esc(pl.arrive || "08:00")}">${esc(pl.name || "Place")} <strong>${x.min} min</strong></span>`);
+    const how = (x.lines || []).join(", ") || "Promenad";
+    bits.push(`<span title="${esc(how)}${x.changes ? `, ${x.changes} ${x.changes > 1 ? "byten" : "byte"}` : ""}, framme ${esc(pl.arrive || "08:00")}">${esc(pl.name || "Plats")} <strong>${x.min} min</strong></span>`);
   }
-  for (const [k, l] of [["grocery", "Grocery"], ["gym", "Gym"], ["bar", "Bar"]]) {
+  for (const [k, l] of [["grocery", "Mataffär"], ["gym", "Gym"], ["bar", "Bar"]]) {
     const x = n[k];
-    if (x) bits.push(`<span title="${esc(x.name)}, ${x.m} m away">${l} <strong>${x.walk} min</strong> walk · ${esc(x.name)}</span>`);
+    if (x) bits.push(`<span title="${esc(x.name)}, ${x.m} m bort">${l} <strong>${x.walk} min</strong> promenad · ${esc(x.name)}</span>`);
   }
   return bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "";
 }
 function showCard(p, s, a, cr) {
   const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);
   const price = p.price || 0, mc = price ? monthlyCost(price, p.avgift, cr.rate) : null;
-  const fit = !price ? `<span class="chip info">No price yet</span>` : price <= a.max ? `<span class="chip good">Within budget</span>` : `<span class="chip bad">${kr(price - a.max)} over max</span>`;
+  const fit = !price ? `<span class="chip info">Inget pris än</span>` : price <= a.max ? `<span class="chip good">Inom budget</span>` : `<span class="chip bad">${kr(price - a.max)} över max</span>`;
   const tracked = S.apts.some((x) => x.link === p.url);
   const photos = p.photos || [];
   return `<article class="show-card ${never ? "never" : ""} ${photos.length ? "has-photo" : ""}">
-    <div class="t">${s ? s.start.slice(11) + (s.end ? "–" + s.end : "") : p.soon ? "Soon" : "No date"}</div>
-    ${photos.length ? `<a class="thumb" href="${esc(photos[0])}" target="_blank" rel="noopener"><img src="${esc(photos[0])}" alt="Photo of ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
+    <div class="t">${s ? s.start.slice(11) + (s.end ? "–" + s.end : "") : p.soon ? "Snart" : "Inget datum"}</div>
+    ${photos.length ? `<a class="thumb" href="${esc(photos[0])}" target="_blank" rel="noopener"><img src="${esc(photos[0])}" alt="Foto på ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="sc-main">
       <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
-        <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
+        <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Aldrig här" : "Område " + r + "/5"}</span>` : ""}</div>
       <p>${esc(describeListing(p))}</p>
+      ${(p.flags || []).length ? `<div class="flags">${flagChips(p.flags).join("")}</div>` : ""}
       ${travelLine(p)}
-      ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} photos</summary><div class="strip"></div></details>` : ""}
-      ${(p.plans || []).length ? `<details class="plan" data-fill="plan" data-key="${esc(p.url)}"><summary>Floor plan${p.plans.length > 1 ? "s (" + p.plans.length + ")" : ""}</summary><div class="fill"></div></details>` : ""}
-      ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>${esc(p.agent)}'s description</summary><div class="fill"></div></details>` : ""}
-      <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
-      ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Your rating of ${esc(p.addr)}"`, v.r ?? "")}
-        <input type="text" data-visit-note="${esc(p.url)}" value="${esc(v.note || "")}" placeholder="Notes from the showing"></div>` : ""}
+      ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} bilder</summary><div class="strip"></div></details>` : ""}
+      ${(p.plans || []).length ? `<details class="plan" data-fill="plan" data-key="${esc(p.url)}"><summary>Planlösning${p.plans.length > 1 ? "ar (" + p.plans.length + ")" : ""}</summary><div class="fill"></div></details>` : ""}
+      ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>Beskrivning från ${esc(p.agent)}</summary><div class="fill"></div></details>` : ""}
+      <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Pris ej satt"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/mån allt inräknat</span>` : ""}${fit}</div>
+      ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Ditt betyg för ${esc(p.addr)}"`, v.r ?? "")}
+        <input type="text" data-visit-note="${esc(p.url)}" value="${esc(v.note || "")}" placeholder="Anteckningar från visningen"></div>` : ""}
     </div>
     <div class="sc-act">
-      ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.url)}">Undo visit</button>` : `<button class="btn" data-act="went" data-key="${esc(p.url)}" data-at="${s ? s.start : isoLocal(new Date())}">I went</button>`}
-      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Remove " + esc(p.addr) + " from Saved" : "Save " + esc(p.addr)}" title="${tracked ? "Saved. Tap to remove." : "Save"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
+      ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.url)}">Ångra besöket</button>` : `<button class="btn" data-act="went" data-key="${esc(p.url)}" data-at="${s ? s.start : isoLocal(new Date())}">Jag var där</button>`}
+      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Ta bort " + esc(p.addr) + " från Sparade" : "Spara " + esc(p.addr)}" title="${tracked ? "Sparad. Tryck för att ta bort." : "Spara"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
     </div>
   </article>`;
 }
@@ -1918,7 +1942,7 @@ function ratingColour(r) {
   const c = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   return r === "never" ? c("--negative") : r === "" ? c("--muted") : +r >= 4 ? c("--positive") : +r === 3 ? c("--data") : c("--warning");
 }
-const ratingLabel = (r) => (r === "never" ? "Never here" : r ? r + "/5" : "Not rated");
+const ratingLabel = (r) => (r === "never" ? "Aldrig här" : r ? r + "/5" : "Inte betygsatt");
 function metres(a, b) { // short distances in Stockholm, near enough for drawing
   const dy = (a[0] - b[0]) * 111320, dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
   return Math.hypot(dx, dy);
@@ -1959,7 +1983,7 @@ function drawMap() {
       },
       onEachFeature: (f, l) => {
         const n = f.properties.name, r = rating(n) || rating(f.properties.group), c = counts[n] || 0;
-        l.bindTooltip(`<strong>${esc(n)}</strong>${n !== f.properties.district ? " · " + esc(f.properties.district) : ""}<br>${ratingLabel(r)} · ${c} apartment${c === 1 ? "" : "s"}`, { sticky: true });
+        l.bindTooltip(`<strong>${esc(n)}</strong>${n !== f.properties.district ? " · " + esc(f.properties.district) : ""}<br>${ratingLabel(r)} · ${c} ${c === 1 ? "lägenhet" : "lägenheter"}`, { sticky: true });
       },
     }).addTo(MAP.layer);
     L.geoJSON(MAP.areas, { filter: (f) => f.properties.kind === "district", interactive: false,
@@ -1968,7 +1992,7 @@ function drawMap() {
   for (const p of list) {
     const r = rating(p.area) || rating(p.group);
     L.circleMarker([p.lat, p.lon], { radius: 5, color: getComputedStyle(document.documentElement).getPropertyValue("--surface").trim(), weight: 1.5, fillColor: r ? ratingColour(r) : getComputedStyle(document.documentElement).getPropertyValue("--text").trim(), fillOpacity: 0.9 })
-      .bindPopup(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Showing " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}<br><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a>`)
+      .bindPopup(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Visning " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}<br><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a>`)
       .addTo(MAP.layer);
   }
   if (!MAP.fitted && list.length) { MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08)); MAP.fitted = true; }
@@ -1976,21 +2000,21 @@ function drawMap() {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawMap());
 function mapPanel() {
   if (!apartments().some((p) => p.lat)) return "";
-  const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Never here"], ["", "Not rated"]];
+  const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Aldrig här"], ["", "Inte betygsatt"]];
   return `<section class="panel map-panel">
-    <div id="map" role="img" aria-label="Map of the apartments and your rated areas"></div>
-    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Districts follow Stockholm's official borders, shore included. Neighbourhoods have no official borders, so each covers the part of its district nearest its centre (Nytorget for SoFo, the square for Mariatorget). A neighbourhood you haven't rated takes its district's rating.</span></div>
+    <div id="map" role="img" aria-label="Karta över lägenheterna och dina betygsatta områden"></div>
+    <div class="legend">${key.map(([r, l]) => `<span><i style="background:${r === "" ? "var(--text)" : r === "never" ? "var(--negative)" : +r >= 4 ? "var(--positive)" : +r === 3 ? "var(--data)" : "var(--warning)"}"></i>${l}</span>`).join("")}<span class="dim">Stadsdelarna följer Stockholms officiella gränser, strandkanten inräknad. Delområden har inga officiella gränser, så vart och ett täcker den del av stadsdelen som ligger närmast dess mitt (Nytorget för SoFo, torget för Mariatorget). Ett delområde du inte betygsatt får stadsdelens betyg.</span></div>
   </section>`;
 }
 // Gallery photos and descriptions are built when you open them, not for every card up front
 function fillDetails(d) {
-  const p = LIST.items[d.dataset.key]; if (!p) return;
-  if (d.dataset.fill === "undated") {
+  if (d.dataset.fill === "undated") { // not one apartment's section, so before looking one up
     const a = affordability(), cr = chosenRate();
     d.querySelector(".fill").innerHTML = apartments().filter((p) => !(p.shows || []).length && (!S.show.hideNever || !isNever(p))).map((p) => showCard(p, null, a, cr)).join("");
     return;
   }
-  if (d.dataset.fill === "plan") d.querySelector(".fill").innerHTML = p.plans.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="Open full size"><img src="${esc(u)}" alt="Floor plan of ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
+  const p = LIST.items[d.dataset.key]; if (!p) return;
+  if (d.dataset.fill === "plan") d.querySelector(".fill").innerHTML = p.plans.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="Öppna i full storlek"><img src="${esc(u)}" alt="Planlösning för ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
   else if (d.dataset.fill === "gallery") d.querySelector(".strip").innerHTML = (p.photos || []).slice(1, 16).map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>`).join("");
   else d.querySelector(".fill").innerHTML = (p.desc || "").split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("");
 }
@@ -2008,30 +2032,30 @@ function showView() {
   for (const r of visible) (days[r.s.start.slice(0, 10)] = days[r.s.start.slice(0, 10)] || []).push(r);
   const undated = list.filter((p) => !(p.shows || []).length && (!sh.hideNever || !isNever(p)));
   const body = !Object.keys(LIST.items).length
-    ? `<div class="note">No apartments yet. ${LOCAL ? "Press Run now, or wait for the morning run." : "Open the planner from the local server to see them."}</div>`
-    : !visible.length ? `<div class="note">No showings in this period${hidden ? `, apart from ${hidden} in areas you marked Never here` : ""}.</div>`
+    ? `<div class="note">Inga lägenheter än. ${LOCAL ? "Tryck på Kör nu, eller vänta på morgonkörningen." : "Öppna planeraren från den lokala servern för att se dem."}</div>`
+    : !visible.length ? `<div class="note">Inga visningar under perioden${hidden ? `, förutom ${hidden} i områden du satt till Aldrig här` : ""}.</div>`
     : (() => {
         let left = showLimit;
         const html = Object.entries(days).map(([d, rs]) => {
           if (left <= 0) return "";
           const shown = rs.slice(0, left); left -= shown.length;
-          return `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} showing${rs.length > 1 ? "s" : ""}</span></h3>${shown.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`;
+          return `<h3 class="show-day">${fmtDay(d)} <span class="dim">${rs.length} ${rs.length > 1 ? "visningar" : "visning"}</span></h3>${shown.map(({ p, s }) => showCard(p, s, a, cr)).join("")}`;
         }).join("");
-        return html + (visible.length > showLimit ? `<button class="btn more" data-act="show-more">Show ${Math.min(SHOW_STEP, visible.length - showLimit)} more${visible.length - showLimit > SHOW_STEP ? ` (${visible.length - showLimit} left)` : ""}</button>` : "");
+        return html + (visible.length > showLimit ? `<button class="btn more" data-act="show-more">Visa ${Math.min(SHOW_STEP, visible.length - showLimit)} till${visible.length - showLimit > SHOW_STEP ? ` (${visible.length - showLimit} kvar)` : ""}</button>` : "");
       })();
   return `
-    <div class="lead"><h1>Showings</h1>
-    <p>Apartments in innanför tullarna with a visning, found on the estate agents' own sites every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
+    <div class="lead"><h1>Visningar</h1>
+    <p>Lägenheter innanför tullarna med visning, hittade på mäklarnas egna sajter varje morgon och jämförda med din budget. Betygsätt områden allteftersom: platser du sätter till <strong>Aldrig här</strong> försvinner ur listan.</p></div>
     <div class="bench show">
       <div class="stack">${crawlPanel()}${filterPanel()}${placesPanel()}${myAreasPanel()}${areasPanel(list)}</div>
       <div>
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
-          <div class="seg">${[["week", "Next week"], ["8", "Next 8 days"], ["all", "All upcoming"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
-          ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Hide ${hidden} in Never areas</label>` : ""}
+          <div class="seg">${[["week", "Nästa vecka"], ["8", "Närmaste 8 dagarna"], ["all", "Alla kommande"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
+          ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Dölj ${hidden} i Aldrig här-områden</label>` : ""}
         </div>
         ${mapPanel()}
         ${body}
-        ${undated.length ? `<details class="undated" data-fill="undated"><summary>${undated.length} apartment${undated.length > 1 ? "s" : ""} without a showing yet</summary><div class="fill"></div></details>` : ""}
+        ${undated.length ? `<details class="undated" data-fill="undated"><summary>${undated.length} ${undated.length > 1 ? "lägenheter" : "lägenhet"} utan visning än</summary><div class="fill"></div></details>` : ""}
       </div>
     </div>`;
 }

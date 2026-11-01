@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
             s["scheduled"] = (Path.home() / "Library/LaunchAgents/se.bostadsplan.scrape.plist").exists()
             if s.get("state") == "running" and not s["running"]:
                 s["state"] = "error"
-                s["msg"] = "The last run stopped without finishing. See data/scraper.log."
+                s["msg"] = "Den senaste körningen avbröts innan den var klar. Se data/scraper.log."
             return self.json(200, s)
         self.send(404, b"Not found", "text/plain")
 
