@@ -561,7 +561,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { f: { maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [] },
+  show: { f: { minPrice: null, maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [] },
 });
 let S = DEFAULT();
 
@@ -861,7 +861,7 @@ const RANGES = {
   "fin.targetPrice": [1000000, 12000000, 25000], "fin.bankOffer": [0, 10000000, 50000],
   "bid.ask": [1000000, 12000000, 25000], "bid.walk": [1000000, 12000000, 25000], "bid.step": [5000, 100000, 5000],
   "five.avgiftExtra": [0, 5, 0.25], "rates.offer": [1, 6, 0.01], "value.manual": [-5, 10, 0.5],
-  "show.f.maxPrice": [1000000, 12000000, 50000], "show.f.minRooms": [1, 6, 0.5], "show.f.minArea": [15, 150, 5], "show.f.maxAvgift": [1000, 10000, 250],
+  "show.f.minPrice": [0, 8000000, 50000], "show.f.maxPrice": [1000000, 12000000, 50000], "show.f.minRooms": [1, 6, 0.5], "show.f.minArea": [15, 150, 5], "show.f.maxAvgift": [1000, 10000, 250],
   "search.minRooms": [1, 6, 0.5], "search.minArea": [15, 150, 5], "search.maxAvgift": [1000, 10000, 250], "search.headroom": [0, 25, 1],
 };
 const nfIn = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
@@ -1660,6 +1660,7 @@ function fits(p, f = S.show.f) {
   if (p.outside || p.state === "sold") return false;
   if (p.soon && !f.includeSoon) return false;
   if (f.maxPrice && p.price && p.price > f.maxPrice) return false;
+  if (f.minPrice && p.price && p.price < f.minPrice) return false;
   if (f.minRooms && p.rooms && p.rooms < f.minRooms) return false;
   if (f.minArea && p.kvm && p.kvm < f.minArea) return false;
   if (f.maxAvgift && p.avgift && p.avgift > f.maxAvgift) return false;
@@ -1787,6 +1788,7 @@ function filterPanel() {
   const chk = (k, label) => `<label class="dim" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" data-check="show.f.${k}" ${f[k] ? "checked" : ""}> ${label}</label>`;
   return `<section class="panel">
     <h3>Sökfilter</h3>
+    ${numField("show.f.minPrice", "Minpris", "kr", "Utgångspriset att söka från. Lägenheter utan pris än är alltid med.")}
     ${numField("show.f.maxPrice", "Maxpris", "kr", "Utgångspriset att söka upp till.")}
     ${numField("show.f.minRooms", "Minst antal rum", "rum")}
     ${numField("show.f.minArea", "Minsta storlek", "m²")}

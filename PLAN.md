@@ -44,6 +44,7 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 
 ### Phase 1: Finish what's built
 
+
 - **Read the förening's figures from the agents' fact sections,** not only the description: debt per m², avgift changes, tomträtt, stambyte year, number of apartments. That makes the red flags complete.
 - **Final prices for sold apartments.** Bidding is followed bid by bid; make sure the final price is recorded every time a saved apartment sells, where the agent publishes it, so our own price per m² per neighbourhood builds up next to the asking price.
 - **Close the gap to Booli.** Every morning the finder compares our count with Booli's for the same filter, and the planner shows the trend day by day. Coverage of Booli's for-sale count: 52 % on 31 October (17 agents), 60 % on 1 November (20 agents). Use it to find which agents or areas are still missing, until we find about as many as Booli.
@@ -79,6 +80,10 @@ Needs months of final prices, which the daily runs collect meanwhile.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **A morning run that doesn't need Amphetamine.** The Mac wakes itself at 06:25 every day (`sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00`, set 2026-11-01; keep the charger connected), and the 06:30 run is wrapped in `caffeinate -is`, so the Mac stays awake until the run is done and then sleeps again. If it still sleeps through 06:30, launchd runs the missed job as soon as it wakes. Check the wake with `pmset -g sched`.
+
+- **A minimum price in the search filter** (Minpris, under Sökfilter). Apartments below it drop out of Visningar and out of the finder's reading, and Booli's count uses the same minimum (`minListPrice`), so the comparison stays like for like. Apartments without a price yet ("snart till salu") are always kept, as with the max price.
 
 - **A daily comparison with Booli.** After each morning run, our count (for sale and coming soon) and Booli's for the same filter are kept for that day, with how many agents were read, in listings.json and data/compare.csv. The finder panel in the planner shows them day by day ("Jämfört med Booli, dag för dag") with our coverage of Booli's for-sale count. Earlier days were filled in from the finder's log.
 

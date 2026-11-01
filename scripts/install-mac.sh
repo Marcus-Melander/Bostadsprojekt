@@ -1,6 +1,7 @@
 #!/bin/bash
 # Starts the planner's server when you log in, and runs the apartment finder every day at 06:30.
-# If the Mac is asleep at 06:30, launchd runs the scraper when it wakes.
+# If the Mac is asleep at 06:30, launchd runs the scraper when it wakes. The run is wrapped in caffeinate,
+# so a Mac woken for it (sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00) stays awake until it's done.
 # Remove both again with: scripts/install-mac.sh --remove
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -37,7 +38,7 @@ cat > "$AGENTS/$SCRAPE.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$SCRAPE</string>
-  <key>ProgramArguments</key><array><string>$ROOT/.venv/bin/python</string><string>$ROOT/scraper/finder.py</string></array>
+  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-is</string><string>$ROOT/.venv/bin/python</string><string>$ROOT/scraper/finder.py</string></array>
   <key>WorkingDirectory</key><string>$ROOT</string>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>30</integer></dict>
   <key>StandardOutPath</key><string>$ROOT/data/scraper.out</string>

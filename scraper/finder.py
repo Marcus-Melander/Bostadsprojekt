@@ -95,6 +95,8 @@ def fits(p, f):
         return False
     if f.get("maxPrice") and p.get("price") and p["price"] > f["maxPrice"]:
         return False
+    if f.get("minPrice") and p.get("price") and p["price"] < f["minPrice"]:
+        return False
     if f.get("minRooms") and p.get("rooms") and p["rooms"] < f["minRooms"]:
         return False
     if f.get("minArea") and p.get("kvm") and p["kvm"] < f["minArea"]:
@@ -110,6 +112,8 @@ def fits(p, f):
 
 def booli_query(f, area_id):
     q = {"areaIds": area_id, "objectType": "Lägenhet"}
+    if f.get("minPrice"):
+        q["minListPrice"] = f["minPrice"]
     if f.get("maxPrice"):
         q["maxListPrice"] = f["maxPrice"]
     if f.get("minRooms"):
@@ -453,7 +457,8 @@ def find(args):
             follow_left(page, store, robots, hist, started)
             if not args.no_count:
                 status("running", "Läser Boolis antal", started=started)
-                store["booli"] = booli_count(pw, f) or {**(store.get("booli") or {}), "missing": stamp()}
+                b = booli_count(pw, f)
+                store["booli"] = {**b, "filter": f} if b else {**(store.get("booli") or {}), "missing": stamp()}
             browser.close()
     except Exception as e:  # keep what was read, and say what went wrong
         write_json(DATA / "listings.json", store)
@@ -470,10 +475,12 @@ def find(args):
         d["soon" if p.get("soon") else "forSale"] += 1
     store.update(lastRun=stamp(), filter=f, agents={**store.get("agents", {}), **report},
                  found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon")), "districts": by})
-    # One comparison with Booli a day (the day's last run wins), to see the gap close while agents are added
+    # One comparison with Booli a day (the day's last run wins), to see the gap close while agents are added.
+    # Booli's count is only comparable when it was read for the filter used now.
     b = store.get("booli") or {}
+    same = b.get("forSale") is not None and not b.get("missing") and b.get("filter") == f
     day = {"forSale": store["found"]["forSale"], "soon": store["found"]["soon"], "agents": len(store["agents"])}
-    if b.get("forSale") is not None and not b.get("missing"):
+    if same:
         day.update(booliForSale=b["forSale"], booliSoon=b["soon"])
     store.setdefault("compare", {})[stamp()[:10]] = day
     with open(DATA / "compare.csv", "w", encoding="utf-8") as fh:
@@ -484,9 +491,8 @@ def find(args):
     store["history"] = hist.counts()
     hist.close()
     write_json(DATA / "listings.json", store)
-    b = store.get("booli") or {}
     msg = f"Hittade {store['found']['forSale']} till salu och {store['found']['soon']} snart till salu."
-    msg += f" Booli visar {b['forSale']} och {b['soon']}." if b.get("forSale") is not None and not b.get("missing") else " Boolis antal gick inte att läsa i dag."
+    msg += f" Booli visar {b['forSale']} och {b['soon']}." if same else " Boolis antal för det här filtret gick inte att läsa i dag." if b.get("missing") or b.get("filter") == f else " Boolis antal läses för det nya filtret vid nästa morgonkörning."
     log(f"Run finished. {msg}")
     status("partial" if notes else "done", " ".join([msg] + notes), started=started, finished=store["lastRun"])
     return 0
