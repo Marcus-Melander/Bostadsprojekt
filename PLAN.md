@@ -38,37 +38,50 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 
 **Mäklarhuset, HusmanHagberg and Mäklarringen (2026-11-01).** Marcus has written permission from them, so their entries are also marked `permission` and their robots.txt isn't read. Agents marked `permission` are the only ones allowed past their robots.txt.
 
-## In progress
+## Phases
 
-- **Find listings on the estate agents' own sites instead of Booli.** Read every agent's for-sale list, pressing "show more" where needed. Use recent sitemap entries where a list is incomplete. Keep the inner-city candidates, then read each apartment's page.
-- **Remove everything about Booli from the planner and the scraper,** except Booli's count (next item).
-- **Booli's count as the answer key.** Once a day, the scraper reads the count Booli shows for the same filter (for example "118 till salu och 160 snart till salu" in Stockholms innerstad). The planner compares it with what we found. It's one page a day; if Booli refuses it, the count is simply missing that day.
-- **Our own neighbourhoods.** Look each address up on OpenStreetMap (Nominatim, at most one lookup a second) to get its neighbourhood and district, and to check that it's inside the inner city. Carry ratings over from Booli's areas by name, for example SoFo.
-- **Our own search filter:** max price (4 500 000 kr), min rooms, min m², max avgift, not on the ground floor, coming soon included.
+Work goes in phases; each one builds on the one before. A phase is done when every item in it is. Every feature added or reworked goes into this plan straight away, and the phases are re-sorted whenever the order or scope changes.
 
-- **Collect price history for predictions.** Save as much as we can about every apartment the finder reads: its details, its agent and area, and each day's asking price, state, highest bid, number of bids and final price. The data goes into a SQLite database (`data/history.sqlite`), with CSV exports after every run (`data/apartments.csv`, `data/readings.csv`). Apartments that leave an agent's list are followed for up to 30 days, to catch the final price. This is the base for predicting final prices: how each agent prices compared with what apartments sell for, and how much prices rise in each area.
+### Phase 1: Finish what's built
 
+- **Read the förening's figures from the agents' fact sections,** not only the description: debt per m², avgift changes, tomträtt, stambyte year, number of apartments. That makes the red flags complete.
+- **Final prices for sold apartments.** Bidding is followed bid by bid; make sure the final price is recorded every time a saved apartment sells, where the agent publishes it, so our own price per m² per neighbourhood builds up next to the asking price.
+- **Close the agents' gaps:** Notar's list isn't complete (25 newest plus 12 per office), and Erik Olsson's list once stopped early.
+- **Floor plans where they're missing.** After the backfill (2026-11-01), 291 of 487 apartments have one, but Bjurfors has 7 of 75, Svensk Fastighetsförmedling 11 of 79 and Länsförsäkringar 0 of 39. Some are early announcements without a plan yet; check which of the rest have one the finder misses.
 
+### Phase 2: Decide faster each day
 
-## Next
+- **Price drops and relistings.** Mark an apartment whose asking price fell, or that came back after leaving the list, since both often mean room to bid lower. The price history already records what's needed.
+- **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
+- **A morning digest.** After the 06:30 run, a short summary: new apartments in your filter, saved apartments with new bids or a final price, price drops, and this week's showings. A notification on the Mac that opens the planner.
+
+### Phase 3: Showing days
+
+- **A showing-day route.** For each day with showings, put them in an order you can travel between by T-bana or on foot, with the time it takes, and flag showings that overlap.
+- **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
+
+### Phase 4: Online
+
+- **Host the planner on Vercel (free).** Put the website online so it opens from anywhere, including the phone. Vercel serves the page and small functions, but can't run the daily finder (Chrome and Playwright, about an hour a day); the finder stays on the Mac, or moves to a scheduled runner such as GitHub Actions, and uploads its results.
+- **Keep the data in Supabase (free tier).** A hosted Postgres database, file storage and login, which both the finder and the website can reach:
+  - **Database:** the price history (apartments, daily readings, bids, final prices), the listings, travel times, and your plan, important addresses and ratings, behind a login with row-level security so only you see your own data.
+  - **Storage:** the floor plans, kept at full size (not shrunk). They're about 140 KB each and grow by roughly 1–2 GB a year, so they'll pass the free tier's file storage (about 1 GB) within a year; plan for a paid tier then, or keep older plans on the Mac.
+  - **Limits to check first:** the free tier (about 500 MB of database and 1 GB of files, as last known) and that a free project pauses after a week without activity; the daily runs keep it active. Check Supabase's current pricing page before relying on these.
+- **Keep it private.** Showing the agents' photos, floor plans and descriptions on a public site is republishing. Keep the site behind a login, and check Fastighetsbyrån's hobby permission still covers it.
+
+### Phase 5: Predictions
+
+Needs months of final prices, which the daily runs collect meanwhile.
 
 - **Predict the final price, two ways, side by side.**
   - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
-- **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
-- **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
-- **Host the planner on Vercel (free).** Put the website online so it opens from anywhere, including the phone. To settle first:
-  - **What runs where:** Vercel serves the page and small functions, but can't run the daily finder (Chrome and Playwright, about an hour a day). The finder stays on the Mac, or moves to a scheduled runner such as GitHub Actions, and uploads its results.
-  - **Your data:** the plan, important addresses and ratings live in data/ on the Mac. Online they need a store (for example Vercel Blob or KV) and a login, so nobody else sees them.
-  - **Agents' content:** showing their photos, floor plans and descriptions on a public site is republishing. Keep the site private (behind a login), and check Fastighetsbyrån's hobby permission still covers it.
-- **A morning digest.** After the 06:30 run, a short summary: new apartments in your filter, saved apartments with new bids or a final price, price drops, and this week's showings. A notification on the Mac that opens the planner.
-- **A showing-day route.** For each day with showings, put them in an order you can travel between by T-bana or on foot, with the time it takes, and flag showings that overlap.
-- **Price drops and relistings.** Mark an apartment whose asking price fell, or that came back after leaving the list, since both often mean room to bid lower. The price history already records what's needed.
-- **Monthly cost per apartment.** Each card shows what the apartment would cost you a month (mortgage interest and amortisation from your money plan, plus avgift and running costs) and whether it fits your budget.
-- **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
-
 ## Done
+
+- **The finder on the agents' own sites, with Booli only as the answer key.** Every agent's for-sale list is read (pressing "show more", following pages, or a recent sitemap where a list is incomplete), the inner-city candidates are opened, and Booli is used only for one count a day for the same filter. Addresses are placed on OpenStreetMap for their neighbourhood and district, with our own search filter (max price, rooms, m², avgift, not the ground floor, coming soon included).
+- **Price history for predictions.** Every apartment the finder reads is saved with its details, agent and area, and each day's asking price, state, highest bid, number of bids and final price, in `data/history.sqlite` with CSV exports after every run. Apartments that leave a list are followed for up to 30 days, to catch the final price.
+- **Monthly cost per apartment.** Each card shows what it would cost a month with your money plan, and whether it fits your budget.
 
 - **The planner in Swedish.** Every page, label, chart, map, date and status message is in Swedish (Visningar, Sparade, Ekonomi, Köpa), including what the finder writes for the planner: its run status and the red flag labels. Plans saved earlier keep working: an apartment's status and the default rate scenarios are stored as before and shown in Swedish, and the features the finder records in English for the price history are shown in Swedish. Our conversation stays in English.
 
