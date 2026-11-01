@@ -2,7 +2,7 @@
 
 Your addresses come from the planner (data/plan.json, show.places). Trips are SL's own journey
 planner (Journey-planner v2 on Trafiklab, open without a key), arriving by the time you set for each
-address on a weekday. Shops and gyms come from OpenStreetMap through Overpass, fetched once a week.
+address on a weekday. Grocery stores (ICA, Hemköp, Coop, Willys and Lidl), gyms, and bars and pubs come from OpenStreetMap through Overpass, fetched once a week.
 Trips are looked up only for the apartments you saved, to keep the requests to SL few; the nearest
 shop and gym are worked out here for every apartment in your filter. Everything is kept in
 data/travel.json, so an apartment is looked up once per address.
@@ -12,6 +12,7 @@ data/travel.json, so an apartment is looked up once per address.
 import datetime as dt
 import json
 import math
+import re
 import os
 import sys
 import time
@@ -32,6 +33,8 @@ SHOPS_DAYS = 7     # how often shops and gyms are fetched again
 TRIP_DAYS = 90     # timetables change; a trip is looked up again after this long
 PAUSE = 1.0        # seconds between requests to SL
 WALK = 80 / 1.25   # metres a minute on foot, counting the streets' detours over a straight line
+GROCERS = re.compile(r"\b(?:ica|hemköp|coop|willys|lidl)\b", re.I)  # the chains you shop at
+SHOPS_VERSION = 3  # raise when what's fetched changes, so the weekly cache is refreshed at once
 
 
 def get_json(url, data=None):
@@ -88,14 +91,17 @@ def trip(origin, dest, day, arrive):
 def fetch_shops():
     s, w, n, e = BBOX
     q = (f"[out:json][timeout:60];(nwr[\"shop\"=\"supermarket\"]({s},{w},{n},{e});"
-         f"nwr[\"leisure\"=\"fitness_centre\"]({s},{w},{n},{e}););out center tags;")
-    out = {"grocery": [], "gym": []}
+         f"nwr[\"leisure\"=\"fitness_centre\"]({s},{w},{n},{e});"
+         f"nwr[\"amenity\"~\"^(bar|pub)$\"]({s},{w},{n},{e}););out center tags;")
+    out = {"grocery": [], "gym": [], "bar": []}
     for el in get_json(OVERPASS, urllib.parse.urlencode({"data": q}).encode())["elements"]:
         t = el.get("tags", {})
         lat, lon = (el["lat"], el["lon"]) if "lat" in el else (el["center"]["lat"], el["center"]["lon"])
         name = t.get("name") or t.get("brand")
-        kind = "grocery" if t.get("shop") == "supermarket" else "gym"
-        if not name or (kind == "gym" and "yoga" in name.lower()):
+        kind = "grocery" if t.get("shop") == "supermarket" else "bar" if t.get("amenity") in ("bar", "pub") else "gym"
+        if not name or (kind == "gym" and re.search(r"yoga|pilates", name, re.I)):
+            continue
+        if kind == "grocery" and not GROCERS.search(f"{name} {t.get('brand', '')}"):
             continue
         out[kind].append({"name": name, "lat": lat, "lon": lon})
     return out
@@ -119,14 +125,14 @@ def run():
 
     # Shops and gyms, once a week
     shops = store.get("shops")
-    if not shops or (store.get("shopsAt") or "") < (now - dt.timedelta(days=SHOPS_DAYS)).isoformat():
+    if not shops or store.get("shopsVersion") != SHOPS_VERSION or (store.get("shopsAt") or "") < (now - dt.timedelta(days=SHOPS_DAYS)).isoformat():
         try:
             shops = fetch_shops()
-            store.update(shops=shops, shopsAt=now.isoformat(timespec="seconds"))
-            finder.log(f"Travel: {len(shops['grocery'])} grocery stores and {len(shops['gym'])} gyms from OpenStreetMap")
+            store.update(shops=shops, shopsAt=now.isoformat(timespec="seconds"), shopsVersion=SHOPS_VERSION)
+            finder.log(f"Travel: {len(shops['grocery'])} grocery stores, {len(shops['gym'])} gyms and {len(shops['bar'])} bars and pubs from OpenStreetMap")
         except Exception as e:
             finder.log(f"Travel: couldn't fetch shops and gyms from OpenStreetMap ({e})")
-            shops = shops or {"grocery": [], "gym": []}
+            shops = shops or {"grocery": [], "gym": [], "bar": []}
 
     # Your addresses, as SL knows them
     known = store.get("places", {})
@@ -148,7 +154,7 @@ def run():
     near, trips = store.get("near", {}), store.get("trips", {})
     for u, p in want.items():
         pt = (p["lat"], p["lon"])
-        near[u] = {"grocery": nearest(pt, shops["grocery"]), "gym": nearest(pt, shops["gym"])}
+        near[u] = {k: nearest(pt, shops.get(k, [])) for k in ("grocery", "gym", "bar")}
     day, stale, done, failed = next_weekday(now), (now - dt.timedelta(days=TRIP_DAYS)).isoformat(), 0, 0
 
     def needed(u, pl):  # not looked up yet, the address or time changed, or the answer is old

@@ -1759,7 +1759,7 @@ function travelLine(p) {
     const how = (x.lines || []).join(", ") || "On foot";
     bits.push(`<span title="${esc(how)}${x.changes ? `, ${x.changes} change${x.changes > 1 ? "s" : ""}` : ""}, arriving by ${esc(pl.arrive || "08:00")}">${esc(pl.name || "Place")} <strong>${x.min} min</strong></span>`);
   }
-  for (const [k, l] of [["grocery", "Grocery"], ["gym", "Gym"]]) {
+  for (const [k, l] of [["grocery", "Grocery"], ["gym", "Gym"], ["bar", "Bar"]]) {
     const x = n[k];
     if (x) bits.push(`<span title="${esc(x.name)}, ${x.m} m away">${l} <strong>${x.walk} min</strong> walk · ${esc(x.name)}</span>`);
   }
@@ -1958,7 +1958,7 @@ function showClick(a) {
     case "del-place": S.show.places = (S.show.places || []).filter((x) => x.id !== a.dataset.id); return false;
     case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
     case "unwent": delete S.show.visits[a.dataset.key]; return false;
-    case "untrack": S.apts = S.apts.filter((x) => x.link !== a.dataset.key); return false;
+    case "untrack": S.apts = S.apts.filter((x) => x.link !== a.dataset.key); setTimeout(flush); return false;
     case "track":
       if (p && (S.show.places || []).some((x) => x.addr)) setTimeout(lookUpTrips); // the trips to your addresses, for this apartment
       if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${p.area || p.group || ""}`, price: p.price || null, bid: p.price || null,
@@ -2038,6 +2038,10 @@ app.addEventListener("click", (e) => {
   }
   changed(true);
 });
+
+// Save at once when the page is hidden or closed, so a change made just before isn't lost
+addEventListener("pagehide", () => { if (saveTimer) flush(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && saveTimer) flush(); });
 
 render();
 initStore().then(async () => {
