@@ -66,6 +66,25 @@ AGENTS = [
                 "marieberg", "lindhagen", "gamla-stan", "reimersholme")] +
               ["https://www.fastighetsbyran.com/sv/sverige/till-salu/stockholms-lan/stockholms-stad"],
      "obj": r"fastighetsbyran\.com/sv/sverige/till-salu/stockholms-lan/stockholms-stad/objekt/\?objektID=\d+$"},
+    # Mäklarhuset, HusmanHagberg and Mäklarringen gave written permission (per Marcus, 2026-11-01), so their
+    # robots.txt isn't read. Mäklarhuset's district page lists that district first and then the rest of the
+    # city, so its first two pages hold the district's apartments.
+    {"name": "Mäklarhuset", "permission": "Written permission, per Marcus 2026-11-01",
+     "lists": [f"https://www.maklarhuset.se/bostad/sverige/stockholm/stockholm/{a}{p}" for a in
+               ("kungsholmen", "vasastan", "sodermalm", "ostermalm") for p in ("", "?page=1")],
+     "obj": r"maklarhuset\.se/bostad/sverige/stockholm/stockholm/[^/]+/\d+$"},
+    # HusmanHagberg's list pages only by clicking, so its 18 newest come from the list and the rest from its
+    # sitemap, whose addresses end in the area's name
+    {"name": "HusmanHagberg", "permission": "Written permission, per Marcus 2026-11-01",
+     "lists": ["https://www.husmanhagberg.se/till-salu/lagenhet/stockholm-stockholm/"],
+     "sitemaps": ["https://www.husmanhagberg.se/sitemap/objekt/sitemap.xml"],
+     "obj": r"husmanhagberg\.se/objekt/[^/]*-(?:vasastan|norrmalm|ostermalm|sodermalm|kungsholmen|gamla-stan|hagastaden|"
+            r"birkastan|odenplan|fridhemsplan|sofo|sofia|katarina|hogalid|mariatorget|zinkensdamm|skanstull|hornstull|"
+            r"marieberg|fredhall|kristineberg|stadshagen|lilla-essingen|gardet|hjorthagen|reimersholme|lindhagen|"
+            r"rodabergen|atlas|larkstaden)(?:-[^/]*)?/OBJ[^/]+/?$"},
+    {"name": "Mäklarringen", "permission": "Written permission, per Marcus 2026-11-01",
+     "lists": ["https://www.maklarringen.se/till-salu?q=%5B%22Stockholm%22%5D"],
+     "obj": r"maklarringen\.se/maklare/[^/]+/bostadsratt/stockholm/stockholm/"},
 ]
 # Sites whose owner allowed the finder in writing, past what their robots.txt says
 PERMITTED = {urlparse(u).netloc for a in AGENTS if a.get("permission") for u in a.get("lists", []) + a.get("sitemaps", [])}

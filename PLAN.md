@@ -12,7 +12,7 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 |---|---|---|---|
 | Bjurfors | Reading | 153 | Stockholm list, every numbered page |
 | Alicia Edelman | Reading | 120 | For-sale list |
-| Erik Olsson | Reading, list not always complete | 45 | One list per inner-city district; scrolling sometimes stops early |
+| Erik Olsson | Reading | 45 | One list per inner-city district; two runs on 2026-11-01 found the same 137 apartments |
 | Bergets Ro | Reading | 37 | For-sale list, "show more" until it ends |
 | Notar | Reading, not complete | 24 | 25 newest plus 12 newest per inner-city office |
 | Tradition | Reading | 24 | For-sale list |
@@ -28,13 +28,15 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 | Karlsson & Uddare | Reading | 1 | For-sale list; mostly Saltsjöbaden |
 | Fastighetsbyrån | Reading, by permission | 187 | One page per area they name (Kungsholmen, Vasastan, Katarina…) plus the city's newest; allowed by e-mail for a hobby project (see below) |
 | Wrede | Left out | – | Hides the address on most apartments, and nearly all are far above budget |
-| Mäklarhuset | To do | – | Its site didn't answer |
-| Living | To do | – | Its address now leads to Leander Pehrson's site; find the right one |
-| HusmanHagberg | To do | – | robots.txt allows it |
-| Mäklarringen | To do | – | robots.txt allows it |
-| ERA | To do | – | |
+| Mäklarhuset | Reading, by permission | 22 | First two pages of the Kungsholmen, Vasastan, Södermalm and Östermalm searches |
+| HusmanHagberg | Reading, by permission | 42 | Stockholm city list (18 newest) plus sitemap entries whose address names an inner-city area |
+| Mäklarringen | Reading, by permission | 1 | Stockholm search; only its Östermalm office has inner-city apartments |
+| Living | Left out | – | livingstockholm.se is now a city guide, and the agent's old address leads to Leander Pehrson |
+| ERA | Left out | – | era.se and erasweden.com are parked domains; no Swedish ERA site found |
 
-**Fastighetsbyrån's permission (2026-10-31).** Their robots.txt and terms forbid automatic reading of fastighetsbyran.com without special permission. Marcus asked them by e-mail, and they allowed it as long as this stays a hobby project. **If the project ever grows beyond that (shared with others, published or commercial), ask them again first.** The finder reads only their apartments in the inner city, once a day, with pauses; their entry in `scraper/agents.py` is marked `permission`, the one agent allowed past its robots.txt.
+**Fastighetsbyrån's permission (2026-10-31).** Their robots.txt and terms forbid automatic reading of fastighetsbyran.com without special permission. Marcus asked them by e-mail, and they allowed it as long as this stays a hobby project. **If the project ever grows beyond that (shared with others, published or commercial), ask them again first.** The finder reads only their apartments in the inner city, once a day, with pauses; their entry in `scraper/agents.py` is marked `permission`.
+
+**Mäklarhuset, HusmanHagberg and Mäklarringen (2026-11-01).** Marcus has written permission from them, so their entries are also marked `permission` and their robots.txt isn't read. Agents marked `permission` are the only ones allowed past their robots.txt.
 
 ## In progress
 

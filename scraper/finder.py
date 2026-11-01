@@ -43,8 +43,8 @@ PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
 AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
-# A challenge page, not the notice under a contact form ("Denna sida skyddas av reCAPTCHA")
-BLOCKED = re.compile(r"(?<!skyddas av )(?<!protected by )\b(?:re)?captcha|verify you are human|är du en människa|"
+# A challenge page, not the notice under a contact form ("skyddas av reCAPTCHA", "skyddas mot missbruk av reCAPTCHA")
+BLOCKED = re.compile(r"(?<! av )(?<! by )\b(?:re)?captcha|verify you are human|är du en människa|"
                      r"access denied|unusual traffic", re.I)
 DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
 # Booli's own area, used only to read its count for the same filter. Only the whole inner city:
