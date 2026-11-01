@@ -348,6 +348,18 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .heart[aria-pressed="true"] { color: var(--negative); border-color: currentColor; }
 .heart[aria-pressed="true"] svg { fill: currentColor; }
 .facts.travel strong { color: var(--text); font-weight: 600; }
+.rank-wait ul { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 4px; font-size: 14px; }
+.rank-wait a { color: var(--text); }
+ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rank-row { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) auto; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 16px; }
+.rank-row .rk { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.rank-row .sc { display: grid; gap: 4px; }
+.rank-row .sc b { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.rank-row .sc i { display: block; height: 4px; border-radius: 2px; background: var(--data); }
+.rank-row .facts { margin: 4px 0 6px; }
+.rank-row .why { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip.score { border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500; }
+@media (max-width: 640px) { .rank-row { grid-template-columns: 24px minmax(0, 1fr) auto; } .rank-row .sc { grid-column: 2; grid-row: 2; } }
 .my-area ul { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 4px; }
 .my-area li { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .my-area li em { flex-basis: 100%; color: var(--muted); }
@@ -561,7 +573,8 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { f: { minPrice: null, maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [] },
+  show: { f: { minPrice: null, maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true, skipPricey: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [],
+    w: { budget: 3, area: 3, flags: 2, travel: 2, near: 1, size: 2, avgift: 1, features: 1 } },
 });
 let S = DEFAULT();
 
@@ -861,7 +874,8 @@ const RANGES = {
   "fin.targetPrice": [1000000, 12000000, 25000], "fin.bankOffer": [0, 10000000, 50000],
   "bid.ask": [1000000, 12000000, 25000], "bid.walk": [1000000, 12000000, 25000], "bid.step": [5000, 100000, 5000],
   "five.avgiftExtra": [0, 5, 0.25], "rates.offer": [1, 6, 0.01], "value.manual": [-5, 10, 0.5],
-  "show.f.minPrice": [0, 8000000, 50000], "show.f.maxPrice": [1000000, 12000000, 50000], "show.f.minRooms": [1, 6, 0.5], "show.f.minArea": [15, 150, 5], "show.f.maxAvgift": [1000, 10000, 250],
+  "show.f.minPrice": [0, 8000000, 50000], "show.w.budget": [0, 3, 1], "show.w.area": [0, 3, 1], "show.w.flags": [0, 3, 1], "show.w.travel": [0, 3, 1],
+  "show.w.near": [0, 3, 1], "show.w.size": [0, 3, 1], "show.w.avgift": [0, 3, 1], "show.w.features": [0, 3, 1], "show.f.maxPrice": [1000000, 12000000, 50000], "show.f.minRooms": [1, 6, 0.5], "show.f.minArea": [15, 150, 5], "show.f.maxAvgift": [1000, 10000, 250],
   "search.minRooms": [1, 6, 0.5], "search.minArea": [15, 150, 5], "search.maxAvgift": [1000, 10000, 250], "search.headroom": [0, 25, 1],
 };
 const nfIn = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 2 });
@@ -1546,7 +1560,7 @@ function aptOut(p) {
 
 // Four sections in the menu; the less used pages sit under Money and Buying as sub-tabs
 const SECTIONS = {
-  show: ["Visningar", [["show", "Visningar"]]],
+  show: ["Visningar", [["show", "Visningar"], ["rank", "Rangordning"]]],
   saved: ["Sparade", [["search", "Sparade lägenheter"]]],
   money: ["Ekonomi", [["overview", "Översikt"], ["money", "Privatekonomi"], ["rates", "Bolåneräntor"], ["five", "Budget på 5 år"]]],
   buying: ["Köpa", [["bid", "Budgivning"], ["value", "Områdespriser"], ["furnish", "Möbler"], ["steps", "Steg i köpet"]]],
@@ -1651,7 +1665,7 @@ const LOCAL = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\
 async function loadList() {
   if (!LOCAL) return;
   try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) { LIST = { items: {}, ...(await r.json()) }; placeAll(); } } catch (e) {}
-  if (S.tab === "show") refresh();
+  if (S.tab === "show" || S.tab === "rank") refresh();
 }
 // What the finder reads: your filter
 function scrapeConfig() { return { filter: S.show.f }; }
@@ -1661,6 +1675,9 @@ function fits(p, f = S.show.f) {
   if (p.soon && !f.includeSoon) return false;
   if (f.maxPrice && p.price && p.price > f.maxPrice) return false;
   if (f.minPrice && p.price && p.price < f.minPrice) return false;
+  // No price yet: leave it out when the district's price per m² times its size is more than 10 % above your max
+  // (the estimate comes from final prices, and asking prices are often set a little lower)
+  if (f.skipPricey !== false && !p.price && f.maxPrice && estimatePrice(p) > f.maxPrice * PRICEY_MARGIN) return false;
   if (f.minRooms && p.rooms && p.rooms < f.minRooms) return false;
   if (f.minArea && p.kvm && p.kvm < f.minArea) return false;
   if (f.maxAvgift && p.avgift && p.avgift > f.maxAvgift) return false;
@@ -1677,7 +1694,7 @@ async function loadTravel() {
   clearTimeout(travelTimer);
   try { const r = await fetch("/api/travel", { cache: "no-store" }); if (r.ok) TRAVEL = { trips: {}, near: {}, places: {}, ...(await r.json()) }; } catch (e) {}
   if (TRAVEL.running) travelTimer = setTimeout(loadTravel, 8000);
-  if (S.tab === "show") refresh();
+  if (S.tab === "show" || S.tab === "rank") refresh();
 }
 // After you change an address or its time: save it, then let the server look up the trips
 async function lookUpTrips() {
@@ -1694,7 +1711,7 @@ let pollTimer = null;
 function setCrawl(state, msg) {
   CRAWL.state = state; CRAWL.msg = msg;
   const b = document.querySelector('#tabs button[data-sec="show"]'); if (b) b.classList.toggle("busy", state === "running");
-  if (S.tab === "show") refresh();
+  if (S.tab === "show" || S.tab === "rank") refresh();
 }
 async function pollStatus() {
   if (!LOCAL) return;
@@ -1795,6 +1812,8 @@ function filterPanel() {
     ${numField("show.f.maxAvgift", "Högsta avgift", "kr/mån", "Lämna ett fält tomt för ingen gräns.")}
     ${chk("notGround", "Inte på bottenvåningen")}
     ${chk("includeSoon", "Ta med lägenheter som snart är till salu")}
+    ${chk("skipPricey", "Dölj lägenheter utan pris som uppskattas mer än 10 % över maxpriset")}
+    <small class="dim" style="display:block;font-size:12px;margin-top:4px">Uppskattningen är stadsdelens senaste kvadratmeterpris gånger lägenhetens storlek (Områdespriser).</small>
   </section>`;
 }
 function areaGroups(list) {
@@ -1908,7 +1927,7 @@ function showCard(p, s, a, cr) {
     ${photos.length ? `<a class="thumb" href="${esc(photos[0])}" target="_blank" rel="noopener"><img src="${esc(photos[0])}" alt="Foto på ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="sc-main">
       <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
-        <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Aldrig här" : "Område " + r + "/5"}</span>` : ""}</div>
+        <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Aldrig här" : "Område " + r + "/5"}</span>` : ""}${never || !p.price ? "" : `<button class="chip score" data-goto="rank" title="Betyg i Rangordning">Betyg ${rankOf(p, a).score}</button>`}</div>
       <p>${esc(describeListing(p))}</p>
       ${(p.flags || []).length ? `<div class="flags">${flagChips(p.flags).join("")}</div>` : ""}
       ${travelLine(p)}
@@ -2089,6 +2108,7 @@ function showClick(a) {
   switch (a.dataset.act) {
     case "crawl-start": startScrape(); return true;
     case "show-more": showLimit += SHOW_STEP; refresh(); return true;
+    case "rank-more": rankLimit += 30; refresh(); return true;
     case "add-place": (S.show.places = S.show.places || []).push({ id: Math.random().toString(36).slice(2, 9), name: "", addr: "", arrive: "08:00" }); return false;
     case "del-place": S.show.places = (S.show.places || []).filter((x) => x.id !== a.dataset.id); return false;
     case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
@@ -2104,6 +2124,108 @@ function showClick(a) {
   return null;
 }
 VIEWS.show = showView;
+
+/* ---------- Ranking: one score per apartment from what we already know, with weights you set ---------- */
+const RANK = [
+  ["budget", "Pris mot budget", "Utgångspriset mot ditt maxpris. Utan pris än uppskattas det från stadsdelens kvadratmeterpris."],
+  ["area", "Ditt områdesbetyg", "Betyget du gett området eller stadsdelen."],
+  ["flags", "Föreningen", "Röda och gröna flaggor från mäklarens beskrivning och fakta."],
+  ["travel", "Restid", "Snittiden med SL till dina viktiga adresser. Finns bara för sparade lägenheter."],
+  ["near", "Nära till vardagen", "Promenad till närmaste mataffär, gym och bar."],
+  ["size", "Storlek", "Fler kvadratmeter än ditt minimum ger mer."],
+  ["avgift", "Avgift per kvm", "Låg avgift per kvadratmeter och år ger mer."],
+  ["features", "Egenskaper", "Balkong, hiss, tvättmaskin, kakelugn och liknande."],
+];
+const NICE = ["balcony", "lift", "washing machine", "dishwasher", "fireplace", "renovated kitchen", "renovated bathroom", "tiled bathroom",
+  "water view", "quiet courtyard side", "high ceilings", "herringbone parquet", "patio", "storage", "corner flat", "stambyte done"];
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+// What an apartment without an asking price would likely cost: its district's latest price per m² times its size
+const PRICEY_MARGIN = 1.1;
+function estimatePrice(p) {
+  return p.kvm ? Math.round((AREAS[DISTRICT_AREA[p.group] || "centrala-stockholm"].now * p.kvm) / 50000) * 50000 : 0;
+}
+// Which of Svensk Mäklarstatistik's areas (Områdespriser) a district's prices come from
+const DISTRICT_AREA = { "Södermalm": "sodermalm", "Gamla stan": "sodermalm", "Kungsholmen": "kungsholmen", "Vasastan": "vasastan-norrmalm", "Norrmalm": "vasastan-norrmalm",
+  "Östermalm": "ostermalm", "Gärdet": "ostermalm" };
+// Each part is [score 0–1, reason]; a part we know nothing about is left out, so it neither helps nor hurts
+function rankParts(p, a = affordability()) {
+  const parts = {};
+  // Without an asking price yet, the district's latest price per m² times the apartment's size gives an estimate
+  const guess = p.price ? 0 : estimatePrice(p);
+  const price = p.price || guess, est = guess ? `uppskattat ${mkr(guess)}, ` : "";
+  if (price) parts.budget = price > a.max ? [0, `${est}${kr(price - a.max)} över ditt max`]
+    : price <= a.max * 0.9 ? [1, guess ? `Uppskattat ${mkr(guess)}, inom budget` : "Gott om utrymme i budgeten"] : [1 - ((price - a.max * 0.9) / (a.max * 0.1)) * 0.5, `${est}nära ditt maxpris`.replace(/^./, (c) => c.toUpperCase())];
+  const r = rating(p.area) || rating(p.group);
+  if (r && r !== "never") parts.area = [(+r - 1) / 4, `${p.area || p.group} ${r}/5`];
+  const fl = (p.flags || []).filter((f) => f.kind !== "ask");
+  if (fl.length) {
+    let s = 0.7;
+    for (const f of fl) s += f.kind === "bad" ? -0.35 : f.kind === "warn" ? -0.12 : 0.08;
+    const worst = fl.find((f) => f.kind === "bad") || fl.find((f) => f.kind === "warn") || fl.find((f) => f.kind === "good");
+    parts.flags = [clamp01(s), worst.label];
+  }
+  const trips = (TRAVEL.trips || {})[p.url] || {}, mins = (S.show.places || []).map((pl) => (trips[pl.id] || {}).min).filter((m) => m != null);
+  if (mins.length && S.apts.some((x) => x.link === p.url)) {
+    const avg = Math.round(mins.reduce((x, y) => x + y, 0) / mins.length);
+    parts.travel = [clamp01((60 - avg) / 45), `${avg} min i snitt till dina adresser`];
+  }
+  const n = (TRAVEL.near || {})[p.url];
+  if (n && (n.grocery || n.gym)) {
+    const ws = [n.grocery, n.gym, n.bar].filter(Boolean).map((x) => x.walk);
+    parts.near = [ws.reduce((x, w) => x + clamp01((15 - w) / 12), 0) / ws.length, [n.grocery && `mataffär ${n.grocery.walk} min`, n.gym && `gym ${n.gym.walk} min`].filter(Boolean).join(", ")];
+  }
+  if (p.kvm) parts.size = [clamp01((p.kvm - (+S.show.f.minArea || 30)) / 35), `${String(p.kvm).replace(".", ",")} m²`];
+  if (p.avgift && p.kvm) { const y = (p.avgift * 12) / p.kvm; parts.avgift = [clamp01((1100 - y) / 450), `avgift ${nf.format(Math.round(y))} kr/m² och år`]; }
+  const nice = (p.extra || []).filter((x) => NICE.includes(x));
+  parts.features = [clamp01(nice.length / 5), nice.length ? nice.slice(0, 3).map((x) => FEATURE_SV[x] || x).join(", ") : "inga särskilda egenskaper nämnda"];
+  return parts;
+}
+function rankOf(p, a) {
+  const parts = rankParts(p, a), w = S.show.w || {};
+  let sum = 0, wsum = 0;
+  for (const [k, [s]] of Object.entries(parts)) { sum += (+w[k] || 0) * s; wsum += +w[k] || 0; }
+  const score = wsum ? Math.round((sum / wsum) * 100) : 0;
+  // The reasons that weigh most: strong parts for, weak parts against
+  const ranked = Object.entries(parts).filter(([k]) => +w[k] > 0).sort((x, y) => (+w[y[0]] || 0) - (+w[x[0]] || 0));
+  return { score, parts, pros: ranked.filter(([, [s]]) => s >= 0.7).slice(0, 3), cons: ranked.filter(([, [s]]) => s <= 0.3).slice(0, 2) };
+}
+let rankLimit = 30;
+function rankView() {
+  const a = affordability();
+  // Only apartments with an asking price are ranked; the rest wait until the agent sets one
+  const all = apartments().filter((p) => !isNever(p));
+  const waiting = all.filter((p) => !p.price);
+  const list = all.filter((p) => p.price).map((p) => ({ p, r: rankOf(p, a) })).sort((x, y) => y.r.score - x.r.score);
+  const weights = RANK.map(([k, l, hint]) => numField(`show.w.${k}`, l, "", hint)).join("");
+  const rows = list.slice(0, rankLimit).map(({ p, r }, i) => {
+    const tracked = S.apts.some((x) => x.link === p.url), next = (p.shows || []).map((s) => s.start).sort()[0];
+    return `<li class="rank-row">
+      <span class="rk">${i + 1}</span>
+      <span class="sc"><b>${r.score}</b><i style="width:${r.score}%"></i></span>
+      <div class="rk-main">
+        <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a><span class="dim">${esc(p.area || p.group || "")}</span></div>
+        <div class="facts"><span>${p.price ? kr(p.price) : "Inget pris än"}</span>${p.rooms ? `<span>${String(p.rooms).replace(".", ",")} rum</span>` : ""}${p.kvm ? `<span>${String(p.kvm).replace(".", ",")} m²</span>` : ""}${next ? `<span>Visning ${fmtShort(next)} ${next.slice(11)}</span>` : p.soon ? "<span>Snart till salu</span>" : ""}<span>${esc(p.agent)}</span></div>
+        <div class="why">${r.pros.map(([k, [, why]]) => `<span class="chip good" title="${esc(RANK.find((x) => x[0] === k)[1])}">${esc(why)}</span>`).join("")}${r.cons.map(([k, [, why]]) => `<span class="chip warn" title="${esc(RANK.find((x) => x[0] === k)[1])}">${esc(why)}</span>`).join("")}</div>
+      </div>
+      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Ta bort " + esc(p.addr) + " från Sparade" : "Spara " + esc(p.addr)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
+    </li>`;
+  }).join("");
+  return `
+    <div class="lead"><h1>Rangordning</h1>
+    <p>Varje lägenhet i ditt filter med ett utgångspris får ett betyg från 0 till 100 utifrån det vi redan vet om den; lägenheter utan pris rankas när priset finns. Ställ in hur mycket varje sak väger; det som saknas för en lägenhet räknas inte alls, så den varken vinner eller förlorar på det. Områden du satt till <strong>Aldrig här</strong> är inte med.</p></div>
+    <div class="bench show">
+      <div class="stack"><section class="panel"><h3>Vad är viktigast för dig?</h3>
+        <p class="dim" style="font-size:13px;margin:0 0 4px">0 betyder att det inte räknas alls, 3 att det väger tyngst.</p>${weights}</section></div>
+      <div>
+        ${list.length ? `<ol class="rank">${rows}</ol>${list.length > rankLimit ? `<button class="btn more" data-act="rank-more">Visa ${Math.min(30, list.length - rankLimit)} till (${list.length - rankLimit} kvar)</button>` : ""}`
+          : `<div class="note">Inga lägenheter med pris i ditt filter än.</div>`}
+        ${waiting.length ? `<details class="undated rank-wait"><summary>${waiting.length} ${waiting.length > 1 ? "lägenheter väntar" : "lägenhet väntar"} på pris</summary>
+          <p class="dim" style="font-size:13px;margin:0 0 8px">De rankas när mäklaren har satt ett utgångspris.</p>
+          <ul>${waiting.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.addr)}</a> <span class="dim">${esc(p.area || p.group || "")}${p.kvm ? " · " + String(p.kvm).replace(".", ",") + " m²" : ""} · ${esc(p.agent)}${estimatePrice(p) ? " · uppskattat " + mkr(estimatePrice(p)) : ""}</span></li>`).join("")}</ul></details>` : ""}
+      </div>
+    </div>`;
+}
+VIEWS.rank = rankView;
 
 /* ---------- Events ---------- */
 document.getElementById("tabs").addEventListener("click", (e) => {

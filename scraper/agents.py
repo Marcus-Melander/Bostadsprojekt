@@ -361,6 +361,9 @@ def _date(day, month_idx, now):
 
 
 def parse_agent_page(text, now):
+    # Only this apartment's part of the page: the list of other apartments below has their prices and showings
+    if (cut := others_at(text)) is not None:
+        text = text[:cut]
     lines = [re.sub(r"[  \t]+", " ", l).strip() for l in text.split("\n")]
     lines = [l for l in lines if l]
     flat = " | ".join(lines)
@@ -456,6 +459,12 @@ FINAL_RX = re.compile(r"(?:slutpris|såld för|sålt för|köpeskilling)\s*:?\s*
 OTHERS_RX = re.compile(r"^\s*(?:liknande (?:bostäder|objekt)|andra (?:bostäder|har också tittat på)|fler bostäder|"
                        r"bostäder i närheten|andra objekt|du kanske också gillar|senast sålda|missa inte din drömbostad)\b", re.I | re.M)
 
+def others_at(t):
+    """Where the list of other apartments starts, or None. Menus often link to "Liknande bostäder" near the
+    top of the page, so a heading in the first third doesn't count."""
+    return next((m.start() for m in OTHERS_RX.finditer(t) if m.start() > len(t) / 3), None)
+
+
 BID_AMOUNT = re.compile(r"^(\d{1,3}(?: \d{3}){1,3}) ?kr$")
 BID_WHEN = re.compile(
     r"^(?:(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})|(?P<d2>\d{1,2})/(?P<m2>\d{1,2})(?:[/-](?P<y2>\d{2,4}))?|"
@@ -507,8 +516,8 @@ def parse_bidding(text):
     """Where an apartment is in its sale: for sale, in bidding (with the highest bid and how
     many bids there are) or sold (with the final price, when the agent publishes it)."""
     t = full = re.sub(r"[\u00a0\u202f]", " ", text)
-    if m := OTHERS_RX.search(t):
-        t = t[:m.start()]  # the state is read from this apartment's part of the page only
+    if (cut := others_at(t)) is not None:
+        t = t[:cut]  # the state is read from this apartment's part of the page only
     out = {"state": "for sale"}
     if m := FINAL_RX.search(t):
         out.update(state="sold", final=int(re.sub(r"\D", "", m.group(1))))
@@ -683,22 +692,34 @@ def _hit(rx, sentences):
     return None, False
 
 
-def red_flags(desc, built=None, now=None):
-    """What the description says about the förening that could cost you, and what reassures:
-    [{"kind": "bad" | "warn" | "good" | "ask", "label", "quote"}]. Each flag quotes the sentence it comes from;
-    "ask" is something to ask the agent about, shown only on saved apartments."""
+def red_flags(desc, built=None, now=None, facts=None, kvm=None):
+    """What the agent's page says about the förening that could cost you, and what reassures:
+    [{"kind": "bad" | "warn" | "good" | "ask", "label", "quote"}]. Reads the förening's facts (forening_facts)
+    first, then the description; each flag quotes the sentence it comes from. "ask" is something to ask the
+    agent about, shown only on saved apartments."""
     year = (now or dt.datetime.now()).year
-    ss, out = _sentences(re.sub(r"[  ]", " ", desc or "")), []
+    # The label "Äkta/oäkta förening" would read as oäkta; it only names the field
+    fs = _sentences(re.sub(r"(?i)äkta\s*/\s*oäkta\s+(?:bostadsrätts)?förening", "Föreningsform", re.sub(r"[\u00a0\u202f]", " ", facts or "")))
+    ss, out = fs + _sentences(re.sub(r"[\u00a0\u202f]", " ", desc or "")), []
     add = lambda kind, label, quote: out.append({"kind": kind, "label": label, "quote": quote[:300]})
+    money = lambda v: f"{v:,}".replace(",", " ")
 
     # Stambyte (new pipes): coming is costly, done is good; an old house that never mentions it is worth asking about
     s, neg = _hit(r"stambyte\w*\s+(?:är\s+|har\s+|blev\s+)?(?:planera|beslut|kommer|ska|skall|inplanera|påbörja|projekter|pågår|förestår)"
                   r"|(?:planera|beslut|kommande|förestående|stundande)\w*\s+stambyte|relining\s+(?:planera|kommer|ska)", ss)
     if s and not neg:
         add("warn", "Stambyte kan komma", s) if _MAYBE.search(s) else add("bad", "Stambyte på gång", s)
-    elif s2 := _hit(r"stamby(?:te|tet|ten|tt)|nya stammar|relin", ss)[0]:
-        ys = [int(y) for y in _YEAR.findall(s2)]
-        if ys and max(ys) > year:
+    elif s2 := _hit(r"stamby(?:te|tet|ten|tt)|nya stammar|relin|(?:vatten|avlopp)\w*[- ]?(?:och\s+\w+\s*)?stammar|stammar\w*\s+(?:byttes|bytt)", ss)[0]:
+        # A renovation list has one line per job ("2002 - Stambyte kök/badrum", "2025 - Nyinstallation av stammar"): the latest counts
+        # Only the part of a line that names the job ("2018 Spolning av stammar: 2019 OVK" is two jobs), and only
+        # replacing or relining counts, not flushing, filming or inspecting the pipes
+        rx, not_a_change = re.compile(r"stamby|stammar|relin", re.I), re.compile(r"spolning|spolad|filmning|filmad|inspektion|besiktning|översyn|planera|kommande|ska\b|framtid", re.I)
+        ys = [int(y) for s in ss for seg in re.split(r":\s|\|", s) if rx.search(seg) and not not_a_change.search(seg)
+              for y in _YEAR.findall(seg) if int(y) <= year]
+        ys = ys or [int(y) for y in _YEAR.findall(s2)]
+        if ys and max(ys) > year + 5:
+            add("warn", f"Stambyte planerat {max(ys)}", s2)
+        elif ys and max(ys) > year:
             add("bad", f"Stambyte {max(ys)}", s2)
         elif ys or re.search(r"genomför|gjor|utför|klar|färdig|stambytt|nya stammar|redan", s2, re.I):
             add("good", f"Stambyte gjort{' ' + str(max(ys)) if ys else ''}", s2)
@@ -706,26 +727,42 @@ def red_flags(desc, built=None, now=None):
         add("ask", "Fråga när stambytet gjordes", f"Byggt {built}; beskrivningen säger inte när stammarna senast byttes.")
 
     # The avgift going up
-    s, neg = _hit(r"avgift\w*\s+(?:kommer\s+att\s+|ska\s+|planeras\s+att\s+)?(?:höj|justera\w*\s+upp)|(?:höjning|höjd|höjt)\w*\s+(?:av\s+)?(?:års|månads)?avgift|avgiftshöjning", ss)
+    if s := _hit(r"(?:ingen|inga)\s+(?:planerad\w*|beslutad\w*)(?:\s*/\s*(?:planerad\w*|beslutad\w*))?\s+(?:ändring\w*|höjning\w*)\s+av\s+(?:års|månads)?avgift", fs)[0]:
+        add("good", "Ingen avgiftsändring planerad", s)
+    s, neg = (None, False) if out and out[-1]["label"] == "Ingen avgiftsändring planerad" else _hit(r"avgift\w*\s+(?:kommer\s+att\s+|ska\s+|planeras\s+att\s+)?(?:höj|justera\w*\s+upp)|(?:höjning|höjd|höjt)\w*\s+(?:av\s+)?(?:års|månads)?avgift|avgiftshöjning", ss)
     if s:
         add("good", "Ingen avgiftshöjning planerad", s) if neg else add("warn", "Avgiften kan höjas", s) if _MAYBE.search(s) else add("bad", "Avgiften höjs", s)
 
     # Tomträtt: the plot is leased from the city, and the ground rent can rise steeply
     s, neg = _hit(r"tomträtt", ss)
-    if s and not neg and not re.search(r"äger (?:sin |själv |)mark|friköpt", s, re.I):
+    land = re.search(r"äger\s+(?:föreningen\s+)?marken\s*:\s*(ja|nej)", f := (_hit(r"äger\s+(?:föreningen\s+)?marken\s*:", fs)[0] or ""), re.I)
+    if land and land.group(1).lower() == "ja":
+        add("good", "Äger marken", f)
+    elif land:
+        add("bad", "Tomträtt", f)
+    elif s and not neg and not re.search(r"äger (?:sin |själv |)mark|friköpt", s, re.I):
         add("bad", "Tomträtt", s)
     elif (s and neg) or (s := _hit(r"äger (?:sin |själva |själv |)marken|friköpt mark|marken (?:är )?friköpt", ss)[0]):
         add("good", "Äger marken", s)
 
     # Äkta or oäkta förening (oäkta changes the tax rules when you sell)
-    s, neg = _hit(r"oäkta\s+(?:bostadsrätts)?förening", ss)
-    if s and not neg:
+    s, neg = _hit(r"oäkta\s+(?:bostadsrätts)?förening|äkta förening\s*:\s*nej|ej privatbostadsföretag|\(oäkta\)", ss)
+    if (k := _hit(r"äkta förening\s*:\s*ja|privatbostadsföretag\s*\(äkta\)|beskattas som\s*:\s*privatbostadsföretag|föreningsform\s*:\s*äkta", fs)[0]) and not (s and not neg):
+        add("good", "Äkta förening", k)
+    elif s and not neg:
         add("bad", "Oäkta förening", s)
     elif s := _hit(r"\bäkta\s+(?:bostadsrätts)?förening|\bäkta brf", ss)[0]:
         add("good", "Äkta förening", s)
 
-    # The förening's debt per m² (belåning): under 5 000 kr is low, over 15 000 kr is high
-    s, _ = _hit(r"(?:belåning|skuld|lån)\w*[^.]{0,60}?\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)"
+    # The förening's debt per m²: under 5 000 kr is low, over 15 000 kr is high. Since 2023 agents give the
+    # apartment's share of the förening's net debt (indirekt nettoskuldsättning) in kronor; per m² of the apartment it compares
+    n = _hit(r"nettoskuld\w*\s*:?\s*\d", fs)[0]
+    nm = n and re.search(r"nettoskuld\w*\s*:?\s*(\d{1,3}(?:[ .]\d{3})*)\s*kr", n, re.I)
+    if nm and kvm:
+        v = round(int(re.sub(r"\D", "", nm.group(1))) / float(kvm) / 100) * 100
+        kind = "bad" if v > 15000 else "warn" if v > 5000 else "good"
+        add(kind, "Ingen nettoskuld" if v == 0 else f"{'Hög' if kind == 'bad' else 'Måttlig' if kind == 'warn' else 'Låg'} skuld: {money(v)} kr/m²", n)
+    s, _ = (None, None) if nm and kvm else _hit(r"(?:belåning|skuld|lån)\w*[^.]{0,60}?\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)"
                 r"|\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2)[^.]{0,30}(?:belåning|skuld|lån)", ss)
     if s and (m := re.search(r"(\d{1,2}[ .]?\d{3})\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)", s, re.I)):
         v = int(re.sub(r"\D", "", m.group(1)))
@@ -740,10 +777,15 @@ def red_flags(desc, built=None, now=None):
     elif (h := _hit(r"(?:hög|högre)\s+belåning", ss))[0] and not h[1]:
         add("bad", "Hög skuld", h[0])
 
-    # A small förening: big repairs are shared by few
-    s, _ = _hit(r"(?:omfattar|består av|har|med|totalt)\s+(?:endast\s+|bara\s+|totalt\s+)?(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", ss)
-    if s and (m := re.search(r"(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", s)) and int(m.group(1)) < 12:
-        add("warn", f"Liten förening: {m.group(1)} lägenheter", s)
+    # A small förening: big repairs are shared by few. The facts' "Antal lägenheter" wins over the description
+    k = _hit(r"antal (?:lägenheter|bostadsrätter|lgh|bostäder)\s*:\s*\d", fs)[0]
+    if k and (m := re.search(r":\s*(\d{1,4})", k)):
+        if int(m.group(1)) < 12:
+            add("warn", f"Liten förening: {m.group(1)} lägenheter", k)
+    else:
+        s, _ = _hit(r"(?:omfattar|består av|har|med|totalt)\s+(?:endast\s+|bara\s+|totalt\s+)?(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", ss)
+        if s and (m := re.search(r"(\d{1,3})\s+(?:lägenheter|bostadsrätter|bostäder|medlemmar)", s)) and int(m.group(1)) < 12:
+            add("warn", f"Liten förening: {m.group(1)} lägenheter", s)
 
     # Big works on the building that the förening hasn't paid for yet
     s, neg = _hit(r"(?:planera|beslut|kommande|förestående|stundande)\w*\s+(?:fasad|tak|fönster|balkong|hiss)\w*renovering|"
@@ -751,3 +793,64 @@ def red_flags(desc, built=None, now=None):
     if s and not neg:
         add("warn", "Renovering av huset planerad", s)
     return out
+
+
+# ---------- The förening's facts ----------
+
+_FACT_KEY = re.compile(r"belåning|skuld|lån per|per kvm|per m²|antal (?:lägenheter|bostadsrätter|lgh|bostäder)|består av \d+|tomträtt|äganderätt|"
+                       r"friköpt|marken|äkta|privatbostadsföretag|beskattas som|stamby|stammar|relin|avgift\w* (?:höj|sänk|ändr|justera)|"
+                       r"(?:ändring|höjning) av (?:års|månads)?avgift", re.I)
+_FACT_TABS = ("Förening", "Föreningen", "Om föreningen", "Ekonomi")
+
+
+def forening_text(page):
+    """The page's text with its förening and ekonomi sections opened: tabs and folded sections named
+    Förening, Föreningen, Om föreningen or Ekonomi (never a link that leaves the page), and a separate
+    fakta page on the same site (BOSTHLM's /fakta)."""
+    texts = [page.inner_text("body")]
+    for label in _FACT_TABS:
+        rx = re.compile(rf"^\s*{label}\s*$", re.I)
+        loc = page.locator("button:visible, summary:visible, a:visible, [role=tab]:visible, li:visible, h2:visible, h3:visible, div:visible, span:visible").filter(has_text=rx)
+        for el in loc.all()[:2]:
+            try:
+                href = el.get_attribute("href") or ""
+                if href and not href.startswith("#"):
+                    continue
+                el.click(timeout=1500)
+                page.wait_for_timeout(600)
+                texts.append(page.inner_text("body"))
+                break
+            except Exception:
+                continue
+    back, here = page.url, urlparse(page.url)
+    fakta = [h for h in page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)")
+             if urlparse(h).netloc == here.netloc and urlparse(h).path.rstrip("/").endswith("/fakta") and urlparse(h).path != here.path]
+    if fakta:
+        try:
+            page.goto(fakta[0], wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(1500)
+            texts.append(page.inner_text("body"))
+            page.goto(back, wait_until="domcontentloaded", timeout=45000)
+        except Exception:
+            pass
+    return "\n".join(texts)
+
+
+def forening_facts(text):
+    """The lines about the förening, as "label: value." sentences where the page lists them as label and value
+    ("Antal lägenheter" then "24"), from this apartment's part of the page only. Kept short for listings.json."""
+    t = re.sub(r"[  ]", " ", text)
+    if (cut := others_at(t)) is not None:
+        t = t[:cut]
+    lines = [l.strip() for l in t.split("\n") if l.strip()]
+    out = []
+    for i, l in enumerate(lines):
+        if not _FACT_KEY.search(l) or len(l) > 400:
+            continue
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        # A short label without a full stop, followed by its value
+        if len(l) < 50 and not re.search(r"[.!?]$", l) and nxt and len(nxt) < 300:
+            out.append(f"{l.rstrip(':')}: {nxt.rstrip('.')}.")
+        else:
+            out.append(l if re.search(r"[.!?]$", l) else l + ".")
+    return "\n".join(dict.fromkeys(out))[:5000]

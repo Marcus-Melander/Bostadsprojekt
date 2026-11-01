@@ -45,7 +45,7 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 ### Phase 1: Finish what's built
 
 
-- **Read the förening's figures from the agents' fact sections,** not only the description: debt per m², avgift changes, tomträtt, stambyte year, number of apartments. That makes the red flags complete.
+- **Förening figures where they're still missing.** Svensk Fastighetsförmedling, HusmanHagberg, Södermäklarna and ESNY show no förening figures the reader can find (their fact sections are loaded or laid out differently), and Bjurfors and Fastighetsbyrån give only a line or two. Find where each keeps them.
 - **Final prices for sold apartments.** Bidding is followed bid by bid; make sure the final price is recorded every time a saved apartment sells, where the agent publishes it, so our own price per m² per neighbourhood builds up next to the asking price.
 - **Close the gap to Booli.** Every morning the finder compares our count with Booli's for the same filter, and the planner shows the trend day by day. Coverage of Booli's for-sale count: 52 % on 31 October (17 agents), 60 % on 1 November (20 agents). Use it to find which agents or areas are still missing, until we find about as many as Booli.
 - **Close the agents' gaps:** Notar's list isn't complete (25 newest plus 12 per office), and Erik Olsson's list once stopped early.
@@ -53,8 +53,10 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 
 ### Phase 2: Decide faster each day
 
+- **Our own page for each apartment.** Clicking an apartment (on a card, in Rangordning, in Sparade) or its dot on the map opens our own page for it, instead of the agent's site: photos, floor plan, description, the förening's facts and flags, price against your budget and monthly cost, score with its reasons, travel times and nearby grocery store, gym and bar, showings, and bidding for saved apartments, with the agent's listing as one link among the rest. The page has its own map showing where the apartment is, and its own address in the planner (so it can be bookmarked and shared later, once the planner is online). The idea of one page per apartment is like Booli's; the design is our own.
+
 - **Price drops and relistings.** Mark an apartment whose asking price fell, or that came back after leaving the list, since both often mean room to bid lower. The price history already records what's needed.
-- **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
+- **Ranking, next steps.** Add price drops and relistings as a factor once they're marked, and the monthly cost against what you have left each month.
 - **A morning digest.** After the 06:30 run, a short summary: new apartments in your filter, saved apartments with new bids or a final price, price drops, and this week's showings. A notification on the Mac that opens the planner.
 
 ### Phase 3: Showing days
@@ -80,6 +82,14 @@ Needs months of final prices, which the daily runs collect meanwhile.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **Prices and showings from the right apartment.** The page parser read prices and showing times from the whole page, so an apartment with no price could take one from the "Andra har också tittat på" or "Liknande bostäder" list below it (Sankt Göransgatan 102 at HusmanHagberg showed 3 650 000 kr). It now stops where the list of other apartments starts, and the backfill reads every apartment in the filter again with the fix.
+
+- **A price sense check for apartments without a price.** An apartment with no asking price yet is left out when its estimated price (its district's latest price per m² from Svensk Mäklarstatistik, times its size) is more than 10 % above your max price, since the estimate comes from final prices and asking prices are often set a little lower; a 72 m² apartment in SoFo comes out at about 8,4 Mkr. On by default, with a checkbox under Sökfilter ("Dölj lägenheter utan pris som uppskattas mer än 10 % över maxpriset"). At 3,5–4 Mkr it took the list from 457 to 35 apartments, since even 35 m² in the inner city is estimated at 3,9–4,75 Mkr. The daily Booli comparison doesn't use it, since Booli counts every coming-soon apartment. One without a size is kept, as it can't be estimated.
+
+- **Ranking (Rangordning, under Visningar).** Every apartment in your filter with an asking price gets a score from 0 to 100 from what we already know (those without a price wait, listed under the ranking, until the agent sets one): price against your max, your area rating, the förening's red and green flags, SL travel time to your important addresses (saved apartments), walking distance to grocery store, gym and bar, size, avgift per m² and features. Sliders from 0 to 3 set how much each counts; whatever isn't known for an apartment is left out rather than counted for or against it, and areas marked Aldrig här are left out. Each apartment shows the reasons that weigh most, for and against, and every card on Visningar shows its score.
+
+- **The förening's figures from the agents' fact sections.** The finder opens each apartment's Förening, Föreningen, Om föreningen and Ekonomi tabs and folded sections (and BOSTHLM's separate fakta page), keeps the lines about the förening, and the red flags read them before the description: debt per m² from the indirekt nettoskuldsättning divided by the apartment's m², whether the förening owns the land or has tomträtt, äkta or oäkta, the number of apartments, the latest stambyte in the renovation list (flushing or inspecting the pipes doesn't count), and whether an avgift change is planned. A stambyte more than five years away is yellow ("Stambyte planerat 2035"). Works for Alicia Edelman, Notar, BOSTHLM, Historiska Hem, Tradition, Stadshem, Bergets Ro, Erik Olsson, Länsförsäkringar, SkandiaMäklarna, Karlsson & Uddare, Mäklarhuset and Mäklarringen; apartments found earlier got theirs with `scraper/plans.py --backfill`. Also fixed: a menu link to "Liknande bostäder" near the top of a page no longer cuts off the rest of it.
 
 - **A morning run that doesn't need Amphetamine.** The Mac wakes itself at 06:25 every day (`sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00`, set 2026-11-01; keep the charger connected), and the 06:30 run is wrapped in `caffeinate -is`, so the Mac stays awake until the run is done and then sleeps again. If it still sleeps through 06:30, launchd runs the missed job as soon as it wakes. Check the wake with `pmset -g sched`.
 

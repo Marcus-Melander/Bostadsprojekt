@@ -87,8 +87,22 @@ def stamp():
 
 # ---------- Your filter ----------
 
-def fits(p, f):
-    """Whether an apartment matches the filter set in the planner."""
+# The latest price per m² for bostadsrätter in each district, from Svensk Mäklarstatistik (the planner's
+# Områdespriser, three months to 8 October 2026), for estimating what an apartment without a price would cost
+DISTRICT_KVM_PRICE = {"Södermalm": 116680, "Gamla stan": 116680, "Kungsholmen": 112452, "Vasastan": 135782, "Norrmalm": 135782,
+                      "Östermalm": 129172, "Gärdet": 129172}
+INNER_KVM_PRICE = 121933
+PRICEY_MARGIN = 1.1  # the estimate comes from final prices, and asking prices are often set a little lower
+
+
+def estimate_price(p):
+    return round(DISTRICT_KVM_PRICE.get(p.get("group"), INNER_KVM_PRICE) * p["kvm"] / 50000) * 50000 if p.get("kvm") else 0
+
+
+def fits(p, f, estimate=True):
+    """Whether an apartment matches the filter set in the planner. Without an asking price, it's left out when its
+    estimated price (the district's price per m² times its size) is more than 10 % above the max price; `estimate=False` skips
+    that, for counting the way Booli counts."""
     if p.get("state") == "sold":
         return False
     if p.get("soon") and not f.get("includeSoon", True):
@@ -96,6 +110,8 @@ def fits(p, f):
     if f.get("maxPrice") and p.get("price") and p["price"] > f["maxPrice"]:
         return False
     if f.get("minPrice") and p.get("price") and p["price"] < f["minPrice"]:
+        return False
+    if estimate and f.get("skipPricey", True) and not p.get("price") and f.get("maxPrice") and estimate_price(p) > f["maxPrice"] * PRICEY_MARGIN:
         return False
     if f.get("minRooms") and p.get("rooms") and p["rooms"] < f["minRooms"]:
         return False
@@ -170,7 +186,7 @@ def counted(items, f):
     on what's missing."""
     seen, out = set(), []
     for p in items.values():
-        if p.get("outside") or not fits(p, f):
+        if p.get("outside") or not fits(p, f, estimate=False):  # Booli can't estimate, so neither does the answer key
             continue
         if not p.get("price") and p.get("state") != "bidding":  # in bidding it's for sale, price or not
             p = {**p, "soon": True}
@@ -228,7 +244,11 @@ def read_listing(page, url, card, now, places, opens=()):
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
     AREAS.rename(d)
-    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"))
+    try:  # the förening's facts, with its tabs and folded sections opened
+        d["facts"] = agents.forening_facts(agents.forening_text(page))
+    except Exception as e:
+        log(f"Couldn't read the förening's facts on {url} ({e})")
+    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"))
     try:  # last, since finding the plan may press the page's floor plan button
         d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
     except Exception as e:
@@ -435,7 +455,7 @@ def find(args):
     items = store["items"]
     for p in items.values():  # neighbourhoods may have been redrawn, and the red flag rules changed, since the last run
         AREAS.rename(p)
-        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"))
+        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"))
     started, now = stamp(), dt.datetime.now()
     status("running", "Startar", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")

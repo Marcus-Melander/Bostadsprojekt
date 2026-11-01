@@ -6,7 +6,7 @@ looks like a drawing: mostly one flat background colour with sharp lines on it. 
 so a model can later be trained on them; the listing's address joins them to the price history.
 Everything stays on this computer (data/ isn't in git).
 
-    .venv/bin/python scraper/plans.py --backfill    # floor plans for apartments found before this existed
+    .venv/bin/python scraper/plans.py --backfill    # floor plans and förening facts for apartments read before these existed
 """
 import datetime as dt
 import hashlib
@@ -128,7 +128,7 @@ def candidates(page, photos):
 
 
 def backfill():
-    """Open each apartment in your filter that was read before floor plans were, once, and find its plan."""
+    """Open each apartment in your filter that was read before floor plans or förening facts were, once, and read what's missing."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import agents
     import finder
@@ -136,8 +136,10 @@ def backfill():
 
     store = finder.read_json(DATA / "listings.json", {})
     f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
-    todo = [u for u, p in store.get("items", {}).items() if "plans" not in p and p.get("lat") and not p.get("outside") and finder.fits(p, f)]
-    finder.log(f"Floor plans: {len(todo)} apartments to look at")
+    # Every apartment in your filter (counted the way Booli counts, so an unpriced one whose price is still wrong is in)
+    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or "facts" not in p or "pageChecked" not in p)
+            and p.get("lat") and not p.get("outside") and finder.fits(p, f, estimate=False)]
+    finder.log(f"Backfill: {len(todo)} apartments to look at for floor plans and förening facts")
     robots, refused, found = agents.Robots(), set(), {}
     with sync_playwright() as pw:
         browser = finder.launch(pw, False)
@@ -157,7 +159,16 @@ def backfill():
                     finder.log(f"Floor plans: {p.get('agent')} refused {u}; skipping the rest of its apartments")
                     refused.add(p.get("agent"))
                     continue
-                found[u] = keep(candidates(page, p.get("photos") or []), p, finder.log)
+                got = {}
+                if "pageChecked" not in p:  # read again with only this apartment's part of the page (fixed 2026-11-01)
+                    d = agents.parse_agent_page(page.inner_text("body"), dt.datetime.now())
+                    got.update(price=d.get("price"), soon=d.get("soon"), shows=d.get("shows", []), pageChecked=finder.stamp())
+                    got.update({k: d[k] for k in ("rooms", "kvm", "avgift", "floor", "floorText", "built") if d.get(k)})
+                if "facts" not in p:  # first, before the floor plan button changes the page
+                    got["facts"] = agents.forening_facts(agents.forening_text(page))
+                if "plans" not in p:
+                    got["plans"] = keep(candidates(page, p.get("photos") or []), p, finder.log)
+                found[u] = got
             except Exception as e:
                 finder.log(f"Floor plans: couldn't open {u} ({e})")
             if i % 25 == 24:
@@ -166,18 +177,22 @@ def backfill():
             time.sleep(2)
         browser.close()
     merge(found)
-    finder.log("Floor plans: done")
+    finder.log("Backfill: done")
 
 
 def merge(found):
-    """Write floor plans into listings.json without losing what a finder run wrote meanwhile."""
+    """Write what the backfill read into listings.json without losing what a finder run wrote meanwhile."""
+    import agents
     import finder
     if not found:
         return
     store = finder.read_json(DATA / "listings.json", {})
-    for u, plans in found.items():
+    for u, got in found.items():
         if u in store.get("items", {}):
-            store["items"][u]["plans"] = plans
+            p = store["items"][u]
+            p.update(got)
+            if "facts" in got:
+                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"))
     finder.write_json(DATA / "listings.json", store)
 
 
