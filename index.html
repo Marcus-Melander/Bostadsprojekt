@@ -289,8 +289,23 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .hood-row label { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .hood-row input[type="text"] { grid-column: 1 / -1; }
 .hood-row.never label { color: var(--muted); text-decoration: line-through; }
-.my-area { padding: 10px 0; border-top: 1px solid var(--rule); display: grid; gap: 6px; }
+.my-area { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
 .my-area:first-of-type { border-top: 0; }
+.my-area > input[type="text"], .my-area > details { grid-column: 1 / -1; }
+.my-area > input[type="text"] { font-size: 13px; padding-top: 4px; padding-bottom: 4px; }
+.my-area > details { font-size: 12px; color: var(--muted); }
+.my-area > details summary { cursor: pointer; }
+.place { display: grid; grid-template-columns: minmax(0, 1fr) 96px 32px; gap: 4px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--rule); }
+.place > input[data-k="addr"], .place > small { grid-column: 1 / -1; }
+.place > small { font-size: 11px; }
+.place .btn { padding: 0; width: 32px; justify-content: center; }
+.facts.travel { margin-top: 4px; }
+.heart { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; padding: 0; }
+.heart svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.heart:hover { color: var(--negative); border-color: currentColor; }
+.heart[aria-pressed="true"] { color: var(--negative); border-color: currentColor; }
+.heart[aria-pressed="true"] svg { fill: currentColor; }
+.facts.travel strong { color: var(--text); font-weight: 600; }
 .my-area ul { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 4px; }
 .my-area li { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .my-area li em { flex-basis: 100%; color: var(--muted); }
@@ -491,7 +506,7 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { f: { maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true },
+  show: { f: { maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [] },
 });
 let S = DEFAULT();
 
@@ -1371,6 +1386,7 @@ function aptCard(p) {
         ${f("rooms", "Rooms", "rok", "0.5")}
         ${f("debtKvm", "Förening debt per kvm", "kr", "500")}
       </div>
+      ${p.link ? travelLine({ url: p.link }) : ""}
       <label style="display:flex;flex-direction:column;gap:3px;font-size:.76rem;color:var(--muted)">Listing link<input type="url" data-apt="${p.id}" data-k="link" value="${esc(p.link)}" placeholder="The estate agent's page"></label>
     </div>
     <div class="apt-out" id="out-${p.id}">${aptOut(p)}</div>
@@ -1539,6 +1555,24 @@ function fits(p, f = S.show.f) {
 }
 function apartments() { return Object.values(LIST.items).filter((p) => fits(p)); }
 
+/* ---------- Travel times and nearby shops (scraper/travel.py fills data/travel.json) ---------- */
+let TRAVEL = { trips: {}, near: {}, places: {}, running: false };
+let travelTimer = null;
+async function loadTravel() {
+  if (!LOCAL) return;
+  clearTimeout(travelTimer);
+  try { const r = await fetch("/api/travel", { cache: "no-store" }); if (r.ok) TRAVEL = { trips: {}, near: {}, places: {}, ...(await r.json()) }; } catch (e) {}
+  if (TRAVEL.running) travelTimer = setTimeout(loadTravel, 8000);
+  if (S.tab === "show") refresh();
+}
+// After you change an address or its time: save it, then let the server look up the trips
+async function lookUpTrips() {
+  await flush();
+  await fetch("/api/travel", { method: "POST" }).catch(() => null);
+  TRAVEL.running = true;
+  travelTimer = setTimeout(loadTravel, 3000);
+}
+
 /* ---------- The finder's status ---------- */
 const CRAWL = { state: "idle", msg: "", scheduled: null };
 const NO_SERVER = "The local server isn't answering. Start it with: .venv/bin/python server.py";
@@ -1557,6 +1591,7 @@ async function pollStatus() {
     if ((was === "running" && !st.running) || (st.running && Date.now() - (pollStatus.loaded || 0) > 30000)) {
       pollStatus.loaded = Date.now();
       await loadList();
+      loadTravel();
     }
     CRAWL.scheduled = !!st.scheduled;
     setCrawl(st.running ? "running" : st.state || "idle", st.msg || "");
@@ -1678,19 +1713,57 @@ function areasPanel(list) {
     }).join("")}
   </section>`;
 }
+// Your rated and visited areas, one line each; those marked Never here are left out (they stay in Areas)
 function myAreasPanel() {
   const visits = Object.entries(S.show.visits);
-  const names = new Set([...Object.keys(S.show.ratings).filter((n) => { const r = S.show.ratings[n]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.area).filter(Boolean)]);
+  const all = new Set([...Object.keys(S.show.ratings).filter((n) => { const r = S.show.ratings[n]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.area).filter(Boolean)]);
+  const names = new Set([...all].filter((n) => rating(n) !== "never")), nevers = all.size - names.size;
+  const left = nevers ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${nevers} area${nevers > 1 ? "s" : ""} marked Never here ${nevers > 1 ? "are" : "is"} left out; change ${nevers > 1 ? "them" : "it"} under Areas.</p>` : "";
+  if (!names.size && nevers) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">No rated areas apart from Never here.</p>${left}</section>`;
   if (!names.size) return `<section class="panel"><h3>Your areas</h3><p class="dim" style="font-size:13px;margin:0">After a showing, press <strong>I went</strong> on the apartment. Your rating and notes for it and its area collect here.</p></section>`;
   const score = (n) => { const r = rating(n); return r === "never" ? -1 : r === "" ? 0 : +r; };
   return `<section class="panel"><h3>Your areas</h3>${[...names].sort((a, b) => score(b) - score(a)).map((n) => {
     const r = S.show.ratings[n] || {}, vs = visits.filter(([, v]) => v.area === n);
     return `<div class="my-area">
-      <div class="row" style="justify-content:space-between"><strong>${esc(n)}</strong>${ratingSelect(`data-hood-r="${esc(n)}" aria-label="Rating for ${esc(n)}"`, r.r ?? "")}</div>
-      <input type="text" data-hood-note="${esc(n)}" value="${esc(r.note || "")}" placeholder="How did the area feel?">
-      ${vs.length ? `<ul>${vs.map(([, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul>` : ""}
+      <strong>${esc(n)}</strong>${ratingSelect(`data-hood-r="${esc(n)}" aria-label="Rating for ${esc(n)}"`, r.r ?? "")}
+      <input type="text" data-hood-note="${esc(n)}" value="${esc(r.note || "")}" placeholder="Note">
+      ${vs.length ? `<details><summary>${vs.length} showing${vs.length > 1 ? "s" : ""} visited</summary><ul>${vs.map(([, v]) => `<li><span>${esc(v.addr)}</span><span class="dim">${v.at ? fmtShort(v.at) : ""}${v.r ? " · " + (v.r === "never" ? "never" : v.r + "/5") : ""}</span>${v.note ? `<em>${esc(v.note)}</em>` : ""}</li>`).join("")}</ul></details>` : ""}
     </div>`;
-  }).join("")}</section>`;
+  }).join("")}${left}</section>`;
+}
+// Work, your girlfriend's place and so on: each apartment shows the SL trip to each, arriving by its time on a weekday
+function placesPanel() {
+  const pl = S.show.places || [], known = TRAVEL.places || {};
+  return `<section class="panel"><h3>Important addresses</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 4px">Each apartment you save (♥) shows the trip there by SL, arriving by the time you set, on a weekday.</p>
+    ${pl.map((x) => {
+      const k = known[(x.addr || "").trim().toLowerCase()];
+      const found = !x.addr ? "" : k === undefined ? (TRAVEL.running ? "Looking it up…" : "Not looked up yet") : k === null ? "SL can't find this address. Try street, number and town." : "SL: " + esc(k.name);
+      return `<div class="place">
+        <input type="text" data-place="${x.id}" data-k="name" value="${esc(x.name || "")}" placeholder="Name" aria-label="Name of the place">
+        <input type="time" data-place="${x.id}" data-k="arrive" value="${esc(x.arrive || "08:00")}" aria-label="Arrive by">
+        <button class="btn ghost" data-act="del-place" data-id="${x.id}" aria-label="Remove ${esc(x.name || "this address")}">×</button>
+        <input type="text" data-place="${x.id}" data-k="addr" value="${esc(x.addr || "")}" placeholder="Street and number, town" aria-label="Address">
+        <small class="dim">${found}</small>
+      </div>`;
+    }).join("")}
+    <div class="row" style="margin-top:8px"><button class="btn" data-act="add-place">Add address</button>${TRAVEL.running ? `<span class="dim" style="font-size:12px">Looking up trips with SL…</span>` : ""}</div>
+  </section>`;
+}
+function travelLine(p) {
+  const t = (TRAVEL.trips || {})[p.url] || {}, n = (TRAVEL.near || {})[p.url] || {}, bits = [];
+  const saved = S.apts.some((x) => x.link === p.url); // trips are looked up only for apartments you saved
+  for (const pl of saved ? S.show.places || [] : []) {
+    const x = t[pl.id];
+    if (!pl.addr || !x || x.min == null) continue;
+    const how = (x.lines || []).join(", ") || "On foot";
+    bits.push(`<span title="${esc(how)}${x.changes ? `, ${x.changes} change${x.changes > 1 ? "s" : ""}` : ""}, arriving by ${esc(pl.arrive || "08:00")}">${esc(pl.name || "Place")} <strong>${x.min} min</strong></span>`);
+  }
+  for (const [k, l] of [["grocery", "Grocery"], ["gym", "Gym"]]) {
+    const x = n[k];
+    if (x) bits.push(`<span title="${esc(x.name)}, ${x.m} m away">${l} <strong>${x.walk} min</strong> walk · ${esc(x.name)}</span>`);
+  }
+  return bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "";
 }
 function showCard(p, s, a, cr) {
   const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);
@@ -1705,6 +1778,7 @@ function showCard(p, s, a, cr) {
       <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
         <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Never here" : "Area " + r + "/5"}</span>` : ""}</div>
       <p>${esc(describeListing(p))}</p>
+      ${travelLine(p)}
       ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} photos</summary><div class="strip"></div></details>` : ""}
       ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>${esc(p.agent)}'s description</summary><div class="fill"></div></details>` : ""}
       <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Price not set"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/month all in</span>` : ""}${fit}</div>
@@ -1713,7 +1787,7 @@ function showCard(p, s, a, cr) {
     </div>
     <div class="sc-act">
       ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.url)}">Undo visit</button>` : `<button class="btn" data-act="went" data-key="${esc(p.url)}" data-at="${s ? s.start : isoLocal(new Date())}">I went</button>`}
-      ${tracked ? `<span class="dim" style="font-size:12px">Saved</span>` : `<button class="btn ghost" data-act="track" data-key="${esc(p.url)}">Save</button>`}
+      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Remove " + esc(p.addr) + " from Saved" : "Save " + esc(p.addr)}" title="${tracked ? "Saved. Tap to remove." : "Save"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
     </div>
   </article>`;
 }
@@ -1851,7 +1925,7 @@ function showView() {
     <div class="lead"><h1>Showings</h1>
     <p>Apartments in innanför tullarna with a visning, found on the estate agents' own sites every morning and checked against your budget. Rate areas as you go: places you mark <strong>Never here</strong> drop out of the list.</p></div>
     <div class="bench show">
-      <div class="stack">${crawlPanel()}${filterPanel()}${myAreasPanel()}${areasPanel(list)}</div>
+      <div class="stack">${crawlPanel()}${filterPanel()}${placesPanel()}${myAreasPanel()}${areasPanel(list)}</div>
       <div>
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
           <div class="seg">${[["week", "Next week"], ["8", "Next 8 days"], ["all", "All upcoming"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
@@ -1864,11 +1938,13 @@ function showView() {
     </div>`;
 }
 function showInput(t) {
+  if (t.dataset.place) { const x = (S.show.places || []).find((y) => y.id === t.dataset.place); if (x) x[t.dataset.k] = t.value; changed(false); return true; }
   if (t.dataset.hoodNote != null) { const n = t.dataset.hoodNote; S.show.ratings[n] = { ...(S.show.ratings[n] || {}), note: t.value }; changed(false); return true; }
   if (t.dataset.visitNote != null) { const v = S.show.visits[t.dataset.visitNote]; if (v) v.note = t.value; changed(false); return true; }
   return t.dataset.hoodR != null || t.dataset.visitR != null;
 }
 function showChange(t) {
+  if (t.dataset.place) { if (t.dataset.k !== "name") lookUpTrips(); changed(false); return true; }
   if (t.dataset.hoodR != null) { const n = t.dataset.hoodR; S.show.ratings[n] = { ...(S.show.ratings[n] || {}), r: t.value }; changed(true); return true; }
   if (t.dataset.visitR != null) { const v = S.show.visits[t.dataset.visitR]; if (v) v.r = t.value; changed(true); return true; }
   return false;
@@ -1878,9 +1954,13 @@ function showClick(a) {
   switch (a.dataset.act) {
     case "crawl-start": startScrape(); return true;
     case "show-more": showLimit += SHOW_STEP; refresh(); return true;
+    case "add-place": (S.show.places = S.show.places || []).push({ id: Math.random().toString(36).slice(2, 9), name: "", addr: "", arrive: "08:00" }); return false;
+    case "del-place": S.show.places = (S.show.places || []).filter((x) => x.id !== a.dataset.id); return false;
     case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
     case "unwent": delete S.show.visits[a.dataset.key]; return false;
+    case "untrack": S.apts = S.apts.filter((x) => x.link !== a.dataset.key); return false;
     case "track":
+      if (p && (S.show.places || []).some((x) => x.addr)) setTimeout(lookUpTrips); // the trips to your addresses, for this apartment
       if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${p.area || p.group || ""}`, price: p.price || null, bid: p.price || null,
         avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: p.url, status: "Viewing booked",
         photo: (p.photos || [])[0] || null, agent: p.agent || null });
@@ -1962,6 +2042,7 @@ app.addEventListener("click", (e) => {
 render();
 initStore().then(async () => {
   await loadList();
+  loadTravel();
   pollStatus();
 });
 </script>

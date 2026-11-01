@@ -52,15 +52,10 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 
 ## Next
 
-- **Erik Olsson's endless list:** one run found 111 apartments, the next 81, so scrolling doesn't always load the whole list. Scroll more patiently, or read each district's list in smaller parts.
 - **Predict the final price.** Once there's enough history: for each agent and area, how far final prices land above asking and how many bids it usually takes. That gives a guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
-- **More agents: the biggest gap.** Work through the "To do" rows of the agents table until the for-sale count nears Booli's.
-- **Important addresses and travel times.** You add the places that matter, each with a name and how you'd get there: work, your girlfriend's place, the gym, your parents. Each apartment then shows the travel time to every one, and the ranking can weigh them.
-  - Travel time by SL via Trafiklab ResRobot (a free key), at a time of day you choose for each address (work at 08:00 on a weekday). Without a key, estimate it from the nearest T-bana station. Walking and cycling times for nearby places.
-  - Distance to the nearest grocery store and gym from OpenStreetMap, without having to add them.
 - **A morning digest.** After the 06:30 run, a short summary: new apartments in your filter, saved apartments with new bids or a final price, price drops, and this week's showings. A notification on the Mac that opens the planner.
 - **A showing-day route.** For each day with showings, put them in an order you can travel between by T-bana or on foot, with the time it takes, and flag showings that overlap.
 - **Price drops and relistings.** Mark an apartment whose asking price fell, or that came back after leaving the list, since both often mean room to bid lower. The price history already records what's needed.
@@ -69,6 +64,11 @@ Which agents the finder reads, and which are left. "Inner city" is the number of
 - **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
 
 ## Done
+
+- **Important addresses and travel times.** Add the places that matter in the planner (name, address, and the time you want to arrive on a weekday). Each apartment you save shows the trip there by SL, door to door, from SL's own journey planner (Journey-planner v2 on Trafiklab, open without a key), with the lines and changes on hover. Work and your girlfriend's place are added (the addresses stay in data/, which isn't in git). To keep requests few, `scraper/travel.py` looks up only saved apartments, once per address, a lookup a second, after every finder run and whenever you change an address; answers are kept in data/travel.json and looked up again after 90 days.
+- **A heart on every apartment** saves it (and looks up its trips) in one tap; tap again to unsave.
+- **Nearest grocery store and gym on every apartment,** with walking minutes and the name, from OpenStreetMap (fetched once a week; yoga studios aren't counted as gyms).
+- **A smaller "Your areas" panel:** one line per area with its rating and a short note field, visits folded away, and areas marked Never here left out (they're still in Areas).
 
 - **Six more agents:** Svensk Fastighetsförmedling (its Stockholm city list, page by page), Länsförsäkringar (its sitemap, since its list shows only 36 suburban apartments), SkandiaMäklarna (only apartments in the city, as its terms allow a private person; its folded fact sections are opened), Fastighetsbyrån (by their permission), ESNY and Karlsson & Uddare. Cards are now cut out precisely on any site, cookie banners are answered with necessary cookies only, "PÅ GÅNG" means coming soon, and a "protected by reCAPTCHA" notice under a contact form no longer counts as a refusal. An apartment in bidding counts as for sale even when no price was read. Result: 62 for sale against Booli's 119, and 393 coming soon against 160. Coming soon is far above Booli because these agents announce many sales early ("Kommande försäljning", Fastighetsbyrån's "PÅ GÅNG") without a price, and Booli shows only some of them; with no price, some may turn out to be above budget.
 - **A fair answer key.** Each apartment is counted once even when two agents list it. One without an asking price counts as coming soon, as on Booli, including Bjurfors' "på förhand" sales. One for sale counts only when its page states what the filter checks. Counts per district aren't possible: Booli answers one search a session and refuses the next, so the finder reads only the whole inner city. First fair result: 38 for sale against Booli's 119, and 167 coming soon against 160. Most for-sale apartments in your budget belong to agents not covered yet.

@@ -390,9 +390,15 @@ def run(args):
             pass  # left behind by a run that was stopped
     lock.write_text(str(os.getpid()))
     try:
-        return find(args)
+        rc = find(args)
     finally:
         lock.unlink(missing_ok=True)
+    try:  # travel times and nearby shops for any new apartments
+        import travel
+        travel.main()
+    except Exception as e:
+        log(f"Travel: stopped ({e})")
+    return rc
 
 
 def find(args):

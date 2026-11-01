@@ -32,15 +32,16 @@ def write_json(path, data):
     os.replace(tmp, path)
 
 
-def scraper_running():
-    lock = DATA / ".scrape.lock"
-    if not lock.exists():
-        return False
+def pid_alive(lock):
     try:
         os.kill(int(lock.read_text()), 0)
         return True
     except (ValueError, OSError):
         return False
+
+
+def scraper_running():
+    return pid_alive(DATA / ".scrape.lock")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -68,6 +69,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, body) if body else self.json(404, {"error": "no plan yet"})
         if path == "/api/listings":
             return self.send(200, read(DATA / "listings.json", b'{"items":{},"done":{},"lastRun":null}'))
+        if path == "/api/travel":
+            t = json.loads(read(DATA / "travel.json", b"{}") or b"{}")
+            t.pop("shops", None)  # the planner needs only each apartment's nearest
+            t["running"] = pid_alive(DATA / ".travel.lock")
+            return self.json(200, t)
         if path == "/api/status":
             s = json.loads(read(DATA / "status.json", b"{}") or b"{}")
             s["running"] = scraper_running()
@@ -98,10 +104,16 @@ class Handler(BaseHTTPRequestHandler):
         self.json(200, {"ok": True})
 
     def do_POST(self):
-        if self.path != "/api/scrape":
+        if self.path not in ("/api/scrape", "/api/travel"):
             return self.send(404, b"Not found", "text/plain")
         if not self.same_origin():
             return self.json(403, {"error": "wrong origin"})
+        if self.path == "/api/travel":  # after you change an important address
+            if not pid_alive(DATA / ".travel.lock"):
+                log = open(DATA / "scraper.out", "ab")
+                subprocess.Popen([sys.executable, str(ROOT / "scraper" / "travel.py")], cwd=ROOT,
+                                 stdout=log, stderr=log, start_new_session=True)
+            return self.json(202, {"ok": True})
         if scraper_running():
             return self.json(409, {"error": "already running"})
         DATA.mkdir(exist_ok=True)
