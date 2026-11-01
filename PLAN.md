@@ -46,6 +46,7 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 
 - **Read the förening's figures from the agents' fact sections,** not only the description: debt per m², avgift changes, tomträtt, stambyte year, number of apartments. That makes the red flags complete.
 - **Final prices for sold apartments.** Bidding is followed bid by bid; make sure the final price is recorded every time a saved apartment sells, where the agent publishes it, so our own price per m² per neighbourhood builds up next to the asking price.
+- **Close the gap to Booli.** Every morning the finder compares our count with Booli's for the same filter, and the planner shows the trend day by day. Coverage of Booli's for-sale count: 52 % on 31 October (17 agents), 60 % on 1 November (20 agents). Use it to find which agents or areas are still missing, until we find about as many as Booli.
 - **Close the agents' gaps:** Notar's list isn't complete (25 newest plus 12 per office), and Erik Olsson's list once stopped early.
 - **Floor plans where they're missing.** After the backfill (2026-11-01), 291 of 487 apartments have one, but Bjurfors has 7 of 75, Svensk Fastighetsförmedling 11 of 79 and Länsförsäkringar 0 of 39. Some are early announcements without a plan yet; check which of the rest have one the finder misses.
 
@@ -78,6 +79,8 @@ Needs months of final prices, which the daily runs collect meanwhile.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **A daily comparison with Booli.** After each morning run, our count (for sale and coming soon) and Booli's for the same filter are kept for that day, with how many agents were read, in listings.json and data/compare.csv. The finder panel in the planner shows them day by day ("Jämfört med Booli, dag för dag") with our coverage of Booli's for-sale count. Earlier days were filled in from the finder's log.
 
 - **The finder on the agents' own sites, with Booli only as the answer key.** Every agent's for-sale list is read (pressing "show more", following pages, or a recent sitemap where a list is incomplete), the inner-city candidates are opened, and Booli is used only for one count a day for the same filter. Addresses are placed on OpenStreetMap for their neighbourhood and district, with our own search filter (max price, rooms, m², avgift, not the ground floor, coming soon included).
 - **Price history for predictions.** Every apartment the finder reads is saved with its details, agent and area, and each day's asking price, state, highest bid, number of bids and final price, in `data/history.sqlite` with CSV exports after every run. Apartments that leave a list are followed for up to 30 days, to catch the final price.

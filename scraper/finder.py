@@ -470,6 +470,16 @@ def find(args):
         d["soon" if p.get("soon") else "forSale"] += 1
     store.update(lastRun=stamp(), filter=f, agents={**store.get("agents", {}), **report},
                  found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon")), "districts": by})
+    # One comparison with Booli a day (the day's last run wins), to see the gap close while agents are added
+    b = store.get("booli") or {}
+    day = {"forSale": store["found"]["forSale"], "soon": store["found"]["soon"], "agents": len(store["agents"])}
+    if b.get("forSale") is not None and not b.get("missing"):
+        day.update(booliForSale=b["forSale"], booliSoon=b["soon"])
+    store.setdefault("compare", {})[stamp()[:10]] = day
+    with open(DATA / "compare.csv", "w", encoding="utf-8") as fh:
+        fh.write("day,for_sale,soon,booli_for_sale,booli_soon,agents\n")
+        for d, c in sorted(store["compare"].items()):
+            fh.write(f"{d},{c['forSale']},{c['soon']},{c.get('booliForSale', '')},{c.get('booliSoon', '')},{c['agents']}\n")
     hist.export_csv()
     store["history"] = hist.counts()
     hist.close()

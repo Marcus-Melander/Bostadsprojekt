@@ -273,6 +273,9 @@ details.agents summary, details.undated > summary { cursor: pointer; }
 details.agents table { width: 100%; margin-top: 6px; border-collapse: collapse; }
 details.agents td { padding: 3px 0; border-top: 1px solid var(--rule); }
 details.agents td + td { text-align: right; color: var(--muted); }
+details.compare th { font-weight: 500; color: var(--muted); text-align: right; padding: 3px 0; font-size: 12px; }
+details.compare th:first-child { text-align: left; }
+details.compare td { font-variant-numeric: tabular-nums; }
 details.undated { margin-top: 22px; }
 .follow { margin: 0 0 12px; display: grid; gap: 6px; }
 .apt-bids { grid-column: 1 / -1; border-top: 1px solid var(--rule); padding-top: 14px; }
@@ -1761,11 +1764,19 @@ function crawlPanel() {
       ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale} · ${b.soon}</span><span class="s">på Booli${b.missing ? ", från " + fmtShort(b.at) : ""}</span></div>` : ""}
     </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Boolis antal för samma filter i Stockholms innerstad är facit: skillnaden är det bostadsletaren inte täcker än.</p>` : ""}` : "";
   const ag = LIST.agents ? Object.entries(LIST.agents) : [];
+  // Ours against Booli, one row a day, newest first: how far the gap has closed while agents were added
+  const days = Object.entries(LIST.compare || {}).sort((x, y) => (x[0] < y[0] ? 1 : -1)).slice(0, 14);
+  const cover = (c) => (c.booliForSale ? Math.round((c.forSale / c.booliForSale) * 100) + " %" : "–");
+  const trend = days.length > 1 ? `<details class="agents compare"><summary>Jämfört med Booli, dag för dag</summary><table>
+      <thead><tr><th>Dag</th><th>Till salu</th><th>Snart</th><th>Täckning</th><th>Mäklare</th></tr></thead>
+      <tbody>${days.map(([d, c]) => `<tr><td>${fmtShort(d)}</td><td>${c.forSale}${c.booliForSale != null ? ` / ${c.booliForSale}` : ""}</td><td>${c.soon}${c.booliSoon != null ? ` / ${c.booliSoon}` : ""}</td><td>${cover(c)}</td><td>${c.agents}</td></tr>`).join("")}</tbody>
+    </table><p class="dim" style="font-size:12px;margin:6px 0 0">Vårt antal / Boolis. Täckning är hur stor del av Boolis till salu vi hittar.</p></details>` : "";
   return `<section class="panel">
     <h3>Bostadsletaren</h3>
     <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}${st !== "running" && CRAWL.msg && st !== "error" ? " " + esc(CRAWL.msg) : ""}</span></div>
     ${key}
     ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Prishistorik: ${LIST.history.apartments} lägenheter, ${LIST.history.readings} dagliga avläsningar, ${LIST.history.withBids} med bud och ${LIST.history.finalPrices} slutpriser hittills. Sparas i data/history.sqlite, med CSV-filer bredvid.</p>` : ""}
+    ${trend}
     ${ag.length ? `<details class="agents"><summary>${ag.length} mäklare lästa</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} i innerstaden</td></tr>`).join("")}</table></details>` : ""}
     ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Kör nu</button></div>`}
     <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:30; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 30) ? "i dag" : "i morgon"} 06:30.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:30.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
