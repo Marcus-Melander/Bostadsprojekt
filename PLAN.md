@@ -4,6 +4,38 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 **Rule for the whole project:** everything is automatic, except what can't be found online: your salary, savings, what you put aside each month, and your own ratings and notes.
 
+## Estate agents
+
+Which agents the finder reads, and which are left. "Inner city" is the number of apartments for sale or coming soon inside the tolls, in the last run.
+
+| Agent | Status | Inner city | How it's read |
+|---|---|---|---|
+| Bjurfors | Reading | 153 | Stockholm list, every numbered page |
+| Alicia Edelman | Reading | 120 | For-sale list |
+| Erik Olsson | Reading, list not always complete | 45 | One list per inner-city district; scrolling sometimes stops early |
+| Bergets Ro | Reading | 37 | For-sale list, "show more" until it ends |
+| Notar | Reading, not complete | 24 | 25 newest plus 12 newest per inner-city office |
+| Tradition | Reading | 24 | For-sale list |
+| BOSTHLM | Reading | 14 | For-sale list |
+| Behrer & Partners | Reading | 9 | For-sale list |
+| Historiska Hem | Reading | 6 | For-sale list |
+| Stadshem | Reading | 5 | For-sale list |
+| Södermäklarna | Reading | 2 | For-sale list |
+| Svensk Fastighetsförmedling | Reading | 101 | Stockholm city list, ?p=2, ?p=3… |
+| Länsförsäkringar | Reading | 67 | Sitemap (the list shows only 36 suburban apartments); many are "Kommande försäljning" |
+| SkandiaMäklarna | Reading | 37 | City list and sitemap; only city apartments, as its terms allow |
+| ESNY | Reading | 2 | Stockholm list; mostly above budget |
+| Karlsson & Uddare | Reading | 1 | For-sale list; mostly Saltsjöbaden |
+| Fastighetsbyrån | Reading, by permission | 187 | One page per area they name (Kungsholmen, Vasastan, Katarina…) plus the city's newest; allowed by e-mail for a hobby project (see below) |
+| Wrede | Left out | – | Hides the address on most apartments, and nearly all are far above budget |
+| Mäklarhuset | To do | – | Its site didn't answer |
+| Living | To do | – | Its address now leads to Leander Pehrson's site; find the right one |
+| HusmanHagberg | To do | – | robots.txt allows it |
+| Mäklarringen | To do | – | robots.txt allows it |
+| ERA | To do | – | |
+
+**Fastighetsbyrån's permission (2026-10-31).** Their robots.txt and terms forbid automatic reading of fastighetsbyran.com without special permission. Marcus asked them by e-mail, and they allowed it as long as this stays a hobby project. **If the project ever grows beyond that (shared with others, published or commercial), ask them again first.** The finder reads only their apartments in the inner city, once a day, with pauses; their entry in `scraper/agents.py` is marked `permission`, the one agent allowed past its robots.txt.
+
 ## In progress
 
 - **Find listings on the estate agents' own sites instead of Booli.** Read every agent's for-sale list, pressing "show more" where needed. Use recent sitemap entries where a list is incomplete. Keep the inner-city candidates, then read each apartment's page.
@@ -23,14 +55,20 @@ Every feature asked for goes here, with where it stands. The planner runs locall
 
 - **Follow bidding and final prices.** While an apartment is in bidding ("budgivning pågår"), read the highest bid from the agent's page every day. When it's sold, keep it instead of dropping it and record the final price where the agent publishes one. That gives our own price per m² for each neighbourhood, next to the asking price, and shows how far over asking apartments go in each area.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
-- **More agents: the biggest gap.** About two thirds of the for-sale apartments in your budget belong to agents not covered yet, such as Fastighetsbyrån, SkandiaMäklarna, Svensk Fastighetsförmedling, Länsförsäkringar, Living, Mäklarhuset, Wrede and Karlsson & Uddare. Add them until the for-sale count nears Booli's.
-- **Commute, grocery store and gym.**
-  - Distance to the nearest grocery store and gym from OpenStreetMap.
-  - Travel time to work by SL, via Trafiklab ResRobot (a free key). Without a key, estimate it from the nearest T-bana station.
-- **Ranking.** One score from budget fit, commute, grocery store, gym, your area ratings and features, with sliders for how much each counts and a reason for every score.
+- **More agents: the biggest gap.** Work through the "To do" rows of the agents table until the for-sale count nears Booli's.
+- **Important addresses and travel times.** You add the places that matter, each with a name and how you'd get there: work, your girlfriend's place, the gym, your parents. Each apartment then shows the travel time to every one, and the ranking can weigh them.
+  - Travel time by SL via Trafiklab ResRobot (a free key), at a time of day you choose for each address (work at 08:00 on a weekday). Without a key, estimate it from the nearest T-bana station. Walking and cycling times for nearby places.
+  - Distance to the nearest grocery store and gym from OpenStreetMap, without having to add them.
+- **A morning digest.** After the 06:30 run, a short summary: new apartments in your filter, saved apartments with new bids or a final price, price drops, and this week's showings. A notification on the Mac that opens the planner.
+- **A showing-day route.** For each day with showings, put them in an order you can travel between by T-bana or on foot, with the time it takes, and flag showings that overlap.
+- **Price drops and relistings.** Mark an apartment whose asking price fell, or that came back after leaving the list, since both often mean room to bid lower. The price history already records what's needed.
+- **Monthly cost per apartment.** Each card shows what the apartment would cost you a month (mortgage interest and amortisation from your money plan, plus avgift and running costs) and whether it fits your budget.
+- **Red flags from the description.** Point out an upcoming stambyte, a raised or planned higher avgift, a leased plot (tomträtt), and a small or heavily indebted housing association.
+- **Ranking.** One score from budget fit, monthly cost, travel time to your important addresses, grocery store, gym, your area ratings, features and red flags, with sliders for how much each counts and a reason for every score.
 
 ## Done
 
+- **Six more agents:** Svensk Fastighetsförmedling (its Stockholm city list, page by page), Länsförsäkringar (its sitemap, since its list shows only 36 suburban apartments), SkandiaMäklarna (only apartments in the city, as its terms allow a private person; its folded fact sections are opened), Fastighetsbyrån (by their permission), ESNY and Karlsson & Uddare. Cards are now cut out precisely on any site, cookie banners are answered with necessary cookies only, "PÅ GÅNG" means coming soon, and a "protected by reCAPTCHA" notice under a contact form no longer counts as a refusal. An apartment in bidding counts as for sale even when no price was read. Result: 62 for sale against Booli's 119, and 393 coming soon against 160. Coming soon is far above Booli because these agents announce many sales early ("Kommande försäljning", Fastighetsbyrån's "PÅ GÅNG") without a price, and Booli shows only some of them; with no price, some may turn out to be above budget.
 - **A fair answer key.** Each apartment is counted once even when two agents list it. One without an asking price counts as coming soon, as on Booli, including Bjurfors' "på förhand" sales. One for sale counts only when its page states what the filter checks. Counts per district aren't possible: Booli answers one search a session and refuses the next, so the finder reads only the whole inner city. First fair result: 38 for sale against Booli's 119, and 167 coming soon against 160. Most for-sale apartments in your budget belong to agents not covered yet.
 - **More and better neighbourhoods, rated at two levels.** 56 neighbourhoods across seven districts, including SoFo (centred on Nytorget), Mariatorget, Mariaberget, Högalid, Tanto, Katarina, Sofia and Slussen on Södermalm, and Fridhemsplan, Rålambshov, Thorildsplan and Kungsholms strand on Kungsholmen. Districts follow the shore, with 11 bays and channels cut out. Each apartment is named by the neighbourhood it lies in. You rate a district and any neighbourhood in it; an unrated neighbourhood takes its district's rating.
 - **Erik Olsson:** read through its own area search, one page per inner-city district (`/homes?areaIds=467` Södermalm, `667` Kungsholmen, `387` Vasastan, `528` Östermalm, `898` Norrmalm/City, `1961` Gamla stan, `668` Gärdet), scrolling until each list ends. About 111 apartments.

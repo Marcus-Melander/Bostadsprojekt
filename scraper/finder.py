@@ -43,7 +43,9 @@ PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
 AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
-BLOCKED = re.compile(r"captcha|verify you are human|är du en människa|access denied|unusual traffic", re.I)
+# A challenge page, not the notice under a contact form ("Denna sida skyddas av reCAPTCHA")
+BLOCKED = re.compile(r"(?<!skyddas av )(?<!protected by )\b(?:re)?captcha|verify you are human|är du en människa|"
+                     r"access denied|unusual traffic", re.I)
 DEFAULT_FILTER = {"maxPrice": 4500000, "minRooms": None, "minArea": None, "maxAvgift": None, "notGround": False, "includeSoon": True}
 # Booli's own area, used only to read its count for the same filter. Only the whole inner city:
 # Booli answers one search a session and refuses the next, so district counts aren't possible.
@@ -157,14 +159,15 @@ def booli_count(pw, f):
 
 def counted(items, f):
     """The apartments to compare with Booli, counted the way Booli counts: each once (two agents
-    can list the same one); one without an asking price as coming soon, as Booli shows those;
+    can list the same one); one without an asking price as coming soon, as Booli shows those,
+    unless it's already in bidding;
     and one for sale only when its page states what the filter checks, since Booli can't filter
     on what's missing."""
     seen, out = set(), []
     for p in items.values():
         if p.get("outside") or not fits(p, f):
             continue
-        if not p.get("price"):
+        if not p.get("price") and p.get("state") != "bidding":  # in bidding it's for sale, price or not
             p = {**p, "soon": True}
         if not p.get("soon"):
             needs = [("rooms", f.get("minRooms")), ("kvm", f.get("minArea")), ("floor", f.get("notGround")), ("avgift", f.get("maxAvgift"))]
@@ -180,14 +183,23 @@ def counted(items, f):
 
 # ---------- Reading the agents ----------
 
-def read_listing(page, url, card, now, places):
-    """Open one apartment page. Returns (listing or None, refused?)."""
+def read_listing(page, url, card, now, places, opens=()):
+    """Open one apartment page, opening the sections named in `opens` (facts some agents keep
+    folded away). Returns (listing or None, refused?)."""
     try:
         resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
         page.wait_for_timeout(2000)
         for _ in range(3):  # galleries load their photos as you scroll
             page.mouse.wheel(0, 2500)
             page.wait_for_timeout(500)
+        for label in opens:
+            section = page.locator("button, summary").filter(has_text=re.compile(rf"^\s*{label}\s*$"))
+            if section.count():
+                try:
+                    section.first.click(timeout=3000)
+                    page.wait_for_timeout(800)
+                except PlaywrightError:
+                    pass
         text = page.inner_text("body")
     except PlaywrightError as e:
         log(f"Couldn't open {url} ({e})")
@@ -330,7 +342,7 @@ def read_agent(ag, sh):
                 if not robots.allowed(url):
                     continue
                 progress(sh, ag["name"], f"{n}/{len(want)}")
-                p, refused = read_listing(page, url, card, now, sh["places"])
+                p, refused = read_listing(page, url, card, now, sh["places"], ag.get("open", ()))
                 if refused:
                     log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
                     with sh["lock"]:
@@ -434,7 +446,7 @@ def find(args):
     for p in found:
         d = by.setdefault(p.get("group") or "Other", {"forSale": 0, "soon": 0})
         d["soon" if p.get("soon") else "forSale"] += 1
-    store.update(lastRun=stamp(), filter=f, agents=report,
+    store.update(lastRun=stamp(), filter=f, agents={**store.get("agents", {}), **report},
                  found={"forSale": sum(1 for p in found if not p.get("soon")), "soon": sum(1 for p in found if p.get("soon")), "districts": by})
     hist.export_csv()
     store["history"] = hist.counts()

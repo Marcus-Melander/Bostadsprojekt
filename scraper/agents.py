@@ -7,6 +7,7 @@ which one shared parser reads, since most agents show the same things the same w
 """
 import datetime as dt
 import gzip
+import html
 import json
 import re
 import time
@@ -41,7 +42,33 @@ AGENTS = [
     {"name": "Bergets Ro", "lists": ["https://www.bergetsro.se/till-salu/"], "obj": r"/houses/", "clicks": 40, "anywhere": True},
     {"name": "Bjurfors", "lists": ["https://www.bjurfors.se/sv/tillsalu/stockholm/stockholm/"], "obj": r"/sv/tillsalu/stockholm/stockholm/[^/]+/[^/]+"},
     {"name": "Behrer & Partners", "lists": ["https://www.behrer.se/vara-hem/"], "obj": r"/objekt/[^/]+/?$"},
+    # Stockholm city's apartments, about 34 a page over ?p=2, ?p=3…
+    {"name": "Svensk Fastighetsförmedling", "lists": ["https://www.svenskfast.se/lagenhet/stockholm/stockholm/stockholm/"],
+     "obj": r"svenskfast\.se/bostadsratt/stockholm/stockholm/stockholm/.+/\d+/?$"},
+    # Its list shows only the first 36 of Stockholm's apartments, mostly suburbs; the sitemap lists every
+    # apartment for sale (and recently sold), without dates. Discreet sales have no address and are left out.
+    {"name": "Länsförsäkringar", "sitemaps": ["https://www.lansfast.se/sitemap/"], "undated": True,
+     "obj": r"lansfast\.se/till-salu/bostadsratt/stockholms/stockholm/stockholm/(?!diskret/)[^/]+/[a-z0-9]{20,}/?$"},
+    # Its terms allow a private person to save what they're looking at, not to copy the site in bulk,
+    # so only apartments in the city are read. Facts are folded into sections that open on click.
+    {"name": "SkandiaMäklarna", "lists": ["https://www.skandiamaklarna.se/hitta-hem/bostadsratt/stockholm/"],
+     "sitemaps": ["https://www.skandiamaklarna.se/sitemap-estates.xml"],
+     "obj": r"skandiamaklarna\.se/hitta-hem/bostadsratt/stockholm/[^/]+/\d+/?$", "open": ["Om bostaden", "Ekonomi"]},
+    {"name": "ESNY", "lists": ["https://www.esny.se/vara-hem/?object_type=all&object_city=stockholm&object_order=published&count=300&object_search="],
+     "obj": r"esny\.se/objekt/"},
+    {"name": "Karlsson & Uddare", "lists": ["https://karlssonuddare.se/till-salu/"], "obj": r"karlssonuddare\.se/objekt/"},
+    # Fastighetsbyrån's robots.txt and terms forbid automatic reading without their permission. They gave it by
+    # e-mail on 2026-10-31 for this as a hobby project; ask again before it grows beyond that (see PLAN.md).
+    # One page per inner-city area they name, plus the newest of the city's apartments for areas without a page.
+    {"name": "Fastighetsbyrån", "permission": "E-mail to Marcus, 2026-10-31: allowed while this is a hobby project",
+     "lists": [f"https://www.fastighetsbyran.com/sv/sverige/till-salu/stockholms-lan/stockholms-stad/{a}" for a in
+               ("kungsholmen", "vasastan", "ostermalm", "hogalid", "katarina", "sofia", "maria", "fredhall", "kristineberg",
+                "marieberg", "lindhagen", "gamla-stan", "reimersholme")] +
+              ["https://www.fastighetsbyran.com/sv/sverige/till-salu/stockholms-lan/stockholms-stad"],
+     "obj": r"fastighetsbyran\.com/sv/sverige/till-salu/stockholms-lan/stockholms-stad/objekt/\?objektID=\d+$"},
 ]
+# Sites whose owner allowed the finder in writing, past what their robots.txt says
+PERMITTED = {urlparse(u).netloc for a in AGENTS if a.get("permission") for u in a.get("lists", []) + a.get("sitemaps", [])}
 
 # Names that place a card in innanför tullarna, and some that place it outside. Checked on
 # accent-free lower case, so "Södermalm" and "sodermalm" in a link both count.
@@ -80,6 +107,8 @@ class Robots:
 
     def allowed(self, url):
         host = urlparse(url).netloc
+        if host in PERMITTED:  # the site's owner said yes in writing, see the agent's "permission"
+            return True
         if host not in self.parsers:
             rp = urllib.robotparser.RobotFileParser()
             try:
@@ -107,7 +136,7 @@ def sitemap_entries(url, cache_dir):
         if data and isinstance(data[0], list):
             return data
     text = fetch_text(url)
-    out = [[m.group(1).strip(), (m.group(2) or "").strip()]
+    out = [[html.unescape(m.group(1).strip()), (m.group(2) or "").strip()]
            for m in re.finditer(r"<loc>\s*([^<]+?)\s*</loc>(?:\s*<lastmod>\s*([^<]+?)\s*</lastmod>)?", text)]
     cache.parent.mkdir(exist_ok=True)
     cache.write_text(json.dumps(out))
@@ -115,22 +144,51 @@ def sitemap_entries(url, cache_dir):
 
 
 def _page_cards(page, obj_rx, cards):
+    # A card is the largest element around a link that holds no other apartment's link
     links = page.eval_on_selector_all(
-        "a[href]", """els => els.map(a => {
-            const card = a.closest('article, li, [class*=card], [class*=object], [class*=item]') || a;
-            return [a.href.split('#')[0], (card.innerText || a.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400)];
-        })""")
+        "a[href]", """(els, rx) => { const re = new RegExp(rx), key = h => h.split('#')[0];
+            const others = (el, own) => [...el.querySelectorAll('a[href]')].some(x => re.test(x.href) && key(x.href) !== own);
+            return els.map(a => { const own = key(a.href); let card = a;
+                while (card.parentElement && card.parentElement !== document.body && !others(card.parentElement, own)) card = card.parentElement;
+                return [own, (card.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 400)]; }); }""", obj_rx)
     for h, t in links:
         if re.search(obj_rx, h) and not re.search(r"/(salda|sold|slutpris)", h, re.I):
             cards[h] = max(cards.get(h, ""), t, key=len)
 
 
-def list_cards(page, url, obj_rx, clicks=8, max_pages=30):
+MORE_RX = r"^\s*(ladda|visa) fler(?! sålda)"
+# The necessary-cookies-only answer on a cookie banner. Cookiebot's "Allow selection" keeps
+# only necessary cookies, which are the only ones ticked to begin with.
+NO_COOKIES_RX = re.compile(r"^\s*(neka|avvisa|avböj|deny|decline|reject all|endast nödvändiga|bara nödvändiga|"
+                           r"(use )?(only )?necessary( cookies)?( only)?|tillåt urval|allow selection)\s*$", re.I)
+
+
+def decline_cookies(page):
+    """Answer a cookie banner with necessary cookies only, so it doesn't cover the list.
+    Banners often appear a moment after the page, so it watches for one for a few seconds."""
+    for _ in range(6):
+        try:
+            btn = page.locator("button:visible, a[role=button]:visible").filter(has_text=NO_COOKIES_RX)
+            if btn.count():
+                btn.first.click(timeout=3000)
+                page.wait_for_timeout(800)
+                return
+        except Exception:
+            return
+        page.wait_for_timeout(700)
+
+
+def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks=()):
     """Every apartment link on a for-sale list, with its card text. Scrolls, presses
-    "Ladda fler" / "Visa fler" so lists that load in parts show everything, and follows
-    numbered page links ("?page=2") for lists split into pages."""
+    "Ladda fler" / "Visa fler" (or the agent's own label) so lists that load in parts show
+    everything, and follows numbered page links ("?page=2", "?p=2") for lists split into pages.
+    `picks` are filter labels to click first, for lists whose filters aren't in the address."""
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(2500)
+    decline_cookies(page)
+    for label in picks:
+        page.get_by_text(label, exact=True).first.click(timeout=5000)
+        page.wait_for_timeout(2000)
     # Lists that grow as you scroll: keep scrolling until no new apartments appear
     seen, still = -1, 0
     for _ in range(40):
@@ -145,7 +203,7 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30):
         for _ in range(3):
             page.mouse.wheel(0, 5000)
             page.wait_for_timeout(500)
-        more = page.locator("button, a").filter(has_text=re.compile(r"^\s*(ladda|visa) fler(?! sålda)", re.I))
+        more = page.locator("button, a").filter(has_text=re.compile(more_rx, re.I))
         if not more.count():
             break
         try:
@@ -159,13 +217,13 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30):
     pages = {}
     for h in page.eval_on_selector_all("a[href]", "els => els.map(a => a.href)"):
         u = urlparse(h)
-        if u.path == base and (m := re.search(r"(?:^|&)page=(\d+)", u.query)) and int(m.group(1)) > 1:
+        if u.path == base and (m := re.search(r"(?:^|&)(?:page|p)=(\d+)", u.query)) and int(m.group(1)) > 1:
             pages.setdefault(int(m.group(1)), h)
     # Page links often skip the middle ("1 2 3 4 5 … 18"), so every page up to the last is visited
     if pages:
         last = max(pages)
         template = pages[last]
-        pages = {n: re.sub(r"((?:^|[?&])page=)\d+", rf"\g<1>{n}", template) for n in range(2, last + 1)}
+        pages = {n: re.sub(r"((?:^|[?&])(?:page|p)=)\d+", rf"\g<1>{n}", template) for n in range(2, last + 1)}
     for n in sorted(pages)[:max_pages]:
         time.sleep(2)
         try:
@@ -185,7 +243,7 @@ def discover(agent, page, robots, cache_dir, log):
             log(f"{agent['name']}: robots.txt asks visitors not to read {url}, skipped")
             continue
         try:
-            found.update(list_cards(page, url, agent["obj"], clicks=agent.get("clicks", 8)))
+            found.update(list_cards(page, url, agent["obj"], clicks=agent.get("clicks", 8), more_rx=agent.get("more", MORE_RX), picks=agent.get("pick", ())))
         except Exception as e:
             log(f"{agent['name']}: couldn't read {url} ({e})")
         time.sleep(3)
@@ -193,7 +251,8 @@ def discover(agent, page, robots, cache_dir, log):
     for url in agent.get("sitemaps", []):
         try:
             for u, lastmod in sitemap_entries(url, cache_dir):
-                if re.search(agent["obj"], u) and lastmod and lastmod >= since and u not in found:
+                # An agent whose sitemap lists only what is for sale now, without dates, takes every entry
+                if re.search(agent["obj"], u) and (agent.get("undated") or (lastmod and lastmod >= since)) and u not in found:
                     found[u] = ""
         except Exception as e:
             log(f"{agent['name']}: couldn't read sitemap {url} ({e})")
@@ -212,7 +271,7 @@ PRICE_RX = re.compile(r"(\d{1,3}(?:[ . ]\d{3}){1,3})\s*kr(?!\s*/\s*m)", re.I)
 ROOMS_RX = re.compile(r"(\d+(?:[.,]5)?)\s*(?:rum|rok)\b", re.I)
 KVM_RX = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:\+\s*\d+(?:[.,]\d+)?\s*)?(?:kvm|m²|m2)\b", re.I)
 AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
-SOON_RX = re.compile(r"snart till salu|kommer snart|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
+SOON_RX = re.compile(r"snart till salu|kommer snart|\bpå gång\b|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
 SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|slutpris\s*:?\s*\d", re.I)
 ADDR_RX = re.compile(r"([A-ZÅÄÖ][A-Za-zÅÄÖåäöéü.'\-]+(?: [A-Za-zÅÄÖåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
 FEATURE_RX = [
