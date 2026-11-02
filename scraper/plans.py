@@ -137,7 +137,7 @@ def backfill():
     store = finder.read_json(DATA / "listings.json", {})
     f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
     # Every apartment in your filter (counted the way Booli counts, so an unpriced one whose price is still wrong is in)
-    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or "facts" not in p or "pageChecked" not in p)
+    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or stale_facts(p) or "pageChecked" not in p)
             and p.get("lat") and not p.get("outside") and finder.fits(p, f, estimate=False)]
     finder.log(f"Backfill: {len(todo)} apartments to look at for floor plans and förening facts")
     robots, refused, found = agents.Robots(), set(), {}
@@ -164,8 +164,8 @@ def backfill():
                     d = agents.parse_agent_page(page.inner_text("body"), dt.datetime.now())
                     got.update(price=d.get("price"), soon=d.get("soon"), shows=d.get("shows", []), pageChecked=finder.stamp())
                     got.update({k: d[k] for k in ("rooms", "kvm", "avgift", "floor", "floorText", "built") if d.get(k)})
-                if "facts" not in p:  # first, before the floor plan button changes the page
-                    got["facts"] = agents.forening_facts(agents.forening_text(page))
+                if stale_facts(p):  # first, before the floor plan button changes the page
+                    got.update(facts=agents.forening_facts(agents.forening_text(page)), factsVersion=agents.FACTS_VERSION)
                 if "plans" not in p:
                     got["plans"] = keep(candidates(page, p.get("photos") or []), p, finder.log)
                 found[u] = got
@@ -178,6 +178,12 @@ def backfill():
         browser.close()
     merge(found)
     finder.log("Backfill: done")
+
+
+def stale_facts(p):
+    """No förening facts yet, or none found by a reader that knew fewer agents' layouts."""
+    import agents
+    return "facts" not in p or (not p["facts"] and p.get("factsVersion", 1) < agents.FACTS_VERSION)
 
 
 def merge(found):

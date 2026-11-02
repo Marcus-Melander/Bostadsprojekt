@@ -246,6 +246,7 @@ def read_listing(page, url, card, now, places, opens=()):
     AREAS.rename(d)
     try:  # the förening's facts, with its tabs and folded sections opened
         d["facts"] = agents.forening_facts(agents.forening_text(page))
+        d["factsVersion"] = agents.FACTS_VERSION
     except Exception as e:
         log(f"Couldn't read the förening's facts on {url} ({e})")
     d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"))

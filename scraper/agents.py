@@ -758,11 +758,16 @@ def red_flags(desc, built=None, now=None, facts=None, kvm=None):
     # apartment's share of the förening's net debt (indirekt nettoskuldsättning) in kronor; per m² of the apartment it compares
     n = _hit(r"nettoskuld\w*\s*:?\s*\d", fs)[0]
     nm = n and re.search(r"nettoskuld\w*\s*:?\s*(\d{1,3}(?:[ .]\d{3})*)\s*kr", n, re.I)
-    if nm and kvm:
-        v = round(int(re.sub(r"\D", "", nm.group(1))) / float(kvm) / 100) * 100
+    # Fastighetsbyrån gives the förening's debt per m² itself ("Skuldsättning/kvm (upplåten med bostadsrätt): 5 547 kr")
+    pk = None if nm and kvm else _hit(r"skuld\w*\s*(?:/|per)\s*(?:kvm|m²|m2)[^:\n]{0,60}:\s*\d", fs)[0]
+    pm = pk and re.search(r"skuld\w*\s*(?:/|per)\s*(?:kvm|m²|m2)[^:\n]{0,60}:\s*(\d{1,3}(?:[ .]\d{3})*)\s*kr", pk, re.I)
+    if (nm and kvm) or pm:
+        v = (round(int(re.sub(r"\D", "", nm.group(1))) / float(kvm) / 100) * 100 if nm and kvm
+             else round(int(re.sub(r"\D", "", pm.group(1))) / 100) * 100)
         kind = "bad" if v > 15000 else "warn" if v > 5000 else "good"
-        add(kind, "Ingen nettoskuld" if v == 0 else f"{'Hög' if kind == 'bad' else 'Måttlig' if kind == 'warn' else 'Låg'} skuld: {money(v)} kr/m²", n)
-    s, _ = (None, None) if nm and kvm else _hit(r"(?:belåning|skuld|lån)\w*[^.]{0,60}?\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)"
+        add(kind, "Ingen nettoskuld" if v == 0 else f"{'Hög' if kind == 'bad' else 'Måttlig' if kind == 'warn' else 'Låg'} skuld: {money(v)} kr/m²",
+            n if nm and kvm else pk)
+    s, _ = (None, None) if (nm and kvm) or pm else _hit(r"(?:belåning|skuld|lån)\w*[^.]{0,60}?\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)"
                 r"|\d{1,2}[ .]?\d{3}\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2)[^.]{0,30}(?:belåning|skuld|lån)", ss)
     if s and (m := re.search(r"(\d{1,2}[ .]?\d{3})\s*kr\s*(?:/|per)\s*(?:kvm|m²|m2|kvadrat)", s, re.I)):
         v = int(re.sub(r"\D", "", m.group(1)))
@@ -797,29 +802,52 @@ def red_flags(desc, built=None, now=None, facts=None, kvm=None):
 
 # ---------- The förening's facts ----------
 
+# Raised when the reader learns a new agent's layout, so the backfill reads again the apartments it found nothing for
+FACTS_VERSION = 2
+
 _FACT_KEY = re.compile(r"belåning|skuld|lån per|per kvm|per m²|antal (?:lägenheter|bostadsrätter|lgh|bostäder)|består av \d+|tomträtt|äganderätt|"
-                       r"friköpt|marken|äkta|privatbostadsföretag|beskattas som|stamby|stammar|relin|avgift\w* (?:höj|sänk|ändr|justera)|"
+                       r"friköpt|marken|äkta(?! engagemang)|privatbostadsföretag|beskattas som|stamby|stammar|relin|avgift\w* (?:höj|sänk|ändr|justera)|"
                        r"(?:ändring|höjning) av (?:års|månads)?avgift", re.I)
-_FACT_TABS = ("Förening", "Föreningen", "Om föreningen", "Ekonomi")
+# Tabs and folded sections that hold the förening's figures, as each agent names them (matched as the whole
+# label): Svensk Fastighetsförmedling's "Om bostaden" tab, Bjurfors' "Visa innehåll", Fastighetsbyrån's
+# "Visa beskrivning", SkandiaMäklarna's "Bostadsfakta" and "Bostadsrättsföreningen", HusmanHagberg's
+# "Fakta om bostaden". Tabs come first, then the folded sections inside them.
+_FACT_TABS = ("Förening", "Föreningen", "Om föreningen", "Bostadsrättsföreningen", "Om bostaden", "Fakta", "Bostadsfakta", "Fakta om bostaden", r"Fakta (?:&|och) \w+",
+              "Ekonomi", "Läs mer", "Läs mer om bostaden", "Visa mer", "Visa innehåll", "Visa beskrivning")
+
+_CLICK_TARGET = """e => {
+    const t = e.closest('button, summary, a, [role=tab], [aria-expanded]') || e.querySelector('button, summary, [aria-expanded]') || e;
+    if (t.dataset.bpOpened) return null;
+    t.dataset.bpOpened = '1';
+    return t;
+}"""
 
 
 def forening_text(page):
-    """The page's text with its förening and ekonomi sections opened: tabs and folded sections named
-    Förening, Föreningen, Om föreningen or Ekonomi (never a link that leaves the page), and a separate
-    fakta page on the same site (BOSTHLM's /fakta)."""
+    """The page's text with its förening and ekonomi sections opened: the tabs and folded sections in _FACT_TABS,
+    up to four of each (Bjurfors folds each section under its own "Visa innehåll"), never a link that leaves the
+    page, and a separate fakta page on the same site (BOSTHLM's /fakta)."""
     texts = [page.inner_text("body")]
     for label in _FACT_TABS:
         rx = re.compile(rf"^\s*{label}\s*$", re.I)
         loc = page.locator("button:visible, summary:visible, a:visible, [role=tab]:visible, li:visible, h2:visible, h3:visible, div:visible, span:visible").filter(has_text=rx)
-        for el in loc.all()[:2]:
+        opened = 0
+        for el in loc.all()[:8]:
+            if opened == 4:
+                break
             try:
+                # The label, its button and the button's wrapper all match; click the button itself, once,
+                # since a second click folds the section away again
+                el = el.evaluate_handle(_CLICK_TARGET, timeout=1500).as_element()
+                if not el:
+                    continue
                 href = el.get_attribute("href") or ""
                 if href and not href.startswith("#"):
                     continue
                 el.click(timeout=1500)
                 page.wait_for_timeout(600)
                 texts.append(page.inner_text("body"))
-                break
+                opened += 1
             except Exception:
                 continue
     back, here = page.url, urlparse(page.url)
@@ -833,16 +861,20 @@ def forening_text(page):
             page.goto(back, wait_until="domcontentloaded", timeout=45000)
         except Exception:
             pass
-    return "\n".join(texts)
+    return "\f".join(texts)
 
 
 def forening_facts(text):
     """The lines about the förening, as "label: value." sentences where the page lists them as label and value
     ("Antal lägenheter" then "24"), from this apartment's part of the page only. Kept short for listings.json."""
-    t = re.sub(r"[  ]", " ", text)
-    if (cut := others_at(t)) is not None:
-        t = t[:cut]
-    lines = [l.strip() for l in t.split("\n") if l.strip()]
+    # forening_text gives one copy of the page per opened section, split by form feeds; cut each copy at
+    # its own list of other apartments, so a later copy's opened section isn't cut away with the first's
+    parts = []
+    for t in re.sub(r"[  ]", " ", text).split("\f"):
+        if (cut := others_at(t)) is not None:
+            t = t[:cut]
+        parts.append(t)
+    lines = [l.strip() for l in "\n".join(parts).split("\n") if l.strip()]
     out = []
     for i, l in enumerate(lines):
         if not _FACT_KEY.search(l) or len(l) > 400:
