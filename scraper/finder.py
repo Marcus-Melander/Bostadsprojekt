@@ -169,13 +169,56 @@ def booli_count(pw, f):
                 continue
             c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
             if name == "Stockholms innerstad":
-                out.update(c)
+                out.update(c, apartments=booli_apartments(page.content()))
             else:
                 out["districts"][name] = c
         browser.close()
     except PlaywrightError as e:
         log(f"Booli's count: couldn't load a page ({e})")
     return out if "forSale" in out or out["districts"] else None
+
+
+def booli_apartments(html):
+    """The for-sale apartments on Booli's search page (its first page of results, about 35), from the data
+    the page carries: address, m², asking price as shown, and agent. Projects and sold ones are left out."""
+    out, dec = {}, json.JSONDecoder()
+    for m in re.finditer(r'"items":\[\{"__typename":"ListableProperty"', html):
+        try:
+            arr, _ = dec.raw_decode(html, m.start() + len('"items":'))
+        except ValueError:
+            continue
+        for it in arr:
+            if not str(it.get("originId", "")).startswith("listing:"):
+                continue
+            dp = {d.get("key"): (d.get("value") or {}).get("plainText", "") for d in (it.get("displayAttributes") or {}).get("dataPoints", [])}
+            kvm = re.search(r"\d+(?:,\d+)?", dp.get("livingArea", ""))
+            out[it["originId"]] = {"addr": it.get("title", ""), "kvm": float(kvm.group().replace(",", ".")) if kvm else None,
+                                   "price": it.get("displayPrice", ""), "agent": (it.get("presenter") or {}).get("name", ""),
+                                   "url": "https://www.booli.se" + it.get("url", "")}
+    return list(out.values())
+
+
+def booli_matched(apts, items, f):
+    """Each of Booli's apartments with what we have for it: "found" (for sale here too), "unpriced" (here, without
+    an asking price), "filtered" (here, but outside the filter or the inner city as we read it) or "missing".
+    Matched on address and m² (within 2), since an address can hold several apartments."""
+    key = lambda a: re.sub(r"[^a-z0-9]+", "", agents.ascii_lower((a or "").split(",")[0]))
+    by = {}
+    for p in items.values():
+        by.setdefault(key(p.get("addr")), []).append(p)
+    out = []
+    for a in apts:
+        ours = [p for p in by.get(key(a["addr"]), []) if a.get("kvm") is None or abs((p.get("kvm") or 0) - a["kvm"]) <= 2]
+        if not ours:
+            why = "missing"
+        elif any(p.get("price") and not p.get("outside") and fits(p, f, estimate=False) for p in ours):
+            why = "found"
+        elif any(not p.get("price") and not p.get("outside") for p in ours):
+            why = "unpriced"
+        else:
+            why = "filtered"
+        out.append({**a, "here": why})
+    return out
 
 
 def counted(items, f):
@@ -503,6 +546,16 @@ def find(args):
     day = {"forSale": store["found"]["forSale"], "soon": store["found"]["soon"], "agents": len(store["agents"])}
     if same:
         day.update(booliForSale=b["forSale"], booliSoon=b["soon"])
+        if b.get("apartments"):
+            b["matched"] = booli_matched(b["apartments"], items, f)
+            tally = {w: sum(1 for a in b["matched"] if a["here"] == w) for w in ("found", "unpriced", "filtered", "missing")}
+            miss = {}
+            for a in b["matched"]:
+                if a["here"] == "missing":
+                    miss[a["agent"] or "?"] = miss.get(a["agent"] or "?", 0) + 1
+            log(f"Booli's first page: {len(b['matched'])} for sale; {tally['found']} found here, {tally['unpriced']} here without a price, "
+                f"{tally['filtered']} here but filtered out, {tally['missing']} missing"
+                + (" (" + ", ".join(f"{k} {v}" for k, v in sorted(miss.items(), key=lambda kv: -kv[1])) + ")" if miss else ""))
     store.setdefault("compare", {})[stamp()[:10]] = day
     with open(DATA / "compare.csv", "w", encoding="utf-8") as fh:
         fh.write("day,for_sale,soon,booli_for_sale,booli_soon,agents\n")

@@ -227,9 +227,14 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks
             break
         try:
             more.first.click(timeout=3000)
-            page.wait_for_timeout(1500)
         except Exception:
-            break
+            # A slow page can miss one click (Bergets Ro's list stopped at 16 of 108 on 2 November): one more try
+            page.wait_for_timeout(3000)
+            try:
+                more.first.click(timeout=5000)
+            except Exception:
+                break
+        page.wait_for_timeout(1500)
     cards = {}
     _page_cards(page, obj_rx, cards)
     base = urlparse(url).path
