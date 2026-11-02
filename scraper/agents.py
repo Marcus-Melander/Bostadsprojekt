@@ -286,11 +286,13 @@ MONTH_RX = "|".join(m[:3] for m in SV_MONTHS)
 SHOW_RX = re.compile(
     rf"(?<!\d)(\d{{1,2}})\s*(?:\|\s*)?({MONTH_RX})[a-zåäö]*\.?(?:\s*\d{{4}})?[^0-9]{{0,40}}?"
     rf"(\d{{1,2}})[:.](\d{{2}})(?:\s*[-–]\s*(\d{{1,2}})[:.](\d{{2}}))?", re.I)
-PRICE_RX = re.compile(r"(\d{1,3}(?:[ . ]\d{3}){1,3})\s*kr(?!\s*/\s*m)", re.I)
+# SkandiaMäklarna writes thousands with commas (6,795,000 kr)
+PRICE_RX = re.compile(r"(\d{1,3}(?:[ ., ]\d{3}){1,3})\s*kr(?!\s*/\s*m)", re.I)
 ROOMS_RX = re.compile(r"(\d+(?:[.,]5)?)\s*(?:rum|rok)\b", re.I)
 KVM_RX = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:\+\s*\d+(?:[.,]\d+)?\s*)?(?:kvm|m²|m2)\b", re.I)
 AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
-SOON_RX = re.compile(r"snart till salu|kommer snart|\bpå gång\b|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
+# HusmanHagberg marks a coming apartment "Kommande®", SkandiaMäklarna one sold before the open market "REDO™"
+SOON_RX = re.compile(r"kommande®|redo™|snart till salu|kommer snart|\bpå gång\b|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
 SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|slutpris\s*:?\s*\d", re.I)
 ADDR_RX = re.compile(r"([A-ZÅÄÖ][A-Za-zÅÄÖåäöéü.'\-]+(?: [A-Za-zÅÄÖåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
 FEATURE_RX = [

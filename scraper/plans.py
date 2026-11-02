@@ -20,6 +20,7 @@ import time
 import urllib.request
 from collections import Counter
 from pathlib import Path
+from urllib.parse import urlparse
 
 from PIL import Image
 
@@ -83,6 +84,8 @@ def _keep(candidates, listing, log, limit):
             break
         if u in by_source:  # downloaded before
             kept.append(u)
+            continue
+        if urlparse(u).path.lower().endswith(".svg"):  # icons (Södermäklarna's close button), never a scanned plan
             continue
         try:
             raw = fetch(u)
