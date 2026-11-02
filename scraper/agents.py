@@ -37,6 +37,8 @@ AGENTS = [
     {"name": "BOSTHLM", "lists": ["https://www.bosthlm.se/till-salu"], "obj": r"bosthlm\.se/\d+/"},
     {"name": "Historiska Hem", "lists": ["https://historiskahem.se/till-salu/"], "obj": r"/object/tillsalu-"},
     {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/"},
+    {"name": "Innerstadsspecialisten", "lists": ["https://innerstadsspecialisten.se/till-salu"], "obj": r"/bostad/"},
+    {"name": "Bronze", "lists": ["https://bronzefast.se/bostader/"], "obj": r"bronzefast\.se/bostader/lagenhet-"},
     {"name": "Södermäklarna", "lists": ["https://www.sodermaklarna.se/till-salu"], "obj": r"/bostad/"},
     {"name": "Stadshem", "lists": ["https://stadshem.se/till-salu"], "obj": r"/objekt/"},
     {"name": "Bergets Ro", "lists": ["https://www.bergetsro.se/till-salu/"], "obj": r"/houses/", "clicks": 40, "anywhere": True},

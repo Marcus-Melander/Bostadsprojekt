@@ -282,6 +282,9 @@ def read_listing(page, url, card, now, places, opens=()):
     if not addr:
         log(f"No address found on {url}")
         return None, False
+    # Some agents give the floor only in the address ("Tulegatan 32A, 2tr", Innerstadsspecialisten)
+    if not d.get("floor") and (m := re.search(r",\s*(\d+(?:[.,]5)?)\s*tr\b", h1, re.I)):
+        d["floor"] = m.group(1).replace(",", ".")
     place = places.lookup(addr)
     if not place or not place["inner"]:
         return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
