@@ -140,7 +140,7 @@ def backfill():
     store = finder.read_json(DATA / "listings.json", {})
     f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
     # Every apartment in your filter (counted the way Booli counts, so an unpriced one whose price is still wrong is in)
-    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or stale_facts(p) or "pageChecked" not in p)
+    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or stale_facts(p) or "pageChecked" not in p or "orgnrChecked" not in p)
             and p.get("lat") and not p.get("outside") and finder.fits(p, f, estimate=False)]
     finder.log(f"Backfill: {len(todo)} apartments to look at for floor plans and förening facts")
     robots, refused, found = agents.Robots(), set(), {}
@@ -167,8 +167,13 @@ def backfill():
                     d = agents.parse_agent_page(page.inner_text("body"), dt.datetime.now())
                     got.update(price=d.get("price"), soon=d.get("soon"), shows=d.get("shows", []), pageChecked=finder.stamp())
                     got.update({k: d[k] for k in ("rooms", "kvm", "avgift", "floor", "floorText", "built") if d.get(k)})
-                if stale_facts(p):  # first, before the floor plan button changes the page
-                    got.update(facts=agents.forening_facts(agents.forening_text(page)), factsVersion=agents.FACTS_VERSION)
+                if stale_facts(p) or "orgnrChecked" not in p:  # first, before the floor plan button changes the page
+                    ftext = agents.forening_text(page)
+                    if stale_facts(p):
+                        got.update(facts=agents.forening_facts(ftext), factsVersion=agents.FACTS_VERSION)
+                    if orgnr := agents.find_orgnr(ftext, page.inner_text("body"), page.content()):
+                        got["orgnr"] = orgnr
+                    got["orgnrChecked"] = True
                 if "plans" not in p:
                     got["plans"] = keep(candidates(page, p.get("photos") or []), p, finder.log)
                 found[u] = got

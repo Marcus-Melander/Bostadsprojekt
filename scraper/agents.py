@@ -873,6 +873,19 @@ def forening_text(page):
     return "\f".join(texts)
 
 
+# A bostadsrättsförening's organisationsnummer: 769… for most, 716…/717… for older ones; never the agent's own (556…)
+ORGNR_RX = re.compile(r"\b(7(?:69|16|17)\d{3})\s?-\s?(\d{4})\b")
+
+
+def find_orgnr(*texts):
+    """The förening's organisationsnummer from the first text that has one (the förening's sections first,
+    then the whole page, then its code, where some agents keep it in a hidden tab)."""
+    for t in texts:
+        if t and (m := ORGNR_RX.search(t)):
+            return m.group(1) + m.group(2)
+    return None
+
+
 def forening_facts(text):
     """The lines about the förening, as "label: value." sentences where the page lists them as label and value
     ("Antal lägenheter" then "24"), from this apartment's part of the page only. Kept short for listings.json."""

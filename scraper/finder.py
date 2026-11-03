@@ -291,7 +291,11 @@ def read_listing(page, url, card, now, places, opens=()):
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
     AREAS.rename(d)
     try:  # the förening's facts, with its tabs and folded sections opened
-        d["facts"] = agents.forening_facts(agents.forening_text(page))
+        ftext = agents.forening_text(page)
+        d["facts"] = agents.forening_facts(ftext)
+        if orgnr := agents.find_orgnr(ftext, page.inner_text("body"), page.content()):
+            d["orgnr"] = orgnr
+        d["orgnrChecked"] = True
         d["factsVersion"] = agents.FACTS_VERSION
     except Exception as e:
         log(f"Couldn't read the förening's facts on {url} ({e})")
