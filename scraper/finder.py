@@ -248,7 +248,7 @@ def counted(items, f):
 
 # ---------- Reading the agents ----------
 
-def read_listing(page, url, card, now, places, opens=()):
+def read_listing(page, url, card, now, places, opens=(), known=None):
     """Open one apartment page, opening the sections named in `opens` (facts some agents keep
     folded away). Returns (listing or None, refused?)."""
     try:
@@ -301,8 +301,7 @@ def read_listing(page, url, card, now, places, opens=()):
     except Exception as e:
         log(f"Couldn't read the förening's facts on {url} ({e})")
     try:  # the förening's latest annual report, where the agent links it; read after the run (reports.py)
-        links = page.eval_on_selector_all("a[href]", "as => as.map(a => [a.innerText || a.title || '', a.href])")
-        if u := reports.report_link(links):
+        if u := reports.report_link(reports.links(page)):
             d["reportUrl"] = u
     except Exception as e:
         log(f"Couldn't read the links on {url} ({e})")
@@ -311,6 +310,18 @@ def read_listing(page, url, card, now, places, opens=()):
         d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
     except Exception as e:
         log(f"Couldn't read the floor plan on {url} ({e})")
+    # A report behind the page's documents button takes several seconds to find, so it's looked for once per
+    # apartment, after everything else on the page is read
+    known = known or {}
+    if not d.get("reportUrl") and not known.get("reportChecked"):
+        try:
+            if u := reports.report_behind_buttons(page, log):
+                d["reportUrl"] = u
+        except Exception as e:
+            log(f"Couldn't open the documents on {url} ({e})")
+    if not d.get("reportUrl") and known.get("reportUrl"):
+        d["reportUrl"] = known["reportUrl"]
+    d["reportChecked"] = True
     if d["state"] == "sold":
         d["shows"] = []
     d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
@@ -439,7 +450,7 @@ def read_agent(ag, sh):
                 if not robots.allowed(url):
                     continue
                 progress(sh, ag["name"], f"{n}/{len(want)}")
-                p, refused = read_listing(page, url, card, now, sh["places"], ag.get("open", ()))
+                p, refused = read_listing(page, url, card, now, sh["places"], ag.get("open", ()), known=old)
                 if refused:
                     log(f"{ag['name']} refused {url}; skipping the rest of this agent today")
                     with sh["lock"]:
