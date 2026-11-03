@@ -134,18 +134,22 @@ def read_creds():
     return creds
 
 
-def setup(zip_path):
-    """Open Bolagsverket's password-protected zip with the code from its text message, and write the client id
-    and secret to data/bolagsverket.json. Nothing is printed but the result."""
-    import getpass
-    code = getpass.getpass("The code from Bolagsverket's text message (not shown): ").strip()
-    test = input("Is it the code marked \"Test\"? [y/N] ").strip().lower().startswith(("y", "j"))
-    with zipfile.ZipFile(zip_path) as z:
-        name = next(n for n in z.namelist() if n.lower().endswith(".txt"))
-        try:
-            text = z.read(name, pwd=code.encode()).decode("utf-8-sig", "replace")
-        except RuntimeError:
-            sys.exit("That code doesn't open the zip. Try the other code from the text message.")
+def setup(path):
+    """Write the client id and secret to data/bolagsverket.json, from Bolagsverket's password-protected zip (opened
+    with the code from its text message) or from the client_credentials.txt already taken out of it. Nothing is
+    printed but the result."""
+    if path.lower().endswith(".txt"):
+        name, text, test = Path(path).name, Path(path).read_text("utf-8-sig"), None
+    else:
+        import getpass
+        code = getpass.getpass("The code from Bolagsverket's text message (not shown): ").strip()
+        test = input("Is it the code marked \"Test\"? [y/N] ").strip().lower().startswith(("y", "j"))
+        with zipfile.ZipFile(path) as z:
+            name = next(n for n in z.namelist() if n.lower().endswith(".txt"))
+            try:
+                text = z.read(name, pwd=code.encode()).decode("utf-8-sig", "replace")
+            except RuntimeError:
+                sys.exit("That code doesn't open the zip. Try the other code from the text message.")
     pairs = {re.sub(r"[^a-z]", "", k.lower()): v.strip() for k, v in re.findall(r"^\s*([\w .-]+?)\s*[:=]\s*(\S+)\s*$", text, re.M)}
     cid = next((v for k, v in pairs.items() if "id" in k), None)
     secret = next((v for k, v in pairs.items() if "secret" in k), None)
@@ -156,6 +160,17 @@ def setup(zip_path):
     if not (cid and secret):
         sys.exit(f"Couldn't tell the client id from the secret in {name}; its lines are named: "
                  + ", ".join(k for k in pairs) or "(none)")
+    if test is None:  # a bare text file doesn't say which environment it's for: ask each for a token
+        why = []
+        for env in ("prod", "test"):
+            try:
+                Client({"client_id": cid, "client_secret": secret, "env": env})._token()
+                test = env == "test"
+                break
+            except Exception as e:
+                why.append(f"{env}: {e}")
+        else:
+            sys.exit("Neither environment accepted these credentials. " + " / ".join(why))
     CREDS.parent.mkdir(exist_ok=True)
     CREDS.write_text(json.dumps({"client_id": cid, "client_secret": secret, "env": "test" if test else "prod"}))
     CREDS.chmod(0o600)
@@ -223,6 +238,12 @@ def forening(client, orgnr, cache):
     name = ((org.get("organisationsnamn") or {}).get("organisationsnamnLista") or [{}])[0].get("namn") if org else None
     # A wrong number (another förening's, read off the page) shows as a name that isn't a bostadsrättsförening
     out = {"read": dt.date.today().isoformat(), "name": name, "isBrf": bool(name and re.search(r"bostadsrätt|\bbrf\b", name, re.I))}
+    if org:
+        # A förening being wound up, in bankruptcy or merging, or no longer registered, is a red flag on its own
+        out["registered"] = (org.get("organisationsdatum") or {}).get("registreringsdatum")
+        out["winding"] = bool(org.get("pagaendeAvvecklingsEllerOmstruktureringsforfarande"))
+        out["deregistered"] = bool(org.get("avregistreradOrganisation"))
+        out["manager"] = (((org.get("postadressOrganisation") or {}).get("postadress") or {}).get("coAdress") or "").removeprefix("c/o ").strip() or None
     docs = sorted(client.documents(orgnr), key=lambda d: d.get("rapporteringsperiodTom") or "", reverse=True)
     out["reports"] = [d.get("rapporteringsperiodTom") for d in docs]
     for d in docs[:2]:  # the latest report, or the one before if the latest has no key figures
