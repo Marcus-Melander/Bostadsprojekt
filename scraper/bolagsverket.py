@@ -11,6 +11,8 @@ client secret from its text message) go in data/bolagsverket.json, which git ign
 
 "env" is "test" for the acceptance environment (the code marked "Test" in the text message) or "prod".
 
+    python scraper/bolagsverket.py --setup FILE.zip    write data/bolagsverket.json from Bolagsverket's zip
+                                                       (asks for the code from the text message, without showing it)
     python scraper/bolagsverket.py --ping              check that the credentials work
     python scraper/bolagsverket.py --org 7696001234    one förening: its name, reports and key figures
     python scraper/bolagsverket.py --update            every förening we have an organisationsnummer for
@@ -132,6 +134,34 @@ def read_creds():
     return creds
 
 
+def setup(zip_path):
+    """Open Bolagsverket's password-protected zip with the code from its text message, and write the client id
+    and secret to data/bolagsverket.json. Nothing is printed but the result."""
+    import getpass
+    code = getpass.getpass("The code from Bolagsverket's text message (not shown): ").strip()
+    test = input("Is it the code marked \"Test\"? [y/N] ").strip().lower().startswith(("y", "j"))
+    with zipfile.ZipFile(zip_path) as z:
+        name = next(n for n in z.namelist() if n.lower().endswith(".txt"))
+        try:
+            text = z.read(name, pwd=code.encode()).decode("utf-8-sig", "replace")
+        except RuntimeError:
+            sys.exit("That code doesn't open the zip. Try the other code from the text message.")
+    pairs = {re.sub(r"[^a-z]", "", k.lower()): v.strip() for k, v in re.findall(r"^\s*([\w .-]+?)\s*[:=]\s*(\S+)\s*$", text, re.M)}
+    cid = next((v for k, v in pairs.items() if "id" in k), None)
+    secret = next((v for k, v in pairs.items() if "secret" in k), None)
+    if not (cid and secret):
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        if len(lines) == 2:
+            cid, secret = lines
+    if not (cid and secret):
+        sys.exit(f"Couldn't tell the client id from the secret in {name}; its lines are named: "
+                 + ", ".join(k for k in pairs) or "(none)")
+    CREDS.parent.mkdir(exist_ok=True)
+    CREDS.write_text(json.dumps({"client_id": cid, "client_secret": secret, "env": "test" if test else "prod"}))
+    CREDS.chmod(0o600)
+    print(f"Saved to {CREDS} ({'test' if test else 'prod'} environment). Check it with: python scraper/bolagsverket.py --ping")
+
+
 def clean_orgnr(s):
     """"769600-1234" or "7696001234" → "7696001234"; a förening's number starts with 7."""
     d = re.sub(r"\D", "", s or "")
@@ -238,12 +268,15 @@ def update(items, log=print):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--setup", metavar="ZIP")
     ap.add_argument("--ping", action="store_true")
     ap.add_argument("--org")
     ap.add_argument("--update", action="store_true")
     a = ap.parse_args()
     try:
-        if a.ping:
+        if a.setup:
+            setup(a.setup)
+        elif a.ping:
             c = Client()
             print(f"{c.env}: {c.ping()}")
         elif a.org:
