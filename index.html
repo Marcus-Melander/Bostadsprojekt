@@ -1797,7 +1797,7 @@ function crawlPanel() {
     ${trend}
     ${ag.length ? `<details class="agents"><summary>${ag.length} mäklare lästa</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} i innerstaden</td></tr>`).join("")}</table></details>` : ""}
     ${st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Kör nu</button></div>`}
-    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:26; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 26) ? "i dag" : "i morgon"} 06:26.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:26.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
+    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:25; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 25) ? "i dag" : "i morgon"} 06:25.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:25.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
   </section>`;
 }
 function filterPanel() {

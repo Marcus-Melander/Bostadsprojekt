@@ -7,7 +7,7 @@ A single-page planner for buying a bostadsrätt in Stockholm. It runs on your ow
 ```bash
 scripts/setup.sh                 # once: Python environment with Playwright
 .venv/bin/python server.py       # then open http://localhost:8765
-scripts/install-mac.sh           # optional: server at login, finder daily at 06:26
+scripts/install-mac.sh           # optional: server at login, finder daily at 06:25
 ```
 
 - `scraper/finder.py` drives your installed Google Chrome. It reads each estate agent's for-sale list (`scraper/agents.py`), opens the inner-city apartments that may fit your filter, and saves every showing time, price, size, avgift, floor, build year, description, features and photos.

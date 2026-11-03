@@ -87,6 +87,8 @@ Needs months of final prices, which the daily runs collect meanwhile.
 
 ## Done
 
+- **The morning run starts at the 06:25 wake.** On 3 November the Mac with its lid closed was back asleep 21 seconds after its 06:25 wake, so the 06:26 job waited for the next wake at 06:55. The job is now set for 06:24, a minute before the wake: that time passes while the Mac sleeps, and launchd starts a missed job the moment the Mac wakes, so the run begins at 06:25 and caffeinate keeps the Mac awake until it's done.
+
 - **Innerstadsspecialisten and Bronze.** Both are now read from their for-sale lists (26 and 40 apartments in the inner city). Wallin & Co is left out, since all of its apartments are outside the tolls. An apartment whose page gives the floor only in its address ("Tulegatan 32A, 2tr") now gets that floor.
 
 - **Booli compared apartment by apartment.** The one search page the finder reads from Booli each morning carries its first ~35 for-sale apartments as data (address, m², asking price, agent). The finder now keeps them and matches each against ours on address and m² (an address can hold several apartments), and the log says how many it found, has without a price, filters out, or misses, with the agents of the missing ones. Booli is still read only once a day, one page. Also fixed: an agent's "Visa fler" button that misses one click on a slow page is tried once more, rather than ending the list (Bergets Ro's stopped at 16 of 108 on 2 November).
@@ -103,7 +105,7 @@ Needs months of final prices, which the daily runs collect meanwhile.
 
 - **The förening's figures from the agents' fact sections.** The finder opens each apartment's Förening, Föreningen, Om föreningen and Ekonomi tabs and folded sections (and BOSTHLM's separate fakta page), keeps the lines about the förening, and the red flags read them before the description: debt per m² from the indirekt nettoskuldsättning divided by the apartment's m², whether the förening owns the land or has tomträtt, äkta or oäkta, the number of apartments, the latest stambyte in the renovation list (flushing or inspecting the pipes doesn't count), and whether an avgift change is planned. A stambyte more than five years away is yellow ("Stambyte planerat 2035"). Works for Alicia Edelman, Notar, BOSTHLM, Historiska Hem, Tradition, Stadshem, Bergets Ro, Erik Olsson, Länsförsäkringar, SkandiaMäklarna, Karlsson & Uddare, Mäklarhuset and Mäklarringen; apartments found earlier got theirs with `scraper/plans.py --backfill`. Also fixed: a menu link to "Liknande bostäder" near the top of a page no longer cuts off the rest of it.
 
-- **A morning run that doesn't need Amphetamine.** The Mac wakes itself at 06:25 every day (`sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00`, set 2026-11-01; keep the charger connected), and the run starts at 06:26, wrapped in `caffeinate -is`, so the Mac stays awake until the run is done and then sleeps again. With the lid closed, the Mac stays awake only about two minutes after the wake (on 2026-11-02 it slept again at 06:27, so the 06:30 run waited until 06:57); 06:26 falls inside those two minutes. If it still sleeps through, launchd runs the missed job as soon as it next wakes. Check the wake with `pmset -g sched`.
+- **A morning run that doesn't need Amphetamine.** The Mac wakes itself at 06:25 every day (`sudo pmset repeat wakeorpoweron MTWRFSU 06:25:00`, set 2026-11-01; keep the charger connected). The job is set for 06:24, so it is always missed while the Mac sleeps, and launchd starts it the moment the Mac wakes; it's wrapped in `caffeinate -is`, so the Mac stays awake until the run is done and then sleeps again. With the lid closed the Mac stays awake only about 20 seconds after the wake, too short to wait for a later minute (06:30 and 06:26 both waited until the next wake at about 06:55). Check the wake with `pmset -g sched`.
 
 - **A minimum price in the search filter** (Minpris, under Sökfilter). Apartments below it drop out of Visningar and out of the finder's reading, and Booli's count uses the same minimum (`minListPrice`), so the comparison stays like for like. Apartments without a price yet ("snart till salu") are always kept, as with the max price.
 
@@ -136,7 +138,7 @@ Needs months of final prices, which the daily runs collect meanwhile.
 - **Redesign:** the menu has four sections (Showings, Saved, Money, Buying), each with sub-tabs for its pages, and Saved apartments is a section of its own.
 - **Map on Showings:** apartments as dots, and each area drawn around its apartments in the colour of your rating (1–5 or Never here). Stadia Maps' quiet grey "Alidade Smooth" map, light and dark, which needs no key for a page on localhost.
 - **Save apartments and follow their bidding.** "Save" on a showing (it replaces Track) adds the apartment to Saved. The finder then reads its page on every run, whatever the filter says. It records the highest bid each day and the final price once it's sold, and Saved shows the bid history.
-- **Show whether the daily run is installed.** The finder panel shows "Körs varje morgon 06:26; nästa körning i morgon" when the schedule is installed, and how to switch it on when it isn't.
+- **Show whether the daily run is installed.** The finder panel shows "Körs varje morgon 06:25; nästa körning i morgon" when the schedule is installed, and how to switch it on when it isn't.
 - **The planner:** finances, mortgage rates, 5-year budget, area prices, bidding guide, furnishing budget and buying steps.
 - **The Showings tab:**
   - next week's showings, checked against your budget;
@@ -147,6 +149,6 @@ Needs months of final prices, which the daily runs collect meanwhile.
 - **The estate agent reader:** every showing time, the build year, running costs, the description, features such as stambyte or a renovated kitchen, and photos, for 10 agents:
   - Alicia Edelman, Notar, BOSTHLM, Historiska Hem and Tradition;
   - Södermäklarna, Stadshem, Bergets Ro, Bjurfors and Behrer & Partners.
-- **Running locally:** a local server, the plan saved in `data/plan.json`, and a daily run at 06:26 via `scripts/install-mac.sh`.
+- **Running locally:** a local server, the plan saved in `data/plan.json`, and a daily run at 06:25 via `scripts/install-mac.sh`.
 - **Moving the plan off claude.ai:** done once with export and import; the export box was then removed.
 - **The scraper doesn't stop on a refusal:** it keeps what it read, shows a plain message, and never retries.
