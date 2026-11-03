@@ -1916,6 +1916,15 @@ function travelLine(p) {
   }
   return bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "";
 }
+// The förening as Bolagsverket has it registered: its name, since when, and who manages it
+function foreningLine(p) {
+  const b = p.bv;
+  if (!b || !b.name) return "";
+  const bits = [`<span title="Organisationsnummer ${esc(p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6))}">${esc(b.name)}</span>`];
+  if (b.registered) bits.push(`<span>Registrerad <strong>${esc(b.registered.slice(0, 4))}</strong></span>`);
+  if (b.manager) bits.push(`<span>Förvaltare ${esc(b.manager)}</span>`);
+  return `<div class="facts travel">${bits.join("")}</div>`;
+}
 function showCard(p, s, a, cr) {
   const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);
   const price = p.price || 0, mc = price ? monthlyCost(price, p.avgift, cr.rate) : null;
@@ -1931,6 +1940,7 @@ function showCard(p, s, a, cr) {
       <p>${esc(describeListing(p))}</p>
       ${(p.flags || []).length ? `<div class="flags">${flagChips(p.flags).join("")}</div>` : ""}
       ${travelLine(p)}
+      ${foreningLine(p)}
       ${photos.length > 1 ? `<details class="gallery" data-fill="gallery" data-key="${esc(p.url)}"><summary>${photos.length} bilder</summary><div class="strip"></div></details>` : ""}
       ${(p.plans || []).length ? `<details class="plan" data-fill="plan" data-key="${esc(p.url)}"><summary>Planlösning${p.plans.length > 1 ? "ar (" + p.plans.length + ")" : ""}</summary><div class="fill"></div></details>` : ""}
       ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>Beskrivning från ${esc(p.agent)}</summary><div class="fill"></div></details>` : ""}

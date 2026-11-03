@@ -41,7 +41,7 @@ HOSTS = {"prod": "gw.api.bolagsverket.se", "test": "gw-accept2.api.bolagsverket.
 TOKEN_HOSTS = {"prod": ("gw.api.bolagsverket.se", "portal.api.bolagsverket.se"),
                "test": ("gw-accept2.api.bolagsverket.se", "portal-accept2.api.bolagsverket.se")}
 SCOPE = "vardefulla-datamangder:read vardefulla-datamangder:ping"
-REFRESH_DAYS = 120  # a förening files one report a year; look again a few times a year for the new one
+NEW_APARTMENT_DAYS = 30  # a förening files one report a year; look again a few times a year for the new one
 PAUSE = 1.0  # seconds between calls, to be a polite client
 
 # The key figures, found by words in their iXBRL names (accent-free, any case); the taxonomy's exact names vary
@@ -229,11 +229,23 @@ def read_cache():
         return {}
 
 
-def forening(client, orgnr, cache):
-    """What Bolagsverket has for one förening, from the cache when it was read recently."""
+def stale(c, new_apartment=False, today=None):
+    """Whether a förening's record is due to be read again. A förening has about seven months after its year
+    (mostly the calendar year) to file the annual report, so the record is read once a year, from 1 August,
+    when last year's report is in. A new apartment for sale in the förening reads it again if it's over a
+    month old, in case its status (a liquidation, say) has changed."""
+    today = today or dt.date.today()
+    read = (c or {}).get("read", "")
+    season = dt.date(today.year if today.month >= 8 else today.year - 1, 8, 1).isoformat()
+    return read < season or (new_apartment and read < (today - dt.timedelta(days=NEW_APARTMENT_DAYS)).isoformat())
+
+
+def forening(client, orgnr, cache, new_apartment=False):
+    """What Bolagsverket has for one förening, from the cache unless it's due to be read again."""
     old = cache.get(orgnr)
-    if old and old.get("read", "") > (dt.date.today() - dt.timedelta(days=REFRESH_DAYS)).isoformat():
+    if old and not stale(old, new_apartment):
         return old
+    old = old or {}
     org = client.organisation(orgnr) or {}
     name = ((org.get("organisationsnamn") or {}).get("organisationsnamnLista") or [{}])[0].get("namn") if org else None
     # A wrong number (another förening's, read off the page) shows as a name that isn't a bostadsrättsförening
@@ -243,7 +255,9 @@ def forening(client, orgnr, cache):
         out["registered"] = (org.get("organisationsdatum") or {}).get("registreringsdatum")
         out["winding"] = bool(org.get("pagaendeAvvecklingsEllerOmstruktureringsforfarande"))
         out["deregistered"] = bool(org.get("avregistreradOrganisation"))
-        out["manager"] = (((org.get("postadressOrganisation") or {}).get("postadress") or {}).get("coAdress") or "").removeprefix("c/o ").strip() or None
+        co = re.sub(r"(?i)^c/o\s*", "", ((org.get("postadressOrganisation") or {}).get("postadress") or {}).get("coAdress") or "")
+        co = re.sub(r"\s+\d+$", "", co).strip()  # "Nabo 1524" is Nabo's customer number
+        out["manager"] = co if co and co.lower() not in (name or "").lower() else None
     docs = sorted(client.documents(orgnr), key=lambda d: d.get("rapporteringsperiodTom") or "", reverse=True)
     out["reports"] = [d.get("rapporteringsperiodTom") for d in docs]
     for d in docs[:2]:  # the latest report, or the one before if the latest has no key figures
@@ -255,12 +269,44 @@ def forening(client, orgnr, cache):
         if any(k in f for k in KEY_FIGURES):
             out.update(f, reportPeriod=d.get("rapporteringsperiodTom"))
             break
-    cache[orgnr] = out
-    return out
+    cache[orgnr] = {**{k: v for k, v in old.items() if k in AGENT_KEYS}, **out}
+    return cache[orgnr]
+
+
+AGENT_KEYS = ("facts", "factsFrom", "factsRead", "apartments")  # what the agents' pages say, kept beside Bolagsverket's answer
+BV_KEYS = ("name", "isBrf", "registered", "winding", "deregistered", "manager", "reports", "reportPeriod", *KEY_FIGURES)
+
+
+def remember(items, cache):
+    """Keep what the agents' pages say about each förening with it, so the next apartment in the same förening
+    starts from it: an apartment whose page gives no facts takes the förening's latest ones."""
+    for url, p in items.items():
+        o = p.get("orgnr")
+        if not o:
+            continue
+        c = cache.setdefault(o, {})
+        c["apartments"] = sorted(set(c.get("apartments", [])) | {url})
+        if p.get("facts") and not p.get("factsFrom") and p.get("read", "") >= c.get("factsRead", ""):
+            c.update(facts=p["facts"], factsFrom=p.get("agent"), factsRead=p.get("read", ""))
+    for p in items.values():
+        c = cache.get(p.get("orgnr")) or {}
+        if c.get("facts") and (not p.get("facts") or p.get("factsFrom")):
+            p.update(facts=c["facts"], factsFrom=c.get("factsFrom") or "?")
+
+
+def write_csv(cache):
+    """data/foreningar.csv: one line per förening, for reading in a spreadsheet."""
+    import csv
+    cols = ["orgnr", "name", "isBrf", "registered", "manager", "winding", "deregistered", "apartments", "factsFrom", "factsRead", "read", "facts"]
+    with open(CACHE.with_suffix(".csv"), "w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(cols)
+        for o, c in sorted(cache.items()):
+            w.writerow([o] + [len(c.get("apartments", [])) if k == "apartments" else c.get(k, "") for k in cols[1:]])
 
 
 def update(items, log=print):
-    """Bolagsverket's figures for every apartment whose förening's organisationsnummer we know; stored on the
+    """Bolagsverket's record for every apartment whose förening's organisationsnummer we know; stored on the
     apartment as "bv", and in data/foreningar.json so each förening is fetched once."""
     try:
         client = Client()
@@ -270,8 +316,12 @@ def update(items, log=print):
     cache, n = read_cache(), 0
     todo = {p["orgnr"] for p in items.values() if p.get("orgnr") and not p.get("outside")}
     for orgnr in sorted(todo):
+        known = set((cache.get(orgnr) or {}).get("apartments", []))
+        fresh = any(u not in known for u, p in items.items() if p.get("orgnr") == orgnr)
+        if not stale(cache.get(orgnr), fresh):
+            continue
         try:
-            forening(client, orgnr, cache)
+            forening(client, orgnr, cache, fresh)
         except Refused as e:
             log(f"{e}; stopping for today")
             break
@@ -279,11 +329,14 @@ def update(items, log=print):
             log(f"Bolagsverket: couldn't read {orgnr} ({e})")
             continue
         n += 1
+    remember(items, cache)
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1))
+    write_csv(cache)
     for p in items.values():
-        if p.get("orgnr") in cache:
-            p["bv"] = {k: v for k, v in cache[p["orgnr"]].items() if k not in ("read",)}
-    log(f"Bolagsverket: {n} föreningar looked up, {sum(1 for c in cache.values() if 'skuldKvm' in c)} with key figures")
+        if cache.get(p.get("orgnr"), {}).get("name"):
+            p["bv"] = {k: v for k, v in cache[p["orgnr"]].items() if k in BV_KEYS}
+    log(f"Bolagsverket: {n} föreningar looked up ({len(todo)} known), "
+        f"{sum(1 for o in todo if (cache.get(o) or {}).get('winding') or (cache.get(o) or {}).get('deregistered'))} being wound up or deregistered")
     return n
 
 

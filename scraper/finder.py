@@ -299,7 +299,7 @@ def read_listing(page, url, card, now, places, opens=()):
         d["factsVersion"] = agents.FACTS_VERSION
     except Exception as e:
         log(f"Couldn't read the förening's facts on {url} ({e})")
-    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"))
+    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"), bv=d.get("bv"))
     try:  # last, since finding the plan may press the page's floor plan button
         d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
     except Exception as e:
@@ -506,7 +506,7 @@ def find(args):
     items = store["items"]
     for p in items.values():  # neighbourhoods may have been redrawn, and the red flag rules changed, since the last run
         AREAS.rename(p)
-        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"))
+        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"))
     started, now = stamp(), dt.datetime.now()
     status("running", "Startar", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")
@@ -568,6 +568,15 @@ def find(args):
         fh.write("day,for_sale,soon,booli_for_sale,booli_soon,agents\n")
         for d, c in sorted(store["compare"].items()):
             fh.write(f"{d},{c['forSale']},{c['soon']},{c.get('booliForSale', '')},{c.get('booliSoon', '')},{c['agents']}\n")
+    try:  # the förening's record at Bolagsverket, for apartments whose organisationsnummer the agent shows
+        import bolagsverket
+        status("running", "Läser föreningarna hos Bolagsverket", started=started)
+        bolagsverket.update(items, log)
+        for p in items.values():
+            if p.get("bv") or p.get("factsFrom"):
+                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"))
+    except Exception as e:
+        log(f"Bolagsverket: stopped ({e})")
     hist.export_csv()
     store["history"] = hist.counts()
     hist.close()

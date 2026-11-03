@@ -701,15 +701,32 @@ def _hit(rx, sentences):
     return None, False
 
 
-def red_flags(desc, built=None, now=None, facts=None, kvm=None):
+def bv_flags(bv, year):
+    """What Bolagsverket's record of the förening (bolagsverket.forening) says that could cost you."""
+    if not bv or not bv.get("name"):
+        return []
+    out, src = [], f"Bolagsverket: {bv['name']}"
+    if bv.get("deregistered"):
+        out.append({"kind": "bad", "label": "Föreningen är avregistrerad", "quote": src + " är avregistrerad."})
+    if bv.get("winding"):
+        out.append({"kind": "bad", "label": "Avveckling eller konkurs pågår", "quote": src + " har en pågående likvidation, konkurs, fusion eller rekonstruktion."})
+    if not bv.get("isBrf"):
+        out.append({"kind": "ask", "label": "Kolla organisationsnumret", "quote": src + " är ingen bostadsrättsförening; numret på sidan kan vara fel."})
+    elif (reg := bv.get("registered")) and int(reg[:4]) >= year - 5:
+        out.append({"kind": "ask", "label": f"Ny förening ({reg[:4]})", "quote": f"{src} registrerades {reg}. Fråga om lånen och hur avgiften är satt."})
+    return out
+
+
+def red_flags(desc, built=None, now=None, facts=None, kvm=None, bv=None):
     """What the agent's page says about the förening that could cost you, and what reassures:
     [{"kind": "bad" | "warn" | "good" | "ask", "label", "quote"}]. Reads the förening's facts (forening_facts)
     first, then the description; each flag quotes the sentence it comes from. "ask" is something to ask the
     agent about, shown only on saved apartments."""
     year = (now or dt.datetime.now()).year
+    out = bv_flags(bv, year)
     # The label "Äkta/oäkta förening" would read as oäkta; it only names the field
     fs = _sentences(re.sub(r"(?i)äkta\s*/\s*oäkta\s+(?:bostadsrätts)?förening", "Föreningsform", re.sub(r"[\u00a0\u202f]", " ", facts or "")))
-    ss, out = fs + _sentences(re.sub(r"[\u00a0\u202f]", " ", desc or "")), []
+    ss = fs + _sentences(re.sub(r"[\u00a0\u202f]", " ", desc or ""))
     add = lambda kind, label, quote: out.append({"kind": kind, "label": label, "quote": quote[:300]})
     money = lambda v: f"{v:,}".replace(",", " ")
 
