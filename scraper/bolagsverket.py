@@ -273,7 +273,7 @@ def forening(client, orgnr, cache, new_apartment=False):
     return cache[orgnr]
 
 
-AGENT_KEYS = ("facts", "factsFrom", "factsRead", "apartments")  # what the agents' pages say, kept beside Bolagsverket's answer
+AGENT_KEYS = ("facts", "factsFrom", "factsRead", "apartments", "report")  # what the agents' pages say, kept beside Bolagsverket's answer
 BV_KEYS = ("name", "isBrf", "registered", "winding", "deregistered", "manager", "reports", "reportPeriod", *KEY_FIGURES)
 
 
@@ -288,21 +288,27 @@ def remember(items, cache):
         c["apartments"] = sorted(set(c.get("apartments", [])) | {url})
         if p.get("facts") and not p.get("factsFrom") and p.get("read", "") >= c.get("factsRead", ""):
             c.update(facts=p["facts"], factsFrom=p.get("agent"), factsRead=p.get("read", ""))
+        if (r := p.get("report")) and r.get("reportYear", 0) >= (c.get("report") or {}).get("reportYear", 0):
+            c["report"] = r
     for p in items.values():
         c = cache.get(p.get("orgnr")) or {}
         if c.get("facts") and (not p.get("facts") or p.get("factsFrom")):
             p.update(facts=c["facts"], factsFrom=c.get("factsFrom") or "?")
+        if c.get("report") and c["report"].get("reportYear", 0) > (p.get("report") or {}).get("reportYear", 0):
+            p["report"] = c["report"]
 
 
 def write_csv(cache):
     """data/foreningar.csv: one line per förening, for reading in a spreadsheet."""
     import csv
-    cols = ["orgnr", "name", "isBrf", "registered", "manager", "winding", "deregistered", "apartments", "factsFrom", "factsRead", "read", "facts"]
+    figs = ["reportYear", "avgiftKvm", "skuldKvm", "skuldKvmTotal", "sparandeKvm", "energiKvm", "rantekanslighet"]
+    cols = ["orgnr", "name", "isBrf", "registered", "manager", "winding", "deregistered", "apartments", *figs, "factsFrom", "factsRead", "read", "facts"]
     with open(CACHE.with_suffix(".csv"), "w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(cols)
         for o, c in sorted(cache.items()):
-            w.writerow([o] + [len(c.get("apartments", [])) if k == "apartments" else c.get(k, "") for k in cols[1:]])
+            r = c.get("report") or {}
+            w.writerow([o] + [len(c.get("apartments", [])) if k == "apartments" else r.get(k, "") if k in figs else c.get(k, "") for k in cols[1:]])
 
 
 def update(items, log=print):

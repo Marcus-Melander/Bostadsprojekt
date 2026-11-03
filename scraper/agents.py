@@ -717,7 +717,7 @@ def bv_flags(bv, year):
     return out
 
 
-def red_flags(desc, built=None, now=None, facts=None, kvm=None, bv=None):
+def red_flags(desc, built=None, now=None, facts=None, kvm=None, bv=None, report=None):
     """What the agent's page says about the förening that could cost you, and what reassures:
     [{"kind": "bad" | "warn" | "good" | "ask", "label", "quote"}]. Reads the förening's facts (forening_facts)
     first, then the description; each flag quotes the sentence it comes from. "ask" is something to ask the
@@ -807,6 +807,17 @@ def red_flags(desc, built=None, now=None, facts=None, kvm=None, bv=None):
         add("good", "Skuldfri förening", s)
     elif (h := _hit(r"(?:hög|högre)\s+belåning", ss))[0] and not h[1]:
         add("bad", "Hög skuld", h[0])
+    # The annual report's own figures where the agent's page gives no debt figure: the debt per m² of
+    # bostadsrätt area, or of the whole building where the report gives only that
+    r = report or {}
+    if r and not any(re.search(r"skuld|nettoskuld", f["label"], re.I) for f in out) and (v := r.get("skuldKvm", r.get("skuldKvmTotal"))) is not None:
+        v = round(v / 100) * 100
+        kind = "bad" if v > 15000 else "warn" if v > 5000 else "good"
+        what = "bostadsrättsyta" if "skuldKvm" in r else "total yta"
+        add(kind, "Ingen skuld" if v == 0 else f"{'Hög' if kind == 'bad' else 'Måttlig' if kind == 'warn' else 'Låg'} skuld: {money(v)} kr/m²",
+            f"Årsredovisning {r.get('reportYear', '')}: skuldsättning {money(v)} kr per kvm {what}.")
+    if r.get("sparandeKvm") is not None and r["sparandeKvm"] < 0:
+        add("warn", "Sparar inget", f"Årsredovisning {r.get('reportYear', '')}: sparande {r['sparandeKvm']} kr per kvm, så föreningen lägger inget undan till underhåll.")
 
     # A small förening: big repairs are shared by few. The facts' "Antal lägenheter" wins over the description
     k = _hit(r"antal (?:lägenheter|bostadsrätter|lgh|bostäder)\s*:\s*\d", fs)[0]
@@ -890,8 +901,8 @@ def forening_text(page):
     return "\f".join(texts)
 
 
-# A bostadsrättsförening's organisationsnummer: 769… for most, 716…/717… for older ones; never the agent's own (556…)
-ORGNR_RX = re.compile(r"\b(7(?:69|16|17)\d{3})\s?-\s?(\d{4})\b")
+# A förening's organisationsnummer starts with 7 (769… for most, 716…/717… for older ones, 702… for HSB's); never the agent's own (556…)
+ORGNR_RX = re.compile(r"\b(7\d{5})\s?[-–]\s?(\d{4})\b")
 
 
 def find_orgnr(*texts):

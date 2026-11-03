@@ -206,7 +206,7 @@ def merge(found):
             p = store["items"][u]
             p.update(got)
             if "facts" in got:
-                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"))
+                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"), report=p.get("report"))
     finder.write_json(DATA / "listings.json", store)
 
 

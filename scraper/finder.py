@@ -34,6 +34,7 @@ from playwright.sync_api import sync_playwright
 
 import agents
 import plans
+import reports
 import geo
 from history import History
 
@@ -299,7 +300,13 @@ def read_listing(page, url, card, now, places, opens=()):
         d["factsVersion"] = agents.FACTS_VERSION
     except Exception as e:
         log(f"Couldn't read the förening's facts on {url} ({e})")
-    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"), bv=d.get("bv"))
+    try:  # the förening's latest annual report, where the agent links it; read after the run (reports.py)
+        links = page.eval_on_selector_all("a[href]", "as => as.map(a => [a.innerText || a.title || '', a.href])")
+        if u := reports.report_link(links):
+            d["reportUrl"] = u
+    except Exception as e:
+        log(f"Couldn't read the links on {url} ({e})")
+    d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"), bv=d.get("bv"), report=d.get("report"))
     try:  # last, since finding the plan may press the page's floor plan button
         d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
     except Exception as e:
@@ -506,7 +513,7 @@ def find(args):
     items = store["items"]
     for p in items.values():  # neighbourhoods may have been redrawn, and the red flag rules changed, since the last run
         AREAS.rename(p)
-        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"))
+        p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"), report=p.get("report"))
     started, now = stamp(), dt.datetime.now()
     status("running", "Startar", started=started)
     log(f"Run started: filter {json.dumps(f, ensure_ascii=False)}")
@@ -568,13 +575,15 @@ def find(args):
         fh.write("day,for_sale,soon,booli_for_sale,booli_soon,agents\n")
         for d, c in sorted(store["compare"].items()):
             fh.write(f"{d},{c['forSale']},{c['soon']},{c.get('booliForSale', '')},{c.get('booliSoon', '')},{c['agents']}\n")
-    try:  # the förening's record at Bolagsverket, for apartments whose organisationsnummer the agent shows
+    try:  # the förening's annual report and its record at Bolagsverket
         import bolagsverket
+        status("running", "Läser föreningarnas årsredovisningar", started=started)
+        reports.update(items, log)
         status("running", "Läser föreningarna hos Bolagsverket", started=started)
         bolagsverket.update(items, log)
         for p in items.values():
-            if p.get("bv") or p.get("factsFrom"):
-                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"))
+            if p.get("bv") or p.get("factsFrom") or p.get("report"):
+                p["flags"] = agents.red_flags(p.get("desc"), p.get("built"), facts=p.get("facts"), kvm=p.get("kvm"), bv=p.get("bv"), report=p.get("report"))
     except Exception as e:
         log(f"Bolagsverket: stopped ({e})")
     hist.export_csv()

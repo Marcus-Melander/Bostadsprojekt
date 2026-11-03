@@ -1916,14 +1916,21 @@ function travelLine(p) {
   }
   return bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "";
 }
-// The förening as Bolagsverket has it registered: its name, since when, and who manages it
+// The förening as Bolagsverket has it registered (its name, since when, and who manages it), and the key
+// figures from its latest annual report
 function foreningLine(p) {
-  const b = p.bv;
-  if (!b || !b.name) return "";
-  const bits = [`<span title="Organisationsnummer ${esc(p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6))}">${esc(b.name)}</span>`];
+  const b = p.bv || {}, r = p.report, bits = [];
+  const nr = p.orgnr ? p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6) : "";
+  if (b.name) bits.push(`<span title="Organisationsnummer ${esc(nr)}">${esc(b.name)}</span>`);
   if (b.registered) bits.push(`<span>Registrerad <strong>${esc(b.registered.slice(0, 4))}</strong></span>`);
   if (b.manager) bits.push(`<span>Förvaltare ${esc(b.manager)}</span>`);
-  return `<div class="facts travel">${bits.join("")}</div>`;
+  const n = (v) => Math.round(v).toLocaleString("sv-SE");
+  const figs = r ? [["avgiftKvm", "Avgift", (v) => n(v) + " kr/m²"], ["skuldKvm", "Skuld", (v) => n(v) + " kr/m²"],
+    ["sparandeKvm", "Sparande", (v) => n(v) + " kr/m²"], ["rantekanslighet", "Räntekänslighet", (v) => String(v).replace(".", ",") + " %"],
+    ["energiKvm", "Energi", (v) => n(v) + " kr/m²"]].filter(([k]) => r[k] != null) : [];
+  if (r && r.skuldKvm == null && r.skuldKvmTotal != null) figs.splice(1, 0, ["skuldKvmTotal", "Skuld (total yta)", (v) => n(v) + " kr/m²"]);
+  const report = figs.length ? `<div class="facts travel"><a href="${esc(r.url)}" target="_blank" rel="noopener">Årsredovisning ${esc(r.reportYear || "")} ↗</a>${figs.map(([k, l, f]) => `<span>${l} <strong>${f(r[k])}</strong></span>`).join("")}</div>` : "";
+  return (bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "") + report;
 }
 function showCard(p, s, a, cr) {
   const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);

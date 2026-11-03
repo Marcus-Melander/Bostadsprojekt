@@ -1,3 +1,4 @@
 playwright>=1.47
 shapely>=2.0          # only for scripts/build_areas.py
 pillow>=10          # tells floor plans from photos, and saves them for training
+pypdf>=5            # reads the förening's annual report
