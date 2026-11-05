@@ -53,7 +53,10 @@ AGENTS = [
      "obj": r"lansfast\.se/till-salu/bostadsratt/stockholms/stockholm/stockholm/(?!diskret/)[^/]+/[a-z0-9]{20,}/?$"},
     # Its terms allow a private person to save what they're looking at, not to copy the site in bulk,
     # so only apartments in the city are read. Facts are folded into sections that open on click.
-    {"name": "SkandiaMäklarna", "lists": ["https://www.skandiamaklarna.se/hitta-hem/bostadsratt/stockholm/"],
+    # Its annual reports are on its CRM's file host, whose robots.txt disallows everything; SkandiaMäklarna allowed
+    # reading them (per Marcus, 2026-11-05). That covers the file host only: its own site still follows robots.txt.
+    {"name": "SkandiaMäklarna", "filesPermission": "Written permission for its file host, per Marcus 2026-11-05",
+     "hosts": ["mspecsfiles2.blob.core.windows.net"], "lists": ["https://www.skandiamaklarna.se/hitta-hem/bostadsratt/stockholm/"],
      "sitemaps": ["https://www.skandiamaklarna.se/sitemap-estates.xml"],
      "obj": r"skandiamaklarna\.se/hitta-hem/bostadsratt/stockholm/[^/]+/\d+/?$", "open": ["Om bostaden", "Ekonomi"]},
     {"name": "ESNY", "lists": ["https://www.esny.se/vara-hem/?object_type=all&object_city=stockholm&object_order=published&count=300&object_search="],
@@ -92,7 +95,7 @@ AGENTS = [
 ]
 # Sites whose owner allowed the finder in writing, past what their robots.txt says
 PERMITTED = {urlparse(u).netloc for a in AGENTS if a.get("permission") for u in a.get("lists", []) + a.get("sitemaps", [])} | \
-    {h for a in AGENTS if a.get("permission") for h in a.get("hosts", [])}
+    {h for a in AGENTS if a.get("permission") or a.get("filesPermission") for h in a.get("hosts", [])}
 
 # Names that place a card in innanför tullarna, and some that place it outside. Checked on
 # accent-free lower case, so "Södermalm" and "sodermalm" in a link both count.

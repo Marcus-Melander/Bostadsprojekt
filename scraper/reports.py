@@ -35,6 +35,10 @@ YEAR = re.compile(r"\b(20[1-3]\d)(?:/(?:20)?\d\d)?\b")
 NUM = re.compile(r"-?(?:0|[1-9]\d{0,2})(?:[,.]\d{1,2})?|-?[1-9]\d{3,}|-?\d+[,.]\d{1,2}|-")
 FOLD = str.maketrans("åäöÅÄÖ", "aaoAAO")
 ROWS_KEYS = [k for k, _ in ROWS]
+# What a förening's key figure can be, kr per m² (räntekänslighet in %). Text recognition sometimes drops a
+# column, and the row's numbers then split wrong (an årsavgift of 375 338 kr per m²); such a value is left out.
+RANGE = {"avgiftKvm": (50, 3000), "skuldKvm": (0, 100000), "skuldKvmTotal": (0, 100000), "sparandeKvm": (-3000, 5000),
+         "energiKvm": (10, 1500), "rantekanslighet": (0, 100)}
 
 
 def report_link(links):
@@ -103,19 +107,25 @@ def figures(text):
             if key == "skuldKvmTotal" and re.match(ROWS[1][1], low):
                 continue  # that's the bostadsrätt row
             rest = line[m.end():]
-            toks = [t.rstrip("%") for t in rest.split()]
+            toks = [t.rstrip("%*") for t in rest.split()]  # "275*" points to a footnote
             while toks and not NUM.fullmatch(toks[0]):
                 toks.pop(0)
             head = next((YEAR.findall(lines[k]) for k in reversed(heads) if i - 60 < k < i), None)
-            vals = _values(toks, len(head)) if head else None
-            if not vals:
+            if not head:
                 continue
             at = head.index(max(head))
-            if vals[at] is None:
+            ok = lambda v: v and v[at] is not None and RANGE[key][0] <= v[at] <= RANGE[key][1]
+            vals = _values(toks, len(head))
+            if not ok(vals) and at == 0:  # text recognition can miss a year in the header: try one column more
+                vals = _values(toks, len(head) + 1)
+            if not ok(vals):
                 continue
             out[key] = round(vals[at], 2) if key == "rantekanslighet" else round(vals[at])
             out.setdefault("reportYear", int(max(head)))
             break
+    # The bostadsrätt area is part of the total, so its debt per m² is never the smaller; a misread one is left out
+    if out.get("skuldKvm") is not None and out.get("skuldKvmTotal") and out["skuldKvm"] < 0.9 * out["skuldKvmTotal"]:
+        del out["skuldKvm"]
     return out
 
 
