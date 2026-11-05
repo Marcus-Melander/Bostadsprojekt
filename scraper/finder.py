@@ -22,6 +22,7 @@ import json
 import os
 import random
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -486,16 +487,41 @@ def read_agent(ag, sh):
     progress(sh, ag["name"], None)
 
 
+# The job starts at 06:24, at login and every hour (scripts/install-mac.sh), so a morning the Mac was off or asleep
+# is caught up as soon as it's on again; a run that finished since 04:00 counts as today's
+DAY_STARTS = 4
+
+
+def done_today(now=None):
+    now = now or dt.datetime.now()
+    start = now.replace(hour=DAY_STARTS, minute=0, second=0, microsecond=0)
+    if now < start:
+        start -= dt.timedelta(days=1)
+    finished = read_json(DATA / "status.json", {}).get("finished")
+    try:
+        return dt.datetime.fromisoformat(finished) >= start
+    except (TypeError, ValueError):
+        return False
+
+
+def finder_running(pid):
+    """Whether the lock's process is still a finder (or bolagsverket.py --update, which takes the same lock): after a
+    restart its number may belong to something else."""
+    try:
+        cmd = subprocess.run(["ps", "-p", str(int(pid)), "-o", "command="], capture_output=True, text=True).stdout
+    except ValueError:
+        return False
+    return any(n in cmd for n in ("finder.py", "bolagsverket.py")) and int(pid) != os.getpid()
+
+
 def run(args):
     DATA.mkdir(exist_ok=True)
+    if args.daily and done_today():
+        return 0  # the catch-up start: today's run already finished
     lock = DATA / ".scrape.lock"
-    if lock.exists() and time.time() - lock.stat().st_mtime < 4 * 3600:
-        try:
-            os.kill(int(lock.read_text()), 0)
-            print("Another run is going.", file=sys.stderr)
-            return 1
-        except (ValueError, OSError):
-            pass  # left behind by a run that was stopped
+    if lock.exists() and finder_running(lock.read_text()):
+        print("Another run is going.", file=sys.stderr)
+        return 1  # also a run that's been asleep for hours: it carries on when the Mac wakes
     lock.write_text(str(os.getpid()))
     try:
         rc = find(args)
@@ -614,4 +640,5 @@ if __name__ == "__main__":
     ap.add_argument("--max-price", type=int, help="max price instead of the planner's filter")
     ap.add_argument("--no-count", action="store_true", help="don't read Booli's count")
     ap.add_argument("--show", action="store_true", help="show the browser window")
+    ap.add_argument("--daily", action="store_true", help="do nothing if today's run already finished (the scheduled starts)")
     sys.exit(run(ap.parse_args()))
