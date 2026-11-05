@@ -188,6 +188,8 @@ def update(items, log=print, limit=PER_RUN):
     n = 0
     # Reports that waited for text recognition on an earlier day are read again
     todo += [u for u, r in done.items() if r.get("ocrWaiting") and u not in todo]
+    # A report robots.txt kept out, from a host whose owner has since said yes (agents.PERMITTED)
+    todo = [u for u, r in done.items() if r.get("blocked") and urllib.parse.urlparse(u).netloc in agents.PERMITTED] + todo
     scans = 0
     for url in todo[:limit]:
         try:

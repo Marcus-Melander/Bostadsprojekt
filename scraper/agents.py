@@ -71,7 +71,9 @@ AGENTS = [
     # Mäklarhuset, HusmanHagberg and Mäklarringen gave written permission (per Marcus, 2026-11-01), so their
     # robots.txt isn't read. Mäklarhuset's district page lists that district first and then the rest of the
     # city, so its first two pages hold the district's apartments.
-    {"name": "Mäklarhuset", "permission": "Written permission, per Marcus 2026-11-01",
+    # The förenings' annual reports are on its file host, cdn.maklarhuset.se, allowed too (per Marcus, 2026-11-05).
+    {"name": "Mäklarhuset", "permission": "Written permission, per Marcus 2026-11-01; its file host 2026-11-05",
+     "hosts": ["cdn.maklarhuset.se"],
      "lists": [f"https://www.maklarhuset.se/bostad/sverige/stockholm/stockholm/{a}{p}" for a in
                ("kungsholmen", "vasastan", "sodermalm", "ostermalm") for p in ("", "?page=1")],
      "obj": r"maklarhuset\.se/bostad/sverige/stockholm/stockholm/[^/]+/\d+$"},
@@ -89,7 +91,8 @@ AGENTS = [
      "obj": r"maklarringen\.se/maklare/[^/]+/bostadsratt/stockholm/stockholm/"},
 ]
 # Sites whose owner allowed the finder in writing, past what their robots.txt says
-PERMITTED = {urlparse(u).netloc for a in AGENTS if a.get("permission") for u in a.get("lists", []) + a.get("sitemaps", [])}
+PERMITTED = {urlparse(u).netloc for a in AGENTS if a.get("permission") for u in a.get("lists", []) + a.get("sitemaps", [])} | \
+    {h for a in AGENTS if a.get("permission") for h in a.get("hosts", [])}
 
 # Names that place a card in innanför tullarna, and some that place it outside. Checked on
 # accent-free lower case, so "Södermalm" and "sodermalm" in a link both count.
