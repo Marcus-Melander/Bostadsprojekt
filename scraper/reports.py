@@ -7,6 +7,7 @@ per link and kept in the förening's store (bolagsverket.py); a scanned report h
 """
 import io
 import re
+import unicodedata
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -18,8 +19,8 @@ LINK_RX = re.compile(r"årsredovisning|arsredovisning|årsredoovisning", re.I)
 
 # Each key figure by the words its row starts with, matched without accents (text recognition reads "å" as "a").
 # The debt per m² of bostadsrätt area is the one the agents give and the red flags compare; the debt per m² of
-# the whole building is kept beside it
-U = r"(?:kvm|m2|m²)"
+# the whole building is kept beside it. Text recognition reads HSB's small "kr/kvm" as "kr/kum"
+U = r"(?:k[vu]m|m2|m²)"
 BR = r"(?:bostadsratt|br[f-]?[ -]?yta|bostadsyta|upplaten)"
 ROWS = [
     ("avgiftKvm", rf"^arsavg\w*\b[^\d\n]*?{U}"),
@@ -37,8 +38,10 @@ FOLD = str.maketrans("åäöÅÄÖ", "aaoAAO")
 ROWS_KEYS = [k for k, _ in ROWS]
 # What a förening's key figure can be, kr per m² (räntekänslighet in %). Text recognition sometimes drops a
 # column, and the row's numbers then split wrong (an årsavgift of 375 338 kr per m²); such a value is left out.
+# A förening's debt is none or at least DEBT_MIN kr per m²: below that, "5 125 5 125" was split as four numbers
 RANGE = {"avgiftKvm": (50, 3000), "skuldKvm": (0, 100000), "skuldKvmTotal": (0, 100000), "sparandeKvm": (-3000, 5000),
          "energiKvm": (10, 1500), "rantekanslighet": (0, 100)}
+DEBT_MIN = 50
 
 
 def report_link(links):
@@ -55,11 +58,12 @@ def report_link(links):
     return best and best[1]
 
 
-def _values(toks, n):
+def _values(toks, n, dash=None, ok=lambda vals: True):
     """The n numbers at the start of one row of the overview, written with spaces between thousands
     ("1 501 845 1 489 039"): a number of 1–3 digits may go on in groups of exactly 3. A row may leave its
     oldest years empty ("711 695 685" under four years), so up to two fewer are taken, padded with None.
-    None when the tokens can't be split that way."""
+    A year written "-" is `dash`. Fewer numbers are tried when `ok` turns a split down ("3 377 3 075" is
+    3 377 and 3 075, not 3, 377 and 3 075). None when the tokens can't be split that way."""
     group = re.compile(r"\d{3}(?:[,.]\d{1,2})?")
     for end in range(len(toks), 0, -1):  # the row ends where its numbers end
         if all(NUM.fullmatch(t) or group.fullmatch(t) for t in toks[:end]):
@@ -85,13 +89,28 @@ def _values(toks, n):
 
     for k in range(n, max(n - 2, 1) - 1, -1):
         if vals := split(0, [], k):
-            return [None if v == "-" else float(v.replace(",", ".")) for v in vals] + [None] * (n - k)
+            vals = [dash if v == "-" else float(v.replace(",", ".")) for v in vals] + [None] * (n - k)
+            if ok(vals):
+                return vals
     return None
 
 
 def figures(text):
     """The key figures for the latest year in a report's text, and the year."""
-    lines = [re.sub(r"[\u00a0\u202f\u2009]", " ", l).replace("\u2212", "-").strip() for l in text.splitlines()]
+    # Some reports write "å" as "a" and a ring after it, and a dash or minus as "–" or "−"
+    text = unicodedata.normalize("NFC", text)
+    lines = [re.sub(r"[\u00a0\u202f\u2009]", " ", l).replace("\u2212", "-").replace("\u2013", "-").strip() for l in text.splitlines()]
+    # "*" marks the key figures the law requires ("*Årsavgift per kvm")
+    lines = [l.lstrip("*") for l in lines]
+    for k, l in enumerate(lines):
+        # A header's years as text recognition reads HSB's ("2025 7074 7023 2022"), a broken year written
+        # "2024 - 2025", years in short ("24/25 23/24") and years as months ("2501-2512")
+        if re.fullmatch(r"(?:[1-3]\d/[1-3]\d\s*){2,}", l):
+            l = re.sub(r"\b([1-3]\d)/", r"20\1/", l)
+        if YEAR.search(l) and len(re.sub(r"[\d\s/-]", "", l)) < 40:
+            l = re.sub(r"\b7(0[1-3]\d)\b", r"2\1", l)
+            lines[k] = re.sub(r"\b(20[1-3]\d) ?- ?(20[1-3]\d)\b", lambda m: f"{m[1]}/{m[2]}" if int(m[2]) == int(m[1]) + 1 else m[0], l)
+        lines[k] = re.sub(r"\b([1-3]\d)01-\1 ?12\b", r"20\1", lines[k])
     heads = [k for k, l in enumerate(lines) if len(YEAR.findall(l)) >= 2 and len(re.sub(r"[\d\s/-]", "", l)) < 40]
     out = {}
     for i, line in enumerate(lines):
@@ -109,15 +128,26 @@ def figures(text):
             rest = line[m.end():]
             toks = [t.rstrip("%*") for t in rest.split()]  # "275*" points to a footnote
             while toks and not NUM.fullmatch(toks[0]):
+                # A first number text recognition misread ("§ SS7 6 679 6 100") would move every year one column
+                if "§" in toks[0] or re.search(r"\d", re.sub(r"m[2²]|\d\)", "", toks[0])):
+                    toks = []
+                    break
                 toks.pop(0)
-            head = next((YEAR.findall(lines[k]) for k in reversed(heads) if i - 60 < k < i), None)
-            if not head:
+            k = next((k for k in reversed(heads) if i - 60 < k < i), None)
+            if k is None:
                 continue
+            head = YEAR.findall(lines[k])
+            # A header text recognition split over two lines ("2025 2024" / "2023 2022")
+            if k - 1 in heads and not set(YEAR.findall(lines[k - 1])) & set(head):
+                head = YEAR.findall(lines[k - 1]) + head
             at = head.index(max(head))
-            ok = lambda v: v and v[at] is not None and RANGE[key][0] <= v[at] <= RANGE[key][1]
-            vals = _values(toks, len(head))
+            ok = lambda v: v and v[at] is not None and RANGE[key][0] <= v[at] <= RANGE[key][1] and \
+                not (key.startswith("skuld") and 0 < v[at] < DEBT_MIN)
+            # A debt row's "-" is a förening without loans: no debt that year
+            dash = 0.0 if key.startswith("skuld") else None
+            vals = _values(toks, len(head), dash, ok)
             if not ok(vals) and at == 0:  # text recognition can miss a year in the header: try one column more
-                vals = _values(toks, len(head) + 1)
+                vals = _values(toks, len(head) + 1, dash, ok)
             if not ok(vals):
                 continue
             out[key] = round(vals[at], 2) if key == "rantekanslighet" else round(vals[at])
@@ -126,6 +156,12 @@ def figures(text):
     # The bostadsrätt area is part of the total, so its debt per m² is never the smaller; a misread one is left out
     if out.get("skuldKvm") is not None and out.get("skuldKvmTotal") and out["skuldKvm"] < 0.9 * out["skuldKvmTotal"]:
         del out["skuldKvm"]
+    # No debt means no interest-rate sensitivity and no debt on the other area; a 0 beside either is a
+    # figure the report left out, not a debt-free förening
+    if any(out.get(k) == 0 for k in ("skuldKvm", "skuldKvmTotal")) and (out.get("rantekanslighet") or out.get("skuldKvm") or out.get("skuldKvmTotal")):
+        for k in ("skuldKvm", "skuldKvmTotal"):
+            if out.get(k) == 0:
+                del out[k]
     return out
 
 
@@ -133,9 +169,10 @@ ROOT = Path(__file__).resolve().parent.parent
 OCR_SRC, OCR_BIN = ROOT / "scripts" / "ocr.swift", ROOT / "data" / "bin" / "ocr"
 
 
-def ocr(data, log=print):
+def ocr(data, log=print, tiles=False):
     """The text of a scanned PDF, by macOS's own text recognition (scripts/ocr.swift, built on first use).
-    None where it can't run."""
+    With `tiles`, each page is also read in parts, for small text the whole page misses (three times as
+    slow). None where it can't run."""
     import subprocess
     import tempfile
     try:
@@ -145,15 +182,18 @@ def ocr(data, log=print):
         with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
             f.write(data)
             f.flush()
-            return subprocess.run([str(OCR_BIN), f.name, "25"], check=True, capture_output=True, text=True, timeout=300).stdout
+            return subprocess.run([str(OCR_BIN), f.name, "25"] + ["tiles"] * tiles, check=True, capture_output=True, text=True,
+                                  timeout=900 if tiles else 300).stdout
     except (OSError, subprocess.SubprocessError) as e:
         log(f"Text recognition couldn't run ({e})")
         return None
 
 
-def read(url, robots, log=print, scans=True):
+def read(url, robots, log=print, scans=True, tiles=True):
     """Download one annual report and read it: {"orgnr", the key figures, "reportYear"}. A scan (or a report
-    whose key figures are a picture) is read by text recognition when `scans` is set; "scanned" says so."""
+    whose key figures are a picture) is read by text recognition when `scans` is set; "scanned" says so.
+    Where that finds too little, the pages are read again in parts when `tiles` is set ("tiled" says so),
+    or else the report waits for another day."""
     if not robots.allowed(url):
         return {"blocked": True}
     req = urllib.request.Request(url, headers={"User-Agent": agents.UA})
@@ -168,9 +208,19 @@ def read(url, robots, log=print, scans=True):
     if sum(k in out for k in ROWS_KEYS) < 3:
         if not scans:
             return {**out, "scanned": True, "ocrWaiting": True}
-        if (seen := ocr(data, log)) and sum(k in (f := figures(seen)) for k in ROWS_KEYS) > sum(k in out for k in ROWS_KEYS):
-            out, text = {**f, "scanned": True}, seen + "\n" + text
-        elif len(re.sub(r"\s", "", text)) < 500:
+        # HSB's flerårsöversikt can be a small picture of a table, which only a read in parts finds
+        for parts in (False, True):
+            if parts and not tiles:
+                out["ocrWaiting"] = True
+                break
+            if not (seen := ocr(data, log, parts)):
+                break
+            if sum(k in (f := figures(seen)) for k in ROWS_KEYS) > sum(k in out for k in ROWS_KEYS):
+                out, text = {**f, "scanned": True}, seen + "\n" + text
+            out["tiled"] = parts
+            if sum(k in out for k in ROWS_KEYS) >= 3:
+                break
+        if not out.get("scanned") and len(re.sub(r"\s", "", text)) < 500:
             out["scanned"] = True
     if o := agents.find_orgnr(text[:8000]):
         out["orgnr"] = o
@@ -181,6 +231,8 @@ DONE = Path(__file__).resolve().parent.parent / "data" / "reports.json"
 FIGURES = ("avgiftKvm", "skuldKvm", "skuldKvmTotal", "sparandeKvm", "energiKvm", "rantekanslighet", "reportYear")
 PER_RUN = 80  # reports downloaded per morning run, a second apart; the rest wait for the next morning
 SCANS_PER_RUN = 20  # scans read by text recognition per run, about half a minute each
+TILES_PER_RUN = 5  # of those, read again in parts, two to four minutes each
+READER = 2  # the reader's version: a report an older one read is read once more, after the new links
 
 
 def update(items, log=print, limit=PER_RUN):
@@ -198,16 +250,20 @@ def update(items, log=print, limit=PER_RUN):
     n = 0
     # Reports that waited for text recognition on an earlier day are read again
     todo += [u for u, r in done.items() if r.get("ocrWaiting") and u not in todo]
+    # Reports an older reader read (version 1 missed HSB's pictured flerårsöversikt and a debt-free förening's "–")
+    todo += [u for u, r in done.items() if r.get("reader", 1) < READER and not any(k in r for k in ("error", "blocked", "notPdf"))
+             and u not in todo]
     # A report robots.txt kept out, from a host whose owner has since said yes (agents.PERMITTED)
     todo = [u for u, r in done.items() if r.get("blocked") and urllib.parse.urlparse(u).netloc in agents.PERMITTED] + todo
-    scans = 0
+    scans = tiled = 0
     for url in todo[:limit]:
         try:
-            r = read(url, robots, log, scans=scans < SCANS_PER_RUN)
+            r = read(url, robots, log, scans=scans < SCANS_PER_RUN, tiles=tiled < TILES_PER_RUN)
             scans += bool(r.get("scanned") and not r.get("ocrWaiting"))
+            tiled += r.pop("tiled", False)
         except Exception as e:  # never retried: a link that fails today is left
             r = {"error": str(e)[:120]}
-        done[url] = {**r, "read": dt.date.today().isoformat()}
+        done[url] = {**r, "read": dt.date.today().isoformat(), "reader": READER}
         n += 1
         time.sleep(1)
     DONE.write_text(json.dumps(done, ensure_ascii=False, indent=1))
