@@ -34,7 +34,8 @@ DETAILS = ("addr", "area", "group", "agent", "rooms", "kvm", "price", "avgift", 
 
 def looks_like_plan(img):
     """A drawing, not a photo: at least 65 % of it is one flat background colour (white, beige, or black where
-    a transparent drawing was flattened), with sharp lines on it. Photos measured below half."""
+    a transparent drawing was flattened), with sharp lines on it. Photos measured below half. A drawing in thin grey
+    lines on an almost bare page (Bjurfors': 99 % background, 0.6 % lines) needs fewer lines."""
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")
         bg = Image.new("RGB", img.size, "white")
@@ -47,7 +48,7 @@ def looks_like_plan(img):
     flat = sum(1 for p in px if max(abs(p[0] - m[0]), abs(p[1] - m[1]), abs(p[2] - m[2])) <= 20) / len(px)
     lum = lambda p: 0.3 * p[0] + 0.59 * p[1] + 0.11 * p[2]
     lines = sum(1 for p in px if abs(lum(p) - lum(m)) > 40) / len(px)
-    return flat >= 0.65 and lines >= 0.01
+    return flat >= 0.65 and lines >= 0.01 or flat >= 0.9 and lines >= 0.003
 
 
 def fetch(url):

@@ -594,7 +594,11 @@ _PLAN_JS = r"""([rx, minW]) => {
   }
   if (out.length) return out;  // named floor plans are the surest; a section may also hold the gallery's photos
   const fromSection = (sec) => { for (const img of sec.querySelectorAll("img, source")) if (!img.naturalWidth || img.naturalWidth >= minW) add(src(img)); };
-  // 2. Images in the nearest box around a "Planritning" label that isn't a link (a heading, a folded section)
+  // 2. A section whose class names the floor plan (Svensk Fastighetsförmedling's object-images-wrapper--floorplan,
+  // whose image has no name): before the "Planritning" labels, whose nearest images may be the gallery's
+  for (const sec of document.querySelectorAll('section[class*="floorplan" i], section[class*="floor-plan" i], section[class*="planritning" i]')) fromSection(sec);
+  if (out.length) return out;
+  // 3. Images in the nearest box around a "Planritning" label that isn't a link (a heading, a folded section)
   const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walk.nextNode()) {
     const n = walk.currentNode;
@@ -606,14 +610,14 @@ _PLAN_JS = r"""([rx, minW]) => {
     }
   }
   if (out.length) return out;
-  // 3. The section the page's own "Planritning" link points to
+  // 4. The section the page's own "Planritning" link points to
   for (const a of document.querySelectorAll('a[href*="#"]')) {
     if (!re.test(a.innerText || "") && !re.test(a.hash || "")) continue;
     let target = null;
     try { target = a.hash && document.querySelector(a.hash); } catch (e) {}
     if (target && !/bild|image|gallery|galleri/i.test(a.hash)) fromSection(target);
   }
-  // 4. Sections whose id or class names the floor plan
+  // 5. Sections whose id or class names the floor plan
   for (const sec of document.querySelectorAll('[id*="plan" i], [class*="planritning" i], [class*="floorplan" i], [class*="floor-plan" i]')) {
     if (!re.test(sec.id + " " + sec.className) && !/^plan$/i.test(sec.id)) continue;
     fromSection(sec);
