@@ -336,17 +336,22 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
 
 
 def follow_left(page, store, robots, hist, started):
-    """Apartments that left their agent's list: check their page daily for up to a month,
-    to record that they sold and, where the agent shows it, the final price."""
+    """Apartments that left their agent's list, or that it still lists as sold: check their page daily
+    for up to a month, to record that they sold and, where the agent shows it, the final price."""
     left = store.setdefault("left", {})
     now = dt.datetime.now()
-    todo = [u for u, p in left.items() if not p.get("final") and p.get("state") != "gone"
-            and now - dt.datetime.fromisoformat(p["left"]) < dt.timedelta(days=FOLLOW_DAYS)]
+    # A sold apartment on the list isn't read again by its agent's run, but the final price often comes days after "Såld"
+    sold = {u: p for u, p in store["items"].items() if p.get("state") == "sold" and not p.get("final") and not p.get("outside")}
+    for p in sold.values():
+        p.setdefault("sold", stamp())
+    todo = [u for u, p in sold.items() if now - dt.datetime.fromisoformat(p["sold"]) < dt.timedelta(days=FOLLOW_DAYS)]
+    todo += [u for u, p in left.items() if not p.get("final") and p.get("state") != "gone"
+             and now - dt.datetime.fromisoformat(p["left"]) < dt.timedelta(days=FOLLOW_DAYS)]
     for i, url in enumerate(todo, 1):
-        p = left[url]
+        p, on_list = (store["items"][url], True) if url in sold else (left[url], False)
         if not robots.allowed(url):
             continue
-        status("running", f"Kollar lägenheter som lämnat listorna, {i} av {len(todo)}", started=started)
+        status("running", f"Kollar sålda lägenheter och de som lämnat listorna, {i} av {len(todo)}", started=started)
         try:
             resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
             page.wait_for_timeout(2000)
@@ -355,13 +360,17 @@ def follow_left(page, store, robots, hist, started):
             log(f"Couldn't open {url} ({e})")
             continue
         if resp is not None and resp.status in (404, 410):
+            if on_list:
+                continue  # still on the list: the agent's own run tells whether it's gone
             p["state"] = "gone"  # the page was taken down, usually after the sale
         elif (resp is not None and resp.status in (403, 429)) or BLOCKED.search(text):
             log(f"{p.get('agent')} refused {url}; trying again tomorrow")
             continue
         else:
             p.update(agents.parse_bidding(text))
-        hist.record(p, stamp(), on_list=False)
+            if p["state"] != "sold":
+                p.pop("sold", None)  # wasn't sold after all: the agent's run reads it in full again
+        hist.record(p, stamp(), on_list=on_list)
         time.sleep(random.uniform(*PAUSE_S))
     # After a month, or once the final price is known, the apartment stays only in the history
     for u in [u for u, p in left.items() if p.get("final") or p.get("state") == "gone"

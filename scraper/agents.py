@@ -306,7 +306,7 @@ KVM_RX = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:\+\s*\d+(?:[.,]\d+)?\s*)?(?:kvm|m²
 AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
 # HusmanHagberg marks a coming apartment "Kommande®", SkandiaMäklarna one sold before the open market "REDO™"
 SOON_RX = re.compile(r"kommande®|redo™|snart till salu|kommer snart|\bpå gång\b|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
-SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|slutpris\s*:?\s*\d", re.I)
+SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|(?<!bevaka )(?<!uppskattat )slutpris\s*:?\s*\d|kr\s*\(slutpris\)", re.I)
 ADDR_RX = re.compile(r"([A-ZÅÄÖ][A-Za-zÅÄÖåäöéü.'\-]+(?: [A-Za-zÅÄÖåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
 FEATURE_RX = [
     ("stambyte done", r"stamby(?:te|tet|ten)\s+(?:är\s+|har\s+)?(?:gjor|genomför|utför|klar|färdig)|nya stammar|stambytt"),
@@ -467,11 +467,14 @@ def parse_agent_page(text, now):
 
 BIDDING_RX = re.compile(r"pågående budgivning|budgivning pågår|budgivningen pågår", re.I)
 HIGH_BID_RX = re.compile(r"(?:högsta|aktuellt|senaste|ledande)\s+bud(?:et)?\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr", re.I)
-FINAL_RX = re.compile(r"(?:slutpris|såld för|sålt för|köpeskilling)\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr", re.I)
+# "Slutpris 3 800 000 kr", or after the price, "3 360 000 kr (slutpris)" (Alicia Edelman, Tradition). Not Fastighetsbyrån's
+# "Bevaka slutpris" button or "Uppskattat slutpris" calculator, both followed by the asking price
+FINAL_RX = re.compile(r"(?<!bevaka )(?<!uppskattat )(?:slutpris|såld för|sålt för|köpeskilling)\s*:?\s*(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr"
+                      r"|(\d{1,3}(?:[ .]\d{3}){1,3})\s*kr\s*\(slutpris\)", re.I)
 
 
 # Where a page stops being about this apartment: lists of other apartments, whose "Budgivning pågår" isn't ours
-OTHERS_RX = re.compile(r"^\s*(?:liknande (?:bostäder|objekt)|andra (?:bostäder|har också tittat på)|fler bostäder|"
+OTHERS_RX = re.compile(r"^\s*(?:liknande (?:bostäder|bostad|objekt)|andra (?:bostäder|har också tittat på)|fler bostäder|"
                        r"bostäder i närheten|andra objekt|du kanske också gillar|senast sålda|missa inte din drömbostad)\b", re.I | re.M)
 
 def others_at(t):
@@ -535,7 +538,7 @@ def parse_bidding(text):
         t = t[:cut]  # the state is read from this apartment's part of the page only
     out = {"state": "for sale"}
     if m := FINAL_RX.search(t):
-        out.update(state="sold", final=int(re.sub(r"\D", "", m.group(1))))
+        out.update(state="sold", final=int(re.sub(r"\D", "", m.group(1) or m.group(2))))
     elif is_sold(t):
         out["state"] = "sold"
     elif BIDDING_RX.search(t) or HIGH_BID_RX.search(t):
