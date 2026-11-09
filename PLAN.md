@@ -94,6 +94,8 @@ Needs months of final prices, which the daily runs collect meanwhile.
 
 ## Done
 
+- **Länsförsäkringar's new addresses (2026-11-09).** Its apartment addresses changed from `/bostadsratt/stockholms/stockholm/stockholm/` to `/bostadsratt/stockholm/stockholm/stockholm/`, so the 6 November run found none of them. The pattern takes both now (143 in its sitemap), and the 110 apartments already known were moved to their new addresses in the listings, the förening store, travel times, floor plans and the history, so they keep their history instead of counting as sold.
+
 - **SkandiaMäklarna's annual reports, and impossible figures left out.** SkandiaMäklarna allowed reading its reports on its CRM's file host (per Marcus, 2026-11-05); the finder already found the report for 45 of its 49 apartments. Its scans showed that text recognition sometimes misses a year in the overview's header, and the row then split wrong (an årsavgift of 375 338 kr per m²). Now each figure must lie in a plausible range (årsavgift 50–3 000 kr per m², debt up to 100 000, savings −3 000 to 5 000, energy 10–1 500, räntekänslighet up to 100 %), a row that doesn't fit is tried with one column more, a figure marked with a footnote star is read, and a debt per m² of bostadsrätt area smaller than the debt per m² of the total area is left out. Six impossible figures in four of the first 80 reports were read again, and two misread debts dropped.
 
 - **Mäklarhuset's annual reports.** Mäklarhuset allowed its file host too (per Marcus, 2026-11-05), so the reports there are read like any other, and the ones robots.txt kept out before are read first on the next run. Tried on its three: all seven figures and the organisationsnummer from each, one of them a scan.

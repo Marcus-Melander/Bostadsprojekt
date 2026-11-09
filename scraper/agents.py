@@ -50,7 +50,7 @@ AGENTS = [
     # Its list shows only the first 36 of Stockholm's apartments, mostly suburbs; the sitemap lists every
     # apartment for sale (and recently sold), without dates. Discreet sales have no address and are left out.
     {"name": "Länsförsäkringar", "sitemaps": ["https://www.lansfast.se/sitemap/"], "undated": True,
-     "obj": r"lansfast\.se/till-salu/bostadsratt/stockholms/stockholm/stockholm/(?!diskret/)[^/]+/[a-z0-9]{20,}/?$"},
+     "obj": r"lansfast\.se/till-salu/bostadsratt/stockholms?/stockholm/stockholm/(?!diskret/)[^/]+/[a-z0-9]{20,}/?$"},
     # Its terms allow a private person to save what they're looking at, not to copy the site in bulk,
     # so only apartments in the city are read. Facts are folded into sections that open on click.
     # Its annual reports are on its CRM's file host, whose robots.txt disallows everything; SkandiaMäklarna allowed
