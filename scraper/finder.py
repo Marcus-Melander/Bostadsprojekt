@@ -129,7 +129,9 @@ def fits(p, f, estimate=True):
 # ---------- The answer key ----------
 
 def booli_query(f, area_id):
-    q = {"areaIds": area_id, "objectType": "Lägenhet"}
+    # Since November 2026 Booli shows one count for both for sale and coming soon, so its coming-soon ones are hidden
+    # ("Dölj snart till salu") and the page counts those for sale, the number ours is compared with
+    q = {"areaIds": area_id, "objectType": "Lägenhet", "upcomingSale": "0"}
     if f.get("minPrice"):
         q["minListPrice"] = f["minPrice"]
     if f.get("maxPrice"):
@@ -166,10 +168,14 @@ def booli_count(pw, f):
                 log(f"Booli's count: Booli refused the page for {name} ({resp.status if resp else '?'}); no more counts today")
                 break
             m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text)
-            if not m:
+            tab = re.search(r"\bTill salu\s*(\d+)", text)  # the newer page: "Till salu 133" on the tab above the results
+            if m:
+                c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
+            elif tab:
+                c = {"forSale": int(tab.group(1)), "soon": None}
+            else:
                 log(f"Booli's count: no count shown for {name}")
                 continue
-            c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
             if name == "Stockholms innerstad":
                 out.update(c, apartments=booli_apartments(page.content()))
             else:
@@ -596,7 +602,7 @@ def find(args):
     same = b.get("forSale") is not None and not b.get("missing") and b.get("filter") == f
     day = {"forSale": store["found"]["forSale"], "soon": store["found"]["soon"], "agents": len(store["agents"])}
     if same:
-        day.update(booliForSale=b["forSale"], booliSoon=b["soon"])
+        day.update(booliForSale=b["forSale"], **({"booliSoon": b["soon"]} if b.get("soon") is not None else {}))
         if b.get("apartments"):
             b["matched"] = booli_matched(b["apartments"], items, f)
             tally = {w: sum(1 for a in b["matched"] if a["here"] == w) for w in ("found", "unpriced", "filtered", "missing")}

@@ -1779,7 +1779,7 @@ function crawlPanel() {
   const key = found ? `<div class="answer">
       <div><span class="v">${found.forSale}</span><span class="s">till salu hittade</span></div>
       <div><span class="v">${found.soon}</span><span class="s">snart till salu hittade</span></div>
-      ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale} · ${b.soon}</span><span class="s">på Booli${b.missing ? ", från " + fmtShort(b.at) : ""}</span></div>` : ""}
+      ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale}${b.soon != null ? " · " + b.soon : ""}</span><span class="s">${b.soon != null ? "" : "till salu "}på Booli${b.missing ? ", från " + fmtShort(b.at) : ""}</span></div>` : ""}
     </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Boolis antal för samma filter i Stockholms innerstad är facit: skillnaden är det bostadsletaren inte täcker än.</p>` : ""}` : "";
   const ag = LIST.agents ? Object.entries(LIST.agents) : [];
   // Ours against Booli, one row a day, newest first: how far the gap has closed while agents were added
