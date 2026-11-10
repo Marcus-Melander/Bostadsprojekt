@@ -161,7 +161,7 @@ def booli_count(pw, f):
         for i, (name, area_id) in enumerate(BOOLI_AREAS.items()):
             if i:
                 time.sleep(random.uniform(20, 40))
-            resp = page.goto(booli_query(f, area_id), wait_until="domcontentloaded", timeout=45000)
+            resp = agents.goto(page, booli_query(f, area_id))
             page.wait_for_timeout(4000)
             text = page.inner_text("body").replace("\u00a0", " ")
             if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
@@ -259,7 +259,7 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
     """Open one apartment page, opening the sections named in `opens` (facts some agents keep
     folded away). Returns (listing or None, refused?)."""
     try:
-        resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        resp = agents.goto(page, url)
         page.wait_for_timeout(2000)
         for _ in range(3):  # galleries load their photos as you scroll
             page.mouse.wheel(0, 2500)
@@ -353,7 +353,7 @@ def follow_left(page, store, robots, hist, started):
             continue
         status("running", f"Kollar sålda lägenheter och de som lämnat listorna, {i} av {len(todo)}", started=started)
         try:
-            resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            resp = agents.goto(page, url)
             page.wait_for_timeout(2000)
             text = page.inner_text("body")
         except PlaywrightError as e:
@@ -386,7 +386,7 @@ def follow(page, store, saved, robots, hist):
         if not robots.allowed(url):
             continue
         try:
-            resp = page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            resp = agents.goto(page, url)
             page.wait_for_timeout(2500)
             agents.decline_cookies(page)
             text = page.inner_text("body")

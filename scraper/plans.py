@@ -153,7 +153,7 @@ def backfill():
             if p.get("agent") in refused or not robots.allowed(u):
                 continue
             try:
-                resp = page.goto(u, wait_until="domcontentloaded", timeout=45000)
+                resp = agents.goto(page, u)
                 page.wait_for_timeout(2000)
                 agents.decline_cookies(page)
                 for _ in range(3):

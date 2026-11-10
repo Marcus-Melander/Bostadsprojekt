@@ -210,12 +210,41 @@ def decline_cookies(page):
         page.wait_for_timeout(700)
 
 
+OFFLINE_RX = re.compile(r"ERR_(?:INTERNET_DISCONNECTED|NETWORK_IO_SUSPENDED|NETWORK_CHANGED|NAME_NOT_RESOLVED|ADDRESS_UNREACHABLE)")
+ONLINE_WAIT_S = 300
+
+
+def goto(page, url, **kw):
+    """page.goto, but when the computer is offline (it has just woken from sleep and the network isn't back),
+    wait for the network, at most five minutes, and open the page once more. A site's own refusal is never
+    tried again."""
+    kw = {"wait_until": "domcontentloaded", "timeout": 45000, **kw}
+    try:
+        return page.goto(url, **kw)
+    except Exception as e:
+        if not OFFLINE_RX.search(str(e)):
+            raise
+        import socket
+        host, until = urlparse(url).hostname, time.time() + ONLINE_WAIT_S
+        while time.time() < until:
+            time.sleep(10)
+            try:
+                socket.getaddrinfo(host, 443)
+                break
+            except OSError:
+                pass
+        else:
+            raise
+        time.sleep(3)
+        return page.goto(url, **kw)
+
+
 def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks=()):
     """Every apartment link on a for-sale list, with its card text. Scrolls, presses
     "Ladda fler" / "Visa fler" (or the agent's own label) so lists that load in parts show
     everything, and follows numbered page links ("?page=2", "?p=2") for lists split into pages.
     `picks` are filter labels to click first, for lists whose filters aren't in the address."""
-    page.goto(url, wait_until="domcontentloaded", timeout=45000)
+    goto(page, url)
     page.wait_for_timeout(2500)
     decline_cookies(page)
     for label in picks:
@@ -278,7 +307,7 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks
     for n in sorted(pages)[:max_pages]:
         time.sleep(2)
         try:
-            page.goto(pages[n], wait_until="domcontentloaded", timeout=45000)
+            goto(page, pages[n])
             page.wait_for_timeout(2000)
             _page_cards(page, obj_rx, cards)
         except Exception:
@@ -306,7 +335,7 @@ def feed_cards(page, feed):
     """Every apartment in the data a list page loads for itself, kept where it lies in or near the inner city.
     Only the page is visited; its own request is read as it arrives."""
     with page.expect_response(lambda r: re.search(feed["data"], r.url), timeout=45000) as answer:
-        page.goto(feed["page"], wait_until="domcontentloaded", timeout=45000)
+        goto(page, feed["page"])
     r = answer.value
     if not r.ok:
         raise RuntimeError(f"its list's data answered {r.status}")
@@ -744,10 +773,10 @@ def bid_text(page):
     if links:
         here = page.url
         try:
-            page.goto(links[0], wait_until="domcontentloaded", timeout=45000)
+            goto(page, links[0])
             page.wait_for_timeout(2000)
             out += "\n" + page.inner_text("body")
-            page.goto(here, wait_until="domcontentloaded", timeout=45000)
+            goto(page, here)
         except Exception:
             pass
     return out
@@ -964,10 +993,10 @@ def forening_text(page):
              if urlparse(h).netloc == here.netloc and urlparse(h).path.rstrip("/").endswith("/fakta") and urlparse(h).path != here.path]
     if fakta:
         try:
-            page.goto(fakta[0], wait_until="domcontentloaded", timeout=45000)
+            goto(page, fakta[0])
             page.wait_for_timeout(1500)
             texts.append(page.inner_text("body"))
-            page.goto(back, wait_until="domcontentloaded", timeout=45000)
+            goto(page, back)
         except Exception:
             pass
     return "\f".join(texts)
