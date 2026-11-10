@@ -8,6 +8,7 @@ per link and kept in the förening's store (bolagsverket.py); a scanned report h
 import io
 import re
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -229,24 +230,44 @@ def read(url, robots, log=print, scans=True, tiles=True):
 
 DONE = Path(__file__).resolve().parent.parent / "data" / "reports.json"
 FIGURES = ("avgiftKvm", "skuldKvm", "skuldKvmTotal", "sparandeKvm", "energiKvm", "rantekanslighet", "reportYear")
-PER_RUN = 80  # reports downloaded per morning run, a second apart; the rest wait for the next morning
+PER_RUN = 200  # reports downloaded per morning run, a second apart; the rest wait for the next morning
 SCANS_PER_RUN = 20  # scans read by text recognition per run, about half a minute each
 TILES_PER_RUN = 5  # of those, read again in parts, two to four minutes each
 READER = 2  # the reader's version: a report an older one read is read once more, after the new links
 
 
-def update(items, log=print, limit=PER_RUN):
+# A failed name lookup or no network: the Mac is offline, not the site refusing
+OFFLINE_RX = re.compile(r"Errno (?:8|50|51|65)\b|nodename nor servname|Network is (?:down|unreachable)|No route to host", re.I)
+
+
+def offline(e):
+    import socket
+    if isinstance(e, urllib.error.HTTPError):  # the site answered, so a 403 or 429 is never read again
+        return False
+    reason = getattr(e, "reason", e)
+    return isinstance(reason, socket.gaierror) or bool(OFFLINE_RX.search(str(reason)))
+
+
+def update(items, log=print, limit=PER_RUN, first=()):
     """Read the annual reports the agents link, each link once (kept in data/reports.json). Each apartment
     gets its report's figures as "report", and the organisationsnummer from the report's first page when
-    its own page didn't give one."""
+    its own page didn't give one. The links of the apartments in `first` (those in the filter) are read first."""
     import datetime as dt
     import json
     import time
     done = json.loads(DONE.read_text()) if DONE.exists() else {}
     robots = agents.Robots()
-    # Apartments without a number, or whose förening has no figures yet, first
-    todo = sorted({p["reportUrl"] for p in items.values() if p.get("reportUrl") and not p.get("outside")} - set(done),
-                  key=lambda u: any(p.get("orgnr") for p in items.values() if p.get("reportUrl") == u))
+    # Föreningar that already have figures from another apartment's report, which they share by number
+    have = {r["orgnr"] for r in done.values() if r.get("orgnr") and sum(k in r for k in ROWS_KEYS) >= 3}
+    have |= {p["orgnr"] for p in items.values() if p.get("orgnr") and p.get("report")}
+    by_url = {}
+    for u, p in items.items():
+        if p.get("reportUrl") and not p.get("outside") and p.get("state") != "sold":
+            by_url.setdefault(p["reportUrl"], []).append((u, p))
+    # The filter's apartments first, then those whose förening has no figures yet, those without a number first
+    todo = sorted(set(by_url) - set(done), key=lambda u: (
+        not any(a in first for a, _ in by_url[u]), all(p.get("orgnr") in have for _, p in by_url[u]),
+        any(p.get("orgnr") for _, p in by_url[u])))
     n = 0
     # Reports that waited for text recognition on an earlier day are read again
     todo += [u for u, r in done.items() if r.get("ocrWaiting") and u not in todo]
@@ -255,6 +276,8 @@ def update(items, log=print, limit=PER_RUN):
              and u not in todo]
     # A report robots.txt kept out, from a host whose owner has since said yes (agents.PERMITTED)
     todo = [u for u, r in done.items() if r.get("blocked") and urllib.parse.urlparse(u).netloc in agents.PERMITTED] + todo
+    # Reports that failed only because the Mac was offline (just woken from sleep) are read again
+    todo += [u for u, r in done.items() if OFFLINE_RX.search(r.get("error", "")) and u not in todo]
     scans = tiled = 0
     for url in todo[:limit]:
         try:
@@ -262,6 +285,9 @@ def update(items, log=print, limit=PER_RUN):
             scans += bool(r.get("scanned") and not r.get("ocrWaiting"))
             tiled += r.pop("tiled", False)
         except Exception as e:  # never retried: a link that fails today is left
+            if offline(e):  # not the link's fault: the rest wait for the next run
+                log(f"Annual reports: offline ({e}); stopping for today")
+                break
             r = {"error": str(e)[:120]}
         done[url] = {**r, "read": dt.date.today().isoformat(), "reader": READER}
         n += 1
@@ -283,6 +309,9 @@ def update(items, log=print, limit=PER_RUN):
 
 DOCS_RX = re.compile(r"dokument", re.I)
 DEBUG = False
+# The documents reader's version (an apartment's "reportChecked"): a page an older one found nothing on is looked
+# at once more (version 1 was stopped by a cookie banner or an open dialog over HusmanHagberg's buttons)
+BUTTONS = 2
 # The clickable for a label naming the annual report: the label's own link or button, or else the one on the
 # same line beside it (Erik Olsson's "Öppna"); never one on another line, which would be another document's
 _NEAREST = """(el) => { const own = el.closest('a, button, [role=button]'); if (own) return own;
@@ -302,6 +331,11 @@ def report_behind_buttons(page, log=print):
     """For a page that hides its documents: open its documents section (a button or tab named "Dokument",
     also by its aria-label) and take the annual report's link, or press the report itself and keep the
     address of the PDF the page loads (Länsförsäkringar fetches it from its API, Erik Olsson behind "Öppna")."""
+    # A cookie banner left up, or a dialog the förening's facts were read in (HusmanHagberg's "Fakta om bostaden"),
+    # covers the buttons
+    agents.decline_cookies(page)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(500)
     # A section can hold another ("Fakta & dokument", then "Viktiga dokument & länkar"), so look again after each
     opened = set()
     for _ in range(3):
