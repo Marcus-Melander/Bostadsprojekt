@@ -1,8 +1,8 @@
 """Estate agent sites: where each agent lists its apartments for sale, and how to read them.
 
-The finder reads every agent's for-sale list (pressing "show more" where there is one)
-and, for agents whose list is incomplete, the entries in their sitemap that changed
-recently. It keeps the inner-city candidates, then opens each apartment's own page,
+The finder reads every agent's for-sale list (pressing "show more" where there is one, or
+taking the data the list page loads for itself) and, for agents whose list is incomplete,
+the entries in their sitemap that changed recently. It keeps the inner-city candidates, then opens each apartment's own page,
 which one shared parser reads, since most agents show the same things the same way.
 """
 import datetime as dt
@@ -24,13 +24,18 @@ SITEMAP_DAYS = 30   # sitemap entries changed in the last month; older ones are 
 # obj: what a link to one apartment looks like on that site. clicks: how many times to press
 # "show more" at most. anywhere: the cards don't name the area, so OpenStreetMap decides.
 AGENTS = [
-    # Erik Olsson lists all of Sweden; its search narrows to an area by id, one page per inner-city district
+    # Erik Olsson lists all of Sweden; its search narrows to an area by id, one page per inner-city district,
+    # 12 at a time behind "Ladda fler"
     {"name": "Erik Olsson", "lists": [f"https://www.erikolsson.se/homes?areaIds={i}" for i in (467, 667, 387, 528, 898, 1961, 668)],
-     "obj": r"erikolsson\.se/homes/[^/?#]+-\d+$"},
+     "obj": r"erikolsson\.se/homes/[^/?#]+-\d+$", "clicks": 25},
     {"name": "Alicia Edelman", "lists": ["https://aliciaedelman.se/till-salu"], "obj": r"/bostad/"},
-    # Notar's national list shows only its 25 newest (it pages inside the page), and each inner-city office
-    # page shows its 12 newest; together they cover most of Notar's inner-city apartments, not all
-    {"name": "Notar", "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"] +
+    # Notar's national list shows 25 at a time, but the page loads every apartment for sale, with its position,
+    # for its map: that answer is read and the ones in or near the inner city kept. If it can't be read, the
+    # 25 newest and each inner-city office page's 12 newest are read instead.
+    {"name": "Notar", "feed": {"page": "https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc",
+                               "data": r"data\.notar\.se/objects\?.*compactObjects=true", "type": "HousingCooperative",
+                               "link": "https://www.notar.se/kopa-bostad/objekt/{id}"},
+     "lists": ["https://www.notar.se/kopa-bostad?sortBy=date&sortOrder=desc"] +
                                [f"https://www.notar.se/maklare-och-kontor/kontor/{o}" for o in
                                 ("gamlastan-hornstull", "sodermalm-katarina", "kungsholmen", "vasastan", "ostermalm", "gardet")],
      "obj": r"/kopa-bostad/objekt/", "anywhere": True},
@@ -226,23 +231,37 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks
         seen = n
         page.mouse.wheel(0, 8000)
         page.wait_for_timeout(900)
+    count = lambda: page.eval_on_selector_all("a[href]", f"els => new Set(els.filter(a => new RegExp({json.dumps(obj_rx)}).test(a.href)).map(a => a.href)).size")
+    idle = 0
     for _ in range(clicks):
         for _ in range(3):
             page.mouse.wheel(0, 5000)
             page.wait_for_timeout(500)
         more = page.locator("button, a").filter(has_text=re.compile(more_rx, re.I))
         if not more.count():
-            break
+            page.wait_for_timeout(2000)  # the button can be gone for a moment while the next part loads
+            if not more.count():
+                break
+        before = count()
         try:
             more.first.click(timeout=3000)
         except Exception:
-            # A slow page can miss one click (Bergets Ro's list stopped at 16 of 108 on 2 November): one more try
-            page.wait_for_timeout(3000)
+            # A slow page can miss one click (Bergets Ro's list stopped at 16 of 108 on 2 November), and Erik
+            # Olsson's cards cover its button while they settle: the button is then pressed where it is
+            page.wait_for_timeout(2000)
             try:
-                more.first.click(timeout=5000)
+                more.first.dispatch_event("click", timeout=5000)
             except Exception:
                 break
-        page.wait_for_timeout(1500)
+        # Wait for the next part rather than a fixed while; two presses in a row that add nothing end the list
+        for _ in range(16):
+            page.wait_for_timeout(500)
+            if count() > before:
+                break
+        page.wait_for_timeout(700)
+        idle = 0 if count() > before else idle + 1
+        if idle >= 2:
+            break
     cards = {}
     _page_cards(page, obj_rx, cards)
     base = urlparse(url).path
@@ -267,10 +286,50 @@ def list_cards(page, url, obj_rx, clicks=8, max_pages=30, more_rx=MORE_RX, picks
     return cards
 
 
+_NEAR_INNER = []
+
+
+def near_inner(lat, lon):
+    """In or within about 150 m of the inner city's neighbourhoods in areas.geojson; the apartment's own
+    address decides later, so one on the edge isn't lost."""
+    if not _NEAR_INNER:
+        from shapely.geometry import Point, shape
+        from shapely.ops import unary_union
+        data = json.loads((Path(__file__).resolve().parent.parent / "areas.geojson").read_text("utf-8"))
+        area = unary_union([shape(f["geometry"]) for f in data["features"] if f["properties"]["kind"] == "area"])
+        _NEAR_INNER.append((area.buffer(0.002), Point))
+    area, Point = _NEAR_INNER[0]
+    return area.contains(Point(lon, lat))
+
+
+def feed_cards(page, feed):
+    """Every apartment in the data a list page loads for itself, kept where it lies in or near the inner city.
+    Only the page is visited; its own request is read as it arrives."""
+    with page.expect_response(lambda r: re.search(feed["data"], r.url), timeout=45000) as answer:
+        page.goto(feed["page"], wait_until="domcontentloaded", timeout=45000)
+    r = answer.value
+    if not r.ok:
+        raise RuntimeError(f"its list's data answered {r.status}")
+    items = r.json().get("items") or []
+    if not items:
+        raise RuntimeError("its list's data was empty")
+    decline_cookies(page)
+    return {feed["link"].format(**i): "" for i in items if i.get("type") == feed["type"]
+            and i.get("latitude") and i.get("longitude") and near_inner(i["latitude"], i["longitude"])}
+
+
 def discover(agent, page, robots, cache_dir, log):
     """Candidate apartments for one agent: {url: card text}."""
-    found = {}
-    for url in agent.get("lists", []):
+    found, lists = {}, agent.get("lists", [])
+    if (feed := agent.get("feed")) and robots.allowed(feed["page"]):
+        try:
+            found.update(feed_cards(page, feed))
+            lists = []  # the data holds the whole list
+        except Exception as e:
+            log(f"{agent['name']}: couldn't read its list's data ({e}), reading its list pages instead")
+            if re.search(r"answered (403|429)", str(e)):
+                return found  # refused: no more of this site today
+    for url in lists:
         if not robots.allowed(url):
             log(f"{agent['name']}: robots.txt asks visitors not to read {url}, skipped")
             continue
