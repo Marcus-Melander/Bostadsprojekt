@@ -442,6 +442,33 @@ def progress(sh, agent=None, text=None):
         status("running", f"Läser mäklare, {sh['done']} av {sh['total']} klara" + (f". Nu: {now}" if now else ""), started=sh["started"])
 
 
+DROP_FLOOR = 0.75  # a price more than a quarter lower is a misread, not a lowered price
+BACK_DAYS = 7  # away from the lists this long before coming back counts as a relisting; shorter is a list that loaded badly
+
+
+def carry_over(p, old, store, hist):
+    """What earlier readings tell about today's: the asking price from before the bidding, a lowered price,
+    and that the apartment has been for sale before."""
+    old = old or {}
+    was, state = old.get("price"), p.get("state") or "for sale"
+    if was and state != "for sale":
+        p["price"] = was  # in bidding several agents show the highest bid as the price (Erik Olsson, Notar)
+    elif was and p.get("price") and old.get("state", "for sale") == "for sale":
+        top = (old.get("drop") or {}).get("from", was)
+        if p["price"] < was and p["price"] >= top * DROP_FLOOR:
+            p["drop"] = {"from": top, "at": stamp()}
+        elif p["price"] == was and old.get("drop"):
+            p["drop"] = old["drop"]
+    back = store.get("left", {}).pop(p["url"], None)  # on its agent's list again
+    cutoff = (dt.datetime.now() - dt.timedelta(days=BACK_DAYS)).isoformat(timespec="seconds")
+    if old.get("relisted"):
+        p["relisted"] = old["relisted"]
+    elif back and back.get("left", cutoff) < cutoff:
+        p["relisted"] = {"at": stamp(), "left": back["left"], "agent": back.get("agent"), "price": back.get("price")}
+    elif not old and not p.get("outside") and (e := hist.earlier(p, cutoff)) and e["url"] not in store["items"]:
+        p["relisted"] = {"at": stamp(), "left": e["last_seen"], "agent": e["agent"], "price": e["last_price"], "url": e["url"]}
+
+
 def read_agent(ag, sh):
     """One agent's list and apartments, in a browser of its own. Shared data is changed under the lock."""
     items, f, now, robots = sh["items"], sh["f"], sh["now"], sh["robots"]
@@ -476,6 +503,7 @@ def read_agent(ag, sh):
                 with sh["lock"]:
                     if p:
                         p.update(agent=ag["name"], seen=stamp())
+                        carry_over(p, old, sh["store"], sh["hist"])
                         items[url] = p
                         kept += not p.get("outside")
                         if not p.get("outside"):

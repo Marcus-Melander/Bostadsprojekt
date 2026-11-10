@@ -71,6 +71,18 @@ class History:
                         [row[c] for c in APT_COLS])
         self.db.commit()
 
+    def earlier(self, p, before):
+        """The one apartment at the same address, size and floor that was last on a list before `before`
+        under another address on the web: the same apartment, for sale again. None when several match (new buildings)."""
+        if not (p.get("addr") and p.get("kvm") and p.get("floor") and any(c.isdigit() for c in p["addr"])):
+            return None
+        rows = self.db.execute(
+            "SELECT url, agent, last_seen, last_price FROM apartments WHERE addr=? AND kvm=? AND floor=? AND url<>? AND rooms IS ?",
+            (p["addr"], p["kvm"], p["floor"], p["url"], p.get("rooms"))).fetchall()
+        if len(rows) != 1 or not rows[0][2] or rows[0][2] >= before:
+            return None
+        return dict(zip(("url", "agent", "last_seen", "last_price"), rows[0]))
+
     def counts(self):
         a = self.db.execute("SELECT COUNT(*), COUNT(final_price), COUNT(highest_bid) FROM apartments").fetchone()
         r = self.db.execute("SELECT COUNT(*) FROM readings").fetchone()[0]
