@@ -674,6 +674,12 @@ def find(args):
     msg += f" Booli visar {b['forSale']} och {b['soon']}." if same else " Boolis antal för det här filtret gick inte att läsa i dag." if b.get("missing") or b.get("filter") == f else " Boolis antal läses för det nya filtret vid nästa morgonkörning."
     log(f"Run finished. {msg}")
     status("partial" if notes else "done", " ".join([msg] + notes), started=started, finished=store["lastRun"])
+    if not args.agents:  # the morning digest, for the planner and a notification (a run of a few agents isn't a morning)
+        try:
+            import digest
+            log(f"Digest: {digest.run(DATA)['summary']}")
+        except Exception as e:
+            log(f"Digest: stopped ({e!r})")
     return 0
 
 

@@ -109,11 +109,11 @@ def build(data_dir, now=None, since=None):
                 back.append({**brief(p, mine), "firstSeen": first})  # known from before, but on no list at the last digest
             elif fits:
                 new.append(brief(p, mine))
-        if db and p.get("price"):
-            # The readings' on_list isn't used: a day's reading can be rewritten by the check of apartments that left
-            old = db.execute("SELECT price FROM readings WHERE url=? AND at<=? AND price IS NOT NULL ORDER BY at DESC LIMIT 1", (u, since)).fetchone()
-            if old and p["price"] < old[0]:
-                drops.append({**brief(p, mine), "was": old[0]})
+        # The finder's own mark (finder.carry_over), which leaves out misread prices and the highest bid shown as the price
+        if (dr := p.get("drop")) and p.get("price") and dr.get("at", "") > since:
+            drops.append({**brief(p, mine), "was": dr["from"]})
+        if (rl := p.get("relisted")) and rl.get("at", "") > since and u not in {a["url"] for a in back}:
+            back.append({**brief(p, mine), "firstSeen": rl.get("left")})
     if db:
         db.close()
 
