@@ -13,6 +13,8 @@ import re
 import time
 import unicodedata
 import urllib.request
+
+import web
 import urllib.robotparser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -144,9 +146,7 @@ class Robots:
         if host not in self.parsers:
             rp = urllib.robotparser.RobotFileParser()
             try:
-                req = urllib.request.Request(f"https://{host}/robots.txt", headers={"User-Agent": UA})
-                with urllib.request.urlopen(req, timeout=20) as r:
-                    rp.parse(r.read().decode("utf-8", "replace").splitlines())
+                rp.parse(web.text(f"https://{host}/robots.txt", timeout=20).splitlines())
             except Exception:
                 rp.parse([])  # no robots.txt: nothing is disallowed
             self.parsers[host] = rp
@@ -154,9 +154,7 @@ class Robots:
 
 
 def fetch_text(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=40) as r:
-        b = r.read()
+    b = web.get(url)
     return (gzip.decompress(b) if b[:2] == b"\x1f\x8b" else b).decode("utf-8", "replace")
 
 

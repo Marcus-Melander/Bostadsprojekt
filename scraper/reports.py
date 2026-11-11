@@ -14,6 +14,7 @@ import urllib.request
 from pathlib import Path
 
 import agents
+import web
 
 MAX_BYTES = 40_000_000
 LINK_RX = re.compile(r"årsredovisning|arsredovisning|årsredoovisning", re.I)
@@ -197,9 +198,7 @@ def read(url, robots, log=print, scans=True, tiles=True):
     or else the report waits for another day."""
     if not robots.allowed(url):
         return {"blocked": True}
-    req = urllib.request.Request(url, headers={"User-Agent": agents.UA})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = r.read(MAX_BYTES + 1)
+    data = web.get(url, timeout=60)
     if len(data) > MAX_BYTES or not data.startswith(b"%PDF"):
         return {"notPdf": True}
     import pypdf
@@ -237,12 +236,12 @@ READER = 2  # the reader's version: a report an older one read is read once more
 
 
 # A failed name lookup or no network: the Mac is offline, not the site refusing
-OFFLINE_RX = re.compile(r"Errno (?:8|50|51|65)\b|nodename nor servname|Network is (?:down|unreachable)|No route to host", re.I)
+OFFLINE_RX = re.compile(r"Errno (?:8|50|51|65)\b|nodename nor servname|Could not resolve host|Network is (?:down|unreachable)|No route to host", re.I)
 
 
 def offline(e):
     import socket
-    if isinstance(e, urllib.error.HTTPError):  # the site answered, so a 403 or 429 is never read again
+    if isinstance(e, (urllib.error.HTTPError, web.HTTPError)):  # the site answered, so a 403 or 429 is never read again
         return False
     reason = getattr(e, "reason", e)
     return isinstance(reason, socket.gaierror) or bool(OFFLINE_RX.search(str(reason)))

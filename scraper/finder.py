@@ -30,8 +30,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlencode
 
-from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import sync_playwright
+import web
+from web import ERRORS as PlaywrightError  # a page that failed to load, from either browser library
 
 import agents
 import plans
@@ -147,40 +147,36 @@ def booli_query(f, area_id):
     return "https://www.booli.se/sok/till-salu?" + urlencode(q)
 
 
-def booli_count(pw, f):
+def booli_count(f):
     """How many apartments Booli shows for the same filter in Stockholms innerstad: one search page,
     in a Chrome window of its own (Booli refuses Chrome without one). If Booli refuses it, there's
     no count that day."""
     out = {"districts": {}, "at": stamp()}
     try:
-        try:
-            browser = pw.chromium.launch(channel="chrome", headless=False)
-        except PlaywrightError:
-            browser = pw.chromium.launch(headless=False)
-        page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
-        for i, (name, area_id) in enumerate(BOOLI_AREAS.items()):
-            if i:
-                time.sleep(random.uniform(20, 40))
-            resp = agents.goto(page, booli_query(f, area_id))
-            page.wait_for_timeout(4000)
-            text = page.inner_text("body").replace("\u00a0", " ")
-            if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
-                log(f"Booli's count: Booli refused the page for {name} ({resp.status if resp else '?'}); no more counts today")
-                break
-            m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text)
-            tab = re.search(r"\bTill salu\s*(\d+)", text)  # the newer page: "Till salu 133" on the tab above the results
-            if m:
-                c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
-            elif tab:
-                c = {"forSale": int(tab.group(1)), "soon": None}
-            else:
-                log(f"Booli's count: no count shown for {name}")
-                continue
-            if name == "Stockholms innerstad":
-                out.update(c, apartments=booli_apartments(page.content()))
-            else:
-                out["districts"][name] = c
-        browser.close()
+        with launch(True) as browser:
+            page = browser.new_page()
+            for i, (name, area_id) in enumerate(BOOLI_AREAS.items()):
+                if i:
+                    time.sleep(random.uniform(20, 40))
+                resp = agents.goto(page, booli_query(f, area_id))
+                page.wait_for_timeout(4000)
+                text = page.inner_text("body").replace("\u00a0", " ")
+                if (resp is not None and resp.status >= 400) or BLOCKED.search(text):
+                    log(f"Booli's count: Booli refused the page for {name} ({resp.status if resp else '?'}); no more counts today")
+                    break
+                m = re.search(r"(\d+)\s+till salu(?:\s+och\s+(\d+)\s+snart till salu)?", text)
+                tab = re.search(r"\bTill salu\s*(\d+)", text)  # the newer page: "Till salu 133" on the tab above the results
+                if m:
+                    c = {"forSale": int(m.group(1)), "soon": int(m.group(2) or 0)}
+                elif tab:
+                    c = {"forSale": int(tab.group(1)), "soon": None}
+                else:
+                    log(f"Booli's count: no count shown for {name}")
+                    continue
+                if name == "Stockholms innerstad":
+                    out.update(c, apartments=booli_apartments(page.content()))
+                else:
+                    out["districts"][name] = c
     except PlaywrightError as e:
         log(f"Booli's count: couldn't load a page ({e})")
     return out if "forSale" in out or out["districts"] else None
@@ -423,11 +419,9 @@ def follow(page, store, saved, robots, hist):
         time.sleep(random.uniform(*PAUSE_S))
 
 
-def launch(pw, show):
-    try:  # your installed Google Chrome; Playwright's own Chromium as a fallback
-        return pw.chromium.launch(channel="chrome", headless=not show)
-    except PlaywrightError:
-        return pw.chromium.launch(headless=not show)
+def launch(show):
+    """Your installed Google Chrome, through Scrapling (web.py)."""
+    return web.Browser(show)
 
 
 def progress(sh, agent=None, text=None):
@@ -473,9 +467,8 @@ def read_agent(ag, sh):
     """One agent's list and apartments, in a browser of its own. Shared data is changed under the lock."""
     items, f, now, robots = sh["items"], sh["f"], sh["now"], sh["robots"]
     try:
-        with sync_playwright() as pw:
-            browser = launch(pw, sh["show"])
-            page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
+        with launch(sh["show"]) as browser:
+            page = browser.new_page()
             progress(sh, ag["name"], "(listan)")
             cards = agents.discover(ag, page, robots, DATA / "cache", log)
             want = {u: t for u, t in cards.items() if agents.looks_inner(u, t, ag.get("anywhere"))
@@ -606,16 +599,15 @@ def find(args):
     try:
         with ThreadPoolExecutor(max_workers=AT_ONCE) as pool:
             list(pool.map(lambda ag: read_agent(ag, shared), chosen))
-        with sync_playwright() as pw:
-            browser = launch(pw, args.show)
-            page = browser.new_page(locale="sv-SE", timezone_id="Europe/Stockholm")
+        with launch(args.show) as browser:
+            page = browser.new_page()
             if saved:
                 status("running", f"Följer {len(saved)} sparade {'lägenheter' if len(saved) > 1 else 'lägenhet'}", started=started)
                 follow(page, store, saved, robots, hist)
             follow_left(page, store, robots, hist, started)
             if not args.no_count:
                 status("running", "Läser Boolis antal", started=started)
-                b = booli_count(pw, f)
+                b = booli_count(f)
                 store["booli"] = {**b, "filter": f} if b else {**(store.get("booli") or {}), "missing": stamp()}
             browser.close()
     except Exception as e:  # keep what was read, and say what went wrong

@@ -52,9 +52,8 @@ def looks_like_plan(img):
 
 
 def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return r.read()
+    import web
+    return web.get(url, timeout=30)
 
 
 def load_index():
@@ -136,7 +135,6 @@ def backfill():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import agents
     import finder
-    from playwright.sync_api import sync_playwright
 
     store = finder.read_json(DATA / "listings.json", {})
     f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
@@ -145,8 +143,7 @@ def backfill():
             and p.get("lat") and not p.get("outside") and finder.fits(p, f, estimate=False)]
     finder.log(f"Backfill: {len(todo)} apartments to look at for floor plans and förening facts")
     robots, refused, found = agents.Robots(), set(), {}
-    with sync_playwright() as pw:
-        browser = finder.launch(pw, False)
+    with finder.launch(False) as browser:
         page = browser.new_page()
         for i, u in enumerate(todo):
             p = store["items"][u]
