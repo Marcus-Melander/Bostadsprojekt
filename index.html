@@ -2157,7 +2157,13 @@ function drawMap() {
       .on("click", () => { location.hash = aptHref(p); }) // a dot opens the apartment's own page
       .addTo(MAP.layer);
   }
-  if (!MAP.fitted && list.length) { MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08)); MAP.fitted = true; }
+  // Only once the map has its size: online the apartments can arrive while the page is still being laid out,
+  // and a fit to a map without a size zooms out to the whole world
+  if (!MAP.fitted && list.length && el.clientHeight) {
+    MAP.map.invalidateSize();
+    MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08));
+    MAP.fitted = true;
+  }
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { drawMap(); drawAptMap(); });
 function mapPanel() {
