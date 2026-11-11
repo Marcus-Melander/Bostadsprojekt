@@ -2103,7 +2103,8 @@ function metres(a, b) { // short distances in Stockholm, near enough for drawing
   const dy = (a[0] - b[0]) * 111320, dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
   return Math.hypot(dx, dy);
 }
-// Stadia Maps' quiet greys over OpenStreetMap data, light or dark; no key is needed on localhost.
+// Stadia Maps' quiet greys over OpenStreetMap data, light or dark; no key is needed on localhost, and online the
+// site's address is registered in Stadia's free account instead (stadiamaps.com, Manage Properties)
 // Puts the theme's tiles on m.map and says whether they changed.
 function mapTiles(m) {
   const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);

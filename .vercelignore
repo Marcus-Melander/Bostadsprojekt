@@ -1,0 +1,9 @@
+# A deploy uploads only what scripts/build-site.sh needs: never data/ (your plan and keys) or the rest of the repo
+/*
+!/index.html
+!/online.js
+!/areas.geojson
+!/vercel.json
+!/scripts
+/scripts/*
+!/scripts/build-site.sh
