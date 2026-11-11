@@ -8,6 +8,7 @@ computer only.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +18,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 PORT = int(os.environ.get("BOSTADSPLAN_PORT", "8765"))
 MAX_BODY = 5 * 1024 * 1024
+PLAN_FILE = re.compile(r"[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)")
 
 
 def read(path, default=None):
@@ -69,6 +71,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, body) if body else self.json(404, {"error": "no plan yet"})
         if path == "/api/listings":
             return self.send(200, read(DATA / "listings.json", b'{"items":{},"done":{},"lastRun":null}'))
+        if path == "/api/floorplans":  # the saved floor plans' file names, by apartment
+            by = {}
+            for name, v in json.loads(read(DATA / "floorplans" / "index.json", b"{}") or b"{}").items():
+                by.setdefault(v.get("listing"), []).append(name)
+            return self.json(200, by)
+        if path.startswith("/floorplans/"):
+            m = PLAN_FILE.fullmatch(path[len("/floorplans/"):])
+            body = read(DATA / "floorplans" / m.group(0)) if m else None
+            if body:
+                return self.send(200, body, "image/" + m.group(1).replace("jpg", "jpeg"))
         if path == "/api/travel":
             t = json.loads(read(DATA / "travel.json", b"{}") or b"{}")
             t.pop("shops", None)  # the planner needs only each apartment's nearest

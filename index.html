@@ -397,6 +397,77 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .sc-act { flex-direction: row; align-items: center; }
   .visit { grid-template-columns: minmax(0, 1fr); }
 }
+/* An apartment's own page */
+.ap-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); text-decoration: none; margin: -12px 0 14px; min-height: 32px; }
+.ap-back:hover { color: var(--text); }
+.ap-head { display: flex; gap: 12px 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
+.ap-head .lead { margin: 0; flex: 1 1 320px; min-width: 0; }
+.ap-head .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.ap-head .acts { display: flex; gap: 8px; align-items: center; }
+.ap-gallery { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; min-width: 0; }
+.ap-stage { position: relative; }
+.ap-main { display: block; aspect-ratio: 3 / 2; max-height: 72vh; width: 100%; background: var(--raised); }
+.ap-main img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ap-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--text); font: 22px/1 var(--f-body); cursor: pointer; display: grid; place-items: center; padding: 0 0 3px; }
+.ap-nav:hover { background: var(--surface); }
+.ap-nav.prev { left: 12px; }
+.ap-nav.next { right: 12px; }
+.ap-count { position: absolute; right: 12px; bottom: 12px; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+.ap-strip { display: flex; gap: 6px; padding: 8px; overflow-x: auto; scrollbar-width: thin; border-top: 1px solid var(--border); }
+.ap-strip button { flex: none; width: 84px; aspect-ratio: 3 / 2; padding: 0; border: 2px solid transparent; border-radius: 4px; overflow: hidden; background: var(--raised); cursor: pointer; opacity: .7; }
+.ap-strip button:hover, .ap-strip button[aria-current="true"] { opacity: 1; }
+.ap-strip button[aria-current="true"] { border-color: var(--text); }
+.ap-strip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ap-page .tile { cursor: default; }
+.ap-page .tile:hover { background: var(--surface); }
+.ap-page .tiles { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.ap-page .panel h3 small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.ap-desc p { margin: 0 0 12px; max-width: 72ch; font-size: 15px; line-height: 23px; }
+.ap-desc p:last-child { margin-bottom: 0; }
+.ap-feats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.ap-plan { display: grid; gap: 8px; }
+.ap-plan img { display: block; width: 100%; max-height: 85vh; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
+.ap-month { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 18px 0 10px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.ap-month b { font-size: 22px; line-height: 28px; font-weight: 500; }
+.ap-max { display: grid; gap: 6px; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.ap-max .bar b { background: var(--data); }
+.ap-max.over .bar b { background: var(--negative); }
+.ap-row { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.ap-row:last-of-type { border-bottom: 0; }
+.ap-row.past { color: var(--muted); }
+.ap-row > span:first-child { min-width: 0; }
+.ap-score { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+.ap-score b { font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -0.02em; }
+.ap-score .bar { flex: 1; }
+.ap-score .bar b, .ap-part .bar b { display: block; height: 100%; font-size: 0; background: var(--data); }
+.ap-part { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 2px 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.ap-part small { grid-column: 1; color: var(--muted); font-size: 12px; line-height: 16px; }
+.ap-part .bar { grid-column: 2; grid-row: 1 / span 2; height: 6px; }
+.ap-part.low .bar b { background: var(--warning); }
+.ap-part.off { color: var(--muted); }
+.ap-flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ap-flags li { display: grid; gap: 3px; justify-items: start; font-size: 13px; line-height: 18px; color: var(--muted); }
+.ap-sub { font-size: 13px; font-weight: 500; color: var(--muted); margin: 18px 0 8px; }
+.ap-facts { font-size: 13px; margin-top: 14px; }
+.ap-facts summary { cursor: pointer; }
+.ap-facts p { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
+.ap-others { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.ap-others li { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+#aptmap { height: 260px; background: var(--raised); }
+.aptp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: var(--gap); align-items: start; }
+/* One column on a phone, in reading order: photos, price, facts, showings, then the rest */
+@media (max-width: 900px) {
+  .aptp { display: flex; flex-direction: column; align-items: stretch; }
+  .aptp > .stack { display: contents; }
+  .aptp > .stack > * { order: var(--o, 0); }
+}
+@media (max-width: 560px) {
+  .ap-gallery { margin-inline: -16px; border-radius: 0; border-inline: 0; }
+  .ap-strip button { width: 64px; }
+  .ap-nav { width: 36px; height: 36px; }
+  .ap-head .acts { width: 100%; }
+  .ap-head .acts .btn { flex: 1; justify-content: center; }
+}
 </style>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -1438,13 +1509,15 @@ function roomTotal(room) {
 
 function aptCard(p) {
   const f = (k, label, unit, step = "1000") => `<label>${label}<span class="num">${numInput(`data-apt="${p.id}" data-k="${k}" aria-label="${esc(label)}"`, p[k])}<span>${unit}</span></span></label>`;
-  const photo = p.photo || ((LIST.items[p.link] || {}).photos || [])[0];
+  const own = aptOf(p.link); // what the finder knows about it, so it has a page of its own
+  const photo = p.photo || ((own || {}).photos || [])[0];
   return `<article class="apt ${photo ? "has-photo" : ""}">
-    ${photo ? `<a class="apt-photo" href="${esc(p.link || photo)}" target="_blank" rel="noopener"><img src="${esc(photo)}" alt="Foto på ${esc(p.address)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
+    ${photo ? `<a class="apt-photo" ${own ? `href="${aptHref(own)}"` : `href="${esc(p.link || photo)}" target="_blank" rel="noopener"`}><img src="${esc(photo)}" alt="Foto på ${esc(p.address)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="apt-head">
       ${p.example ? '<span class="chip ex">Exempel</span>' : ""}
       <input type="text" aria-label="Adress" data-apt="${p.id}" data-k="address" value="${esc(p.address)}" placeholder="Adress, område">
       <select aria-label="Status" data-apt="${p.id}" data-k="status">${Object.entries(STATUS_SV).map(([s, l]) => `<option value="${s}" ${p.status === s ? "selected" : ""}>${l}</option>`).join("")}</select>
+      ${own ? `<a class="btn" href="${aptHref(own)}">Visa lägenheten</a>` : ""}
       <button class="btn ghost" data-act="del-apt" data-id="${p.id}">Ta bort</button>
     </div>
     <div class="stack" style="gap:10px">
@@ -1572,20 +1645,24 @@ function subnav() {
   return `<nav class="subtabs" aria-label="${name}">${pages.map(([t, l]) => `<button data-goto="${t}" aria-current="${t === S.tab}">${l}</button>`).join("")}</nav>`;
 }
 function go(tab) {
+  if (ROUTE) { ROUTE = null; history.pushState(null, "", location.pathname + location.search); } // leaves an apartment's page; Back returns to it
   S.tab = tab; S.lastTab = { ...(S.lastTab || {}), [sectionOf(tab)]: tab };
   render(); window.scrollTo(0, 0); scheduleSave();
 }
-function page() { return subnav() + VIEWS[S.tab](); }
+function page() { return ROUTE ? aptPage() : subnav() + VIEWS[S.tab](); }
 function chrome() {
   const sec = sectionOf(S.tab);
   document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.sec === sec));
   const c = document.getElementById("savedCount"); if (c) c.textContent = S.apts.length || "";
+  const p = routeApt();
+  document.title = (p ? p.addr + " · " : "") + "Stockholm Bostadsplan";
 }
 function render() {
   chrome();
   lastHtml = page();
   app.innerHTML = lastHtml;
-  drawMap();
+  app.querySelectorAll("details[open][data-fill]").forEach(fillDetails); // a list that was open when you left is open when you come back
+  drawMap(); drawAptMap();
 }
 // Update live outputs without rebuilding inputs (keeps focus while typing)
 // Update the page in place: only what changed is touched, and the field being edited is left alone
@@ -1593,7 +1670,7 @@ function morph(from, to) {
   if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) { from.replaceWith(to.cloneNode(true)); return; }
   if (from.nodeType === 3 || from.nodeType === 8) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
   if (from === document.activeElement && (from.tagName === "INPUT" || from.tagName === "SELECT")) return;
-  if (from.id === "map") return; // the map draws itself
+  if (from.id === "map" || from.id === "aptmap") return; // the maps draw themselves
   if (from.tagName === "DETAILS" && from.open && from.dataset.fill) return; // an opened gallery or description stays as it is
   for (const a of [...from.attributes]) if (!to.hasAttribute(a.name)) from.removeAttribute(a.name);
   for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value) from.setAttribute(a.name, a.value);
@@ -1621,7 +1698,7 @@ function refresh() {
     morphChildren(app, next);
     lastHtml = html;
   }
-  drawMap();
+  drawMap(); drawAptMap();
 }
 // While you type, the page is redrawn once you pause rather than on every key
 function refreshSoon() { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 180); }
@@ -1660,12 +1737,13 @@ const pad2 = (n) => String(n).padStart(2, "0");
 const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 
 /* ---------- Listings come from the local server, which the finder fills ---------- */
-let LIST = { items: {}, lastRun: null };
+let LIST = { items: {}, lastRun: null }, listLoaded = false;
 const LOCAL = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 async function loadList() {
   if (!LOCAL) return;
   try { const r = await fetch("/api/listings", { cache: "no-store" }); if (r.ok) { LIST = { items: {}, ...(await r.json()) }; placeAll(); } } catch (e) {}
-  if (S.tab === "show" || S.tab === "rank") refresh();
+  listLoaded = true;
+  if (S.tab === "show" || S.tab === "rank" || ROUTE) refresh();
 }
 // What the finder reads: your filter
 function scrapeConfig() { return { filter: S.show.f }; }
@@ -1694,7 +1772,7 @@ async function loadTravel() {
   clearTimeout(travelTimer);
   try { const r = await fetch("/api/travel", { cache: "no-store" }); if (r.ok) TRAVEL = { trips: {}, near: {}, places: {}, ...(await r.json()) }; } catch (e) {}
   if (TRAVEL.running) travelTimer = setTimeout(loadTravel, 8000);
-  if (S.tab === "show" || S.tab === "rank") refresh();
+  if (S.tab === "show" || S.tab === "rank" || ROUTE) refresh();
 }
 // After you change an address or its time: save it, then let the server look up the trips
 async function lookUpTrips() {
@@ -1918,19 +1996,28 @@ function travelLine(p) {
 }
 // The förening as Bolagsverket has it registered (its name, since when, and who manages it), and the key
 // figures from its latest annual report
+// The annual report's key figures as [label, value], those it has
+function reportFigs(r) {
+  if (!r) return [];
+  const n = (v) => Math.round(v).toLocaleString("sv-SE");
+  const figs = [["avgiftKvm", "Avgift", (v) => n(v) + " kr/m²"], ["skuldKvm", "Skuld", (v) => n(v) + " kr/m²"],
+    ["sparandeKvm", "Sparande", (v) => n(v) + " kr/m²"], ["rantekanslighet", "Räntekänslighet", (v) => String(v).replace(".", ",") + " %"],
+    ["energiKvm", "Energi", (v) => n(v) + " kr/m²"]].filter(([k]) => r[k] != null);
+  if (r.skuldKvm == null && r.skuldKvmTotal != null) figs.splice(1, 0, ["skuldKvmTotal", "Skuld (total yta)", (v) => n(v) + " kr/m²"]);
+  return figs.map(([k, l, f]) => [l, f(r[k])]);
+}
 function foreningLine(p) {
   const b = p.bv || {}, r = p.report, bits = [];
   const nr = p.orgnr ? p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6) : "";
   if (b.name) bits.push(`<span title="Organisationsnummer ${esc(nr)}">${esc(b.name)}</span>`);
   if (b.registered) bits.push(`<span>Registrerad <strong>${esc(b.registered.slice(0, 4))}</strong></span>`);
   if (b.manager) bits.push(`<span>Förvaltare ${esc(b.manager)}</span>`);
-  const n = (v) => Math.round(v).toLocaleString("sv-SE");
-  const figs = r ? [["avgiftKvm", "Avgift", (v) => n(v) + " kr/m²"], ["skuldKvm", "Skuld", (v) => n(v) + " kr/m²"],
-    ["sparandeKvm", "Sparande", (v) => n(v) + " kr/m²"], ["rantekanslighet", "Räntekänslighet", (v) => String(v).replace(".", ",") + " %"],
-    ["energiKvm", "Energi", (v) => n(v) + " kr/m²"]].filter(([k]) => r[k] != null) : [];
-  if (r && r.skuldKvm == null && r.skuldKvmTotal != null) figs.splice(1, 0, ["skuldKvmTotal", "Skuld (total yta)", (v) => n(v) + " kr/m²"]);
-  const report = figs.length ? `<div class="facts travel"><a href="${esc(r.url)}" target="_blank" rel="noopener">Årsredovisning ${esc(r.reportYear || "")} ↗</a>${figs.map(([k, l, f]) => `<span>${l} <strong>${f(r[k])}</strong></span>`).join("")}</div>` : "";
+  const figs = reportFigs(r);
+  const report = figs.length ? `<div class="facts travel"><a href="${esc(r.url)}" target="_blank" rel="noopener">Årsredovisning ${esc(r.reportYear || "")} ↗</a>${figs.map(([l, v]) => `<span>${l} <strong>${v}</strong></span>`).join("")}</div>` : "";
   return (bits.length ? `<div class="facts travel">${bits.join("")}</div>` : "") + report;
+}
+function heartBtn(p, tracked) {
+  return `<button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Ta bort " + esc(p.addr) + " från Sparade" : "Spara " + esc(p.addr)}" title="${tracked ? "Sparad. Tryck för att ta bort." : "Spara"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>`;
 }
 function showCard(p, s, a, cr) {
   const v = S.show.visits[p.url], never = isNever(p), r = rating(p.area) || rating(p.group);
@@ -1940,9 +2027,9 @@ function showCard(p, s, a, cr) {
   const photos = p.photos || [];
   return `<article class="show-card ${never ? "never" : ""} ${photos.length ? "has-photo" : ""}">
     <div class="t">${s ? s.start.slice(11) + (s.end ? "–" + s.end : "") : p.soon ? "Snart" : "Inget datum"}</div>
-    ${photos.length ? `<a class="thumb" href="${esc(photos[0])}" target="_blank" rel="noopener"><img src="${esc(photos[0])}" alt="Foto på ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
+    ${photos.length ? `<a class="thumb" href="${aptHref(p)}"><img src="${esc(photos[0])}" alt="Foto på ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>` : ""}
     <div class="sc-main">
-      <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a>
+      <div class="row" style="gap:8px"><a href="${aptHref(p)}"><strong>${esc(p.addr)}</strong></a>
         <span class="dim">${esc(p.area || p.group || "")}</span>${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Aldrig här" : "Område " + r + "/5"}</span>` : ""}${never || !p.price ? "" : `<button class="chip score" data-goto="rank" title="Betyg i Rangordning">Betyg ${rankOf(p, a).score}</button>`}</div>
       <p>${esc(describeListing(p))}</p>
       ${(p.flags || []).length ? `<div class="flags">${flagChips(p.flags).join("")}</div>` : ""}
@@ -1957,7 +2044,7 @@ function showCard(p, s, a, cr) {
     </div>
     <div class="sc-act">
       ${v ? `<button class="btn ghost" data-act="unwent" data-key="${esc(p.url)}">Ångra besöket</button>` : `<button class="btn" data-act="went" data-key="${esc(p.url)}" data-at="${s ? s.start : isoLocal(new Date())}">Jag var där</button>`}
-      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Ta bort " + esc(p.addr) + " från Sparade" : "Spara " + esc(p.addr)}" title="${tracked ? "Sparad. Tryck för att ta bort." : "Spara"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
+      ${heartBtn(p, tracked)}
     </div>
   </article>`;
 }
@@ -1996,6 +2083,19 @@ function metres(a, b) { // short distances in Stockholm, near enough for drawing
   const dy = (a[0] - b[0]) * 111320, dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
   return Math.hypot(dx, dy);
 }
+// Stadia Maps' quiet greys over OpenStreetMap data, light or dark; no key is needed on localhost.
+// Puts the theme's tiles on m.map and says whether they changed.
+function mapTiles(m) {
+  const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  if (m.dark === dark && m.tiles) return false;
+  if (m.tiles) m.tiles.remove();
+  m.tiles = L.tileLayer(`https://tiles.stadiamaps.com/tiles/${dark ? "alidade_smooth_dark" : "alidade_smooth"}/{z}/{x}/{y}{r}.png`, {
+    maxZoom: 20,
+    attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(m.map);
+  m.dark = dark;
+  return true;
+}
 function drawMap() {
   const el = document.getElementById("map");
   if (!el || !window.L) return;
@@ -2005,16 +2105,7 @@ function drawMap() {
     MAP.tiles = null;
     Object.assign(MAP, { el, layer: L.layerGroup().addTo(MAP.map), sig: "", fitted: false });
   }
-  // Stadia Maps' quiet greys over OpenStreetMap data, light or dark; no key is needed on localhost
-  const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-  if (MAP.dark !== dark || !MAP.tiles) {
-    if (MAP.tiles) MAP.tiles.remove();
-    MAP.tiles = L.tileLayer(`https://tiles.stadiamaps.com/tiles/${dark ? "alidade_smooth_dark" : "alidade_smooth"}/{z}/{x}/{y}{r}.png`, {
-      maxZoom: 20,
-      attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(MAP.map);
-    MAP.dark = dark; MAP.sig = ""; // redraw the areas in this theme's colours
-  }
+  if (mapTiles(MAP)) MAP.sig = ""; // redraw the areas in this theme's colours
   const list = apartments().filter((p) => p.lat && (!S.show.hideNever || !isNever(p)));
   const sig = list.map((p) => p.url).join() + JSON.stringify(S.show.ratings) + !!MAP.areas;
   if (sig === MAP.sig) return;
@@ -2041,12 +2132,13 @@ function drawMap() {
   for (const p of list) {
     const r = rating(p.area) || rating(p.group);
     L.circleMarker([p.lat, p.lon], { radius: 5, color: getComputedStyle(document.documentElement).getPropertyValue("--surface").trim(), weight: 1.5, fillColor: r ? ratingColour(r) : getComputedStyle(document.documentElement).getPropertyValue("--text").trim(), fillOpacity: 0.9 })
-      .bindPopup(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Visning " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}<br><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a>`)
+      .bindTooltip(`<strong>${esc(p.addr)}</strong><br>${esc(p.area || p.group || "")}${p.price ? " · " + kr(p.price) : ""}${(p.shows || [])[0] ? "<br>Visning " + fmtShort(p.shows[0].start) + " " + p.shows[0].start.slice(11) : ""}`, { direction: "top", offset: [0, -4] })
+      .on("click", () => { location.hash = aptHref(p); }) // a dot opens the apartment's own page
       .addTo(MAP.layer);
   }
   if (!MAP.fitted && list.length) { MAP.map.fitBounds(L.latLngBounds(list.map((p) => [p.lat, p.lon])).pad(0.08)); MAP.fitted = true; }
 }
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawMap());
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { drawMap(); drawAptMap(); });
 function mapPanel() {
   if (!apartments().some((p) => p.lat)) return "";
   const key = [["5", "4–5"], ["3", "3"], ["2", "1–2"], ["never", "Aldrig här"], ["", "Inte betygsatt"]];
@@ -2068,7 +2160,7 @@ function fillDetails(d) {
   else d.querySelector(".fill").innerHTML = (p.desc || "").split("\n\n").map((t) => `<p>${esc(t)}</p>`).join("");
 }
 const SHOW_STEP = 30; // cards drawn at a time
-let showLimit = SHOW_STEP;
+let showLimit = SHOW_STEP, undatedOpen = false;
 function showView() {
   const sh = S.show, a = affordability(), cr = chosenRate();
   const [from, to] = showWindow(sh.days, new Date());
@@ -2104,7 +2196,7 @@ function showView() {
         </div>
         ${mapPanel()}
         ${body}
-        ${undated.length ? `<details class="undated" data-fill="undated"><summary>${undated.length} ${undated.length > 1 ? "lägenheter" : "lägenhet"} utan visning än</summary><div class="fill"></div></details>` : ""}
+        ${undated.length ? `<details class="undated" data-fill="undated" ${undatedOpen ? "open" : ""}><summary>${undated.length} ${undated.length > 1 ? "lägenheter" : "lägenhet"} utan visning än</summary><div class="fill"></div></details>` : ""}
       </div>
     </div>`;
 }
@@ -2220,11 +2312,11 @@ function rankView() {
       <span class="rk">${i + 1}</span>
       <span class="sc"><b>${r.score}</b><i style="width:${r.score}%"></i></span>
       <div class="rk-main">
-        <div class="row" style="gap:8px"><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.addr)}</strong></a><span class="dim">${esc(p.area || p.group || "")}</span></div>
+        <div class="row" style="gap:8px"><a href="${aptHref(p)}"><strong>${esc(p.addr)}</strong></a><span class="dim">${esc(p.area || p.group || "")}</span></div>
         <div class="facts"><span>${p.price ? kr(p.price) : "Inget pris än"}</span>${p.rooms ? `<span>${String(p.rooms).replace(".", ",")} rum</span>` : ""}${p.kvm ? `<span>${String(p.kvm).replace(".", ",")} m²</span>` : ""}${next ? `<span>Visning ${fmtShort(next)} ${next.slice(11)}</span>` : p.soon ? "<span>Snart till salu</span>" : ""}<span>${esc(p.agent)}</span></div>
         <div class="why">${r.pros.map(([k, [, why]]) => `<span class="chip good" title="${esc(RANK.find((x) => x[0] === k)[1])}">${esc(why)}</span>`).join("")}${r.cons.map(([k, [, why]]) => `<span class="chip warn" title="${esc(RANK.find((x) => x[0] === k)[1])}">${esc(why)}</span>`).join("")}</div>
       </div>
-      <button class="heart" data-act="${tracked ? "untrack" : "track"}" data-key="${esc(p.url)}" aria-pressed="${tracked}" aria-label="${tracked ? "Ta bort " + esc(p.addr) + " från Sparade" : "Spara " + esc(p.addr)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8.2 3.4 4.5 7 4.5c2.1 0 3.7 1.2 5 3 1.3-1.8 2.9-3 5-3 3.6 0 5.5 3.7 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg></button>
+      ${heartBtn(p, tracked)}
     </li>`;
   }).join("");
   return `
@@ -2238,11 +2330,257 @@ function rankView() {
           : `<div class="note">Inga lägenheter med pris i ditt filter än.</div>`}
         ${waiting.length ? `<details class="undated rank-wait"><summary>${waiting.length} ${waiting.length > 1 ? "lägenheter väntar" : "lägenhet väntar"} på pris</summary>
           <p class="dim" style="font-size:13px;margin:0 0 8px">De rankas när mäklaren har satt ett utgångspris.</p>
-          <ul>${waiting.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.addr)}</a> <span class="dim">${esc(p.area || p.group || "")}${p.kvm ? " · " + String(p.kvm).replace(".", ",") + " m²" : ""} · ${esc(p.agent)}${estimatePrice(p) ? " · uppskattat " + mkr(estimatePrice(p)) : ""}</span></li>`).join("")}</ul></details>` : ""}
+          <ul>${waiting.map((p) => `<li><a href="${aptHref(p)}">${esc(p.addr)}</a> <span class="dim">${esc(p.area || p.group || "")}${p.kvm ? " · " + String(p.kvm).replace(".", ",") + " m²" : ""} · ${esc(p.agent)}${estimatePrice(p) ? " · uppskattat " + mkr(estimatePrice(p)) : ""}</span></li>`).join("")}</ul></details>` : ""}
       </div>
     </div>`;
 }
 VIEWS.rank = rankView;
+
+/* ---------- Each apartment's own page: all we know about it, at its own address (#/lagenhet/…) ---------- */
+let ROUTE = readRoute(); // { id, url } while an apartment's page is open
+const APT = { photo: 0, back: 0, cameIn: false };
+let PLANS = {}; // the floor plans the finder saved (data/floorplans), by apartment
+const hashOf = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+const slug = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+// The address ends in a short hash of the agent's URL, so it still works if the street name is corrected
+const aptHref = (p) => `#/lagenhet/${slug(p.addr)}-${hashOf(p.url)}`;
+// On the agents' lists, or followed after it left them
+const aptOf = (url) => LIST.items[url] || (LIST.left || {})[url];
+function readRoute() { const m = /^#\/lagenhet\/([^/?#]+)/.exec(location.hash); return m ? { id: m[1], url: null } : null; }
+function routeApt() {
+  if (!ROUTE) return null;
+  if (!ROUTE.url) {
+    const h = ROUTE.id.split("-").pop();
+    ROUTE.url = [...Object.keys(LIST.items), ...Object.keys(LIST.left || {})].find((u) => hashOf(u) === h) || null;
+  }
+  return ROUTE.url ? aptOf(ROUTE.url) : null;
+}
+async function loadPlans() {
+  if (!LOCAL) return;
+  try { const r = await fetch("/api/floorplans", { cache: "no-store" }); if (r.ok) PLANS = await r.json(); } catch (e) {}
+  if (ROUTE) refresh();
+}
+addEventListener("hashchange", () => {
+  const was = ROUTE;
+  ROUTE = readRoute();
+  if (ROUTE && !was) { APT.back = scrollY; APT.cameIn = true; }
+  APT.photo = 0;
+  render();
+  window.scrollTo(0, ROUTE ? 0 : APT.back); // back in the list where you left it
+});
+function aptPhoto(i) {
+  const p = routeApt(), n = p ? (p.photos || []).length : 0;
+  if (n < 2) return;
+  APT.photo = ((i % n) + n) % n;
+  refresh();
+  const strip = app.querySelector(".ap-strip"), cur = strip && strip.querySelector('[aria-current="true"]');
+  if (cur) strip.scrollLeft = cur.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+}
+function aptClick(a, e) {
+  switch (a.dataset.act) {
+    case "apt-photo": aptPhoto(a.dataset.i != null ? +a.dataset.i : APT.photo + +a.dataset.d); return true;
+    case "apt-back":
+      e.preventDefault();
+      if (APT.cameIn) history.back(); // opened from inside the planner
+      else { ROUTE = null; history.replaceState(null, "", location.pathname + location.search); render(); window.scrollTo(0, 0); }
+      return true;
+  }
+  return false;
+}
+// Arrow keys and a sideways swipe turn the photos
+addEventListener("keydown", (e) => {
+  if (!ROUTE || e.altKey || e.ctrlKey || e.metaKey || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (e.key === "ArrowLeft") aptPhoto(APT.photo - 1); else if (e.key === "ArrowRight") aptPhoto(APT.photo + 1);
+});
+let swipeX = null;
+app.addEventListener("touchstart", (e) => { swipeX = e.target.closest(".ap-stage") ? e.touches[0].clientX : null; }, { passive: true });
+app.addEventListener("touchend", (e) => {
+  if (swipeX == null) return;
+  const dx = e.changedTouches[0].clientX - swipeX; swipeX = null;
+  if (Math.abs(dx) > 40) aptPhoto(APT.photo + (dx < 0 ? 1 : -1));
+}, { passive: true });
+
+const AMAP = { map: null, el: null, at: "" };
+function drawAptMap() {
+  const el = document.getElementById("aptmap");
+  if (!el || !window.L) { if (!el && AMAP.map) { AMAP.map.remove(); Object.assign(AMAP, { map: null, el: null, tiles: null, at: "" }); } return; }
+  if (AMAP.el !== el) {
+    if (AMAP.map) AMAP.map.remove();
+    Object.assign(AMAP, { el, map: L.map(el, { scrollWheelZoom: false }), tiles: null, at: "" });
+  }
+  mapTiles(AMAP);
+  if (AMAP.at === el.dataset.at) return;
+  AMAP.at = el.dataset.at;
+  const at = el.dataset.at.split(",").map(Number), c = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  if (AMAP.dot) AMAP.dot.remove();
+  AMAP.dot = L.circleMarker(at, { radius: 8, color: c("--surface"), weight: 2, fillColor: c("--data"), fillOpacity: 1 }).addTo(AMAP.map);
+  AMAP.map.setView(at, 15);
+}
+function aptState(p, gone) {
+  if (p.state === "sold") return ["", "Såld"];
+  if (gone) return ["", "Borta från mäklarens lista"];
+  if (p.state === "bidding") return ["warn", "Budgivning pågår"];
+  return p.soon ? ["info", "Snart till salu"] : ["good", "Till salu"];
+}
+function aptPage() {
+  const p = routeApt();
+  const back = `<a class="ap-back" href="#" data-act="apt-back">← Tillbaka till ${esc(SECTIONS[sectionOf(S.tab)][1].find(([t]) => t === S.tab)[1])}</a>`;
+  if (!p) return `${back}<div class="note">${listLoaded || !LOCAL ? "Den här lägenheten finns inte i bostadsletarens lista längre." : "Laddar lägenheten…"}</div>`;
+  const a = affordability(), cr = chosenRate(), h = household(), url = p.url, num = (x) => String(x).replace(".", ",");
+  const saved = S.apts.find((x) => x.link === url), v = S.show.visits[url], r = rating(p.area) || rating(p.group);
+  const [stKind, stText] = aptState(p, !LIST.items[url]);
+  const panel = (o, title, body, cls = "") => `<section class="panel ${cls}" style="--o:${o}">${title ? `<h3>${title}</h3>` : ""}${body}</section>`;
+
+  // Photos
+  const ph = (p.photos || []).length ? p.photos : saved && saved.photo ? [saved.photo] : [], pi = Math.min(APT.photo, ph.length - 1);
+  const gallery = ph.length ? `<section class="ap-gallery" style="--o:0">
+      <div class="ap-stage">
+        <a class="ap-main" href="${esc(ph[pi])}" target="_blank" rel="noopener" title="Öppna bilden i full storlek"><img src="${esc(ph[pi])}" alt="Foto ${pi + 1} av ${ph.length} på ${esc(p.addr)}" referrerpolicy="no-referrer"></a>
+        ${ph.length > 1 ? `<button class="ap-nav prev" data-act="apt-photo" data-d="-1" aria-label="Föregående bild">‹</button><button class="ap-nav next" data-act="apt-photo" data-d="1" aria-label="Nästa bild">›</button><span class="ap-count">${pi + 1} / ${ph.length}</span>` : ""}
+      </div>
+      ${ph.length > 1 ? `<div class="ap-strip">${ph.map((u, j) => `<button data-act="apt-photo" data-i="${j}" aria-current="${j === pi}" aria-label="Bild ${j + 1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join("")}</div>` : ""}
+    </section>` : "";
+
+  // The price we count on: the final price, else your expected one unless the bids have passed it, else the best the agent's page gives
+  const bidding = p.state === "bidding" && p.bid;
+  const ask = p.price && !(bidding && p.price === p.bid) ? p.price : 0; // some agents show the highest bid as the price
+  const guess = p.price || p.final || bidding ? 0 : estimatePrice(p);
+  const head = p.final ? ["Slutpris", p.final] : ask ? ["Utgångspris", ask] : bidding ? ["Högsta bud", p.bid] : guess ? ["Uppskattat pris", guess] : null;
+  const expected = saved && +saved.bid !== ask && +saved.bid >= (bidding || 0) ? +saved.bid : 0;
+  const [basis, basisLabel] = [[p.final, "slutpriset"], [expected, "ditt väntade slutpris"], [bidding && p.bid, "högsta budet"],
+    [ask, "utgångspriset"], [guess, "det uppskattade priset"]].find(([x]) => x) || [0, ""];
+  const mc = basis ? monthlyCost(basis, p.avgift, cr.rate) : null;
+  const fit = !basis ? `<span class="chip info">Inget pris än</span>` : basis <= a.max ? `<span class="chip good">Inom budget</span>` : `<span class="chip bad">${kr(basis - a.max)} över max</span>`;
+  const avgKvm = p.avgift && p.kvm ? (p.avgift * 12) / p.kvm : 0;
+  const left = mc ? h.net - mc.total - (+S.fin.living || 0) - (+S.fin.otherDebtMonthly || 0) : 0;
+  const price = panel(1, "", `
+      <span class="eyebrow">${head ? head[0] : "Pris"}</span>
+      <div class="bigfig">${head ? nf.format(head[1]) + "<small> kr</small>" : "<small>Inte satt än</small>"}</div>
+      ${guess ? `<p class="dim" style="font-size:13px;margin:4px 0 0">Mäklaren har inte satt något pris än. Uppskattat från stadsdelens kvadratmeterpris gånger storleken.</p>` : ""}
+      <div class="row" style="gap:6px;margin:10px 0 12px">${fit}${mc && mc.cashShort ? `<span class="chip bad">Kontanterna räcker inte till 10 %</span>` : ""}</div>
+      ${basis && a.max ? `<div class="ap-max ${basis > a.max ? "over" : ""}"><div class="bar"><b style="width:${Math.min(100, (basis / a.max) * 100).toFixed(1)}%"></b></div><span>${Math.round((basis / a.max) * 100)} % av ditt max på ${mkr(a.max)}${basis !== (head || [])[1] ? `, räknat på ${basisLabel} ${kr(basis)}` : ""}</span></div>` : ""}
+      <dl class="kv">
+        ${p.final && ask && ask !== p.final ? `<dt>Utgångspris</dt><dd>${kr(ask)}</dd><dt>Slutpris mot utgångspris</dt><dd>${p.final >= ask ? "+" : ""}${kr(p.final - ask)}</dd>` : ""}
+        ${bidding && ask ? `<dt>Högsta bud</dt><dd>${kr(p.bid)}</dd>` : ""}
+        ${head && p.kvm ? `<dt>Pris per m²</dt><dd>${kr(head[1] / p.kvm)}</dd>` : ""}
+        ${p.avgift ? `<dt>Avgift</dt><dd>${kr(p.avgift)}/mån</dd>` : ""}
+        ${avgKvm ? `<dt>Avgift per m² och år</dt><dd>${kr(avgKvm)}</dd>` : ""}
+        ${p.drift ? `<dt>Driftkostnad enligt mäklaren</dt><dd>${kr(p.drift)}</dd>` : ""}
+      </dl>
+      ${mc ? `<div class="ap-month"><span class="eyebrow">Per månad, allt inräknat</span><b>${kr(mc.total)}</b></div>
+      <dl class="kv">
+        <dt>Ränta ${pct(cr.rate)} efter ränteavdrag</dt><dd>${kr(mc.interestNet)}</dd>
+        <dt>Amortering (${(amortRate(mc.ltv) * 100).toFixed(0)} % per år)</dt><dd>${kr(mc.amort)}</dd>
+        <dt>Avgift</dt><dd>${p.avgift ? kr(mc.avgift) : "inte känd"}</dd>
+        <dt>El, försäkring, bredband</dt><dd>${kr(mc.running)}</dd>
+        <dt class="total">Kontantinsats</dt><dd class="total">${kr(mc.insats)}</dd>
+        <dt>Bolån (${pct(mc.ltv * 100, 0)} belåning)</dt><dd>${kr(mc.loan)}</dd>
+        ${h.net ? `<dt>Kvar efter boende och levnadskostnader</dt><dd style="color:${left < 0 ? "var(--bad)" : "var(--good)"}">${kr(left)}</dd>` : ""}
+      </dl>
+      <p class="dim" style="font-size:12px;margin:10px 0 0">Räknat på ${basisLabel} med ${esc(cr.label)}${S.example ? ", och exempelekonomin" : ""}. <a href="#" data-goto="money">Ändra din ekonomi</a></p>` : ""}`);
+
+  // Rooms, size and the like, those the agent's page gave
+  const of = /av\s+(\d+)/.exec(p.floorText || "");
+  const tile = (l, val, s = "") => `<div class="tile"><span class="eyebrow">${l}</span><span class="v">${val}</span>${s ? `<span class="s">${s}</span>` : ""}</div>`;
+  const tiles = [p.rooms && tile("Rum", num(p.rooms)), p.kvm && tile("Boarea", num(p.kvm) + " m²"),
+    p.floor && tile("Våning", p.floor === "BV" || p.floor === "0" ? "BV" : num(p.floor), of ? "av " + of[1] : ""),
+    p.built && tile("Byggår", p.built), p.avgift && tile("Avgift", nf.format(p.avgift), "kr/mån")].filter(Boolean);
+  const facts = tiles.length ? `<div class="tiles" style="--o:2">${tiles.join("")}</div>` : "";
+
+  // Showings, and your own visit
+  const now = isoLocal(new Date()), shows = (p.shows || []).slice().sort((x, y) => (x.start < y.start ? -1 : 1));
+  const lastPast = shows.filter((s) => s.start < now).pop();
+  const showings = panel(3, "Visningar", `
+      ${shows.length ? shows.map((s) => `<div class="ap-row ${s.start < now ? "past" : ""}"><span><strong>${fmtDay(s.start)}</strong></span><span>${s.start.slice(11)}${s.end ? "–" + s.end : ""}${s.start < now ? " · har varit" : ""}</span></div>`).join("")
+        : `<p class="dim" style="font-size:14px;margin:0">${p.state === "sold" ? "Lägenheten är såld." : p.soon ? "Ingen visning än; lägenheten är inte ute till salu." : "Ingen visning utlagd just nu."}</p>`}
+      ${v ? `<div class="visit" style="grid-template-columns:minmax(0,1fr)"><span class="dim" style="font-size:13px">Du var här${v.at ? " " + fmtShort(v.at) : ""}. Ditt betyg och dina anteckningar:</span>
+          ${ratingSelect(`data-visit-r="${esc(url)}" aria-label="Ditt betyg för ${esc(p.addr)}"`, v.r ?? "")}
+          <input type="text" data-visit-note="${esc(url)}" value="${esc(v.note || "")}" placeholder="Anteckningar från visningen">
+          <button class="btn ghost" style="justify-self:start" data-act="unwent" data-key="${esc(url)}">Ångra besöket</button></div>`
+        : LIST.items[url] ? `<div class="row" style="margin-top:12px"><button class="btn" data-act="went" data-key="${esc(url)}" data-at="${lastPast ? lastPast.start : now}">Jag var där</button></div>` : ""}`);
+
+  // Your own watch on a saved apartment
+  const watch = saved ? panel(4, "Din bevakning", `
+      <div class="field"><label for="ap-status">Status</label><select id="ap-status" data-apt="${saved.id}" data-k="status">${Object.entries(STATUS_SV).map(([s, l]) => `<option value="${s}" ${saved.status === s ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label for="ap-bid">Väntat slutpris</label><span class="num">${numInput(`id="ap-bid" data-apt="${saved.id}" data-k="bid"`, saved.bid)}<span>kr</span></span><small>Månadskostnaden och budgeten här räknas på det.</small></div>
+      <p class="dim" style="font-size:12px;margin:8px 0 0">Fler fält och jämförelsen med dina andra finns under <a href="#" data-goto="search">Sparade</a>.</p>`) : "";
+
+  // Bidding and the final price
+  // The daily readings of a saved apartment, with whichever bid list is longer: the one read today or the one followed
+  const fo = (LIST.followed || {})[url] || {};
+  const f = { ...fo, bidList: (p.bidList || []).length > (fo.bidList || []).length ? p.bidList : fo.bidList };
+  const chart = bidChart({ price: (saved && +saved.price) || ask, link: "" }, f);
+  const sold = p.state === "sold" || f.state === "sold", final = p.final || f.final;
+  const bids = bidding || sold || chart ? panel(5, sold ? "Såld" : "Budgivning", `
+      ${sold ? `<p style="margin:0 0 ${chart ? 12 : 0}px;font-size:14px">${final ? `Slutpris <strong>${kr(final)}</strong>${ask && ask !== final ? `, ${final >= ask ? "+" : ""}${kr(final - ask)} mot utgångspriset` : ""}.` : "Slutpriset är inte känt än; bostadsletaren letar efter det varje morgon."}</p>`
+        : !chart && bidding ? `<p style="margin:0;font-size:14px">Högsta bud <strong>${kr(p.bid)}</strong>${p.bids ? `, ${p.bids} bud` : ""}${p.bidders ? ` från ${p.bidders} budgivare` : ""}${ask ? `, ${p.bid >= ask ? "+" : ""}${kr(p.bid - ask)} mot utgångspriset` : ""}. ${saved ? "Buden följs dag för dag från och med nu." : "Spara lägenheten (♥) så följs buden dag för dag."}</p>` : ""}
+      ${chart}`) : "";
+
+  // Description, with what it names as chips
+  const feats = (p.extra || []).map((x) => `<span class="chip">${esc(FEATURE_SV[x] || x)}</span>`).join("");
+  const desc = p.desc || feats ? panel(6, `Beskrivning${p.desc ? `<small>från ${esc(p.agent)}</small>` : ""}`, `
+      ${feats ? `<div class="ap-feats">${feats}</div>` : ""}
+      <div class="ap-desc">${(p.desc || "").split("\n\n").filter(Boolean).map((t) => `<p>${esc(t)}</p>`).join("") || `<p class="dim">Mäklaren har ingen beskrivning ute än.</p>`}</div>`) : "";
+
+  // Floor plan: our saved copy if there is one, else the agent's picture
+  const plans = (PLANS[url] || []).length ? PLANS[url].map((n) => "/floorplans/" + n) : p.plans || [];
+  const plan = plans.length ? panel(7, plans.length > 1 ? "Planlösningar" : "Planlösning", `<div class="ap-plan">${plans.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener" title="Öppna i full storlek"><img src="${esc(u)}" alt="Planlösning för ${esc(p.addr)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join("")}</div>`) : "";
+
+  // The score, part by part
+  const rk = rankOf(p, a), w = S.show.w || {}, thin = Object.keys(rk.parts).length < 3; // too little known for a score to mean anything
+  const score = panel(8, "Betyg", `
+      ${thin ? `<p class="dim" style="font-size:14px;margin:0 0 12px">För lite är känt om lägenheten för ett betyg än.</p>` : `<div class="ap-score"><b>${rk.score}</b><div class="bar"><b style="width:${rk.score}%"></b></div></div>`}
+      ${RANK.map(([k, l]) => {
+        const part = rk.parts[k], off = !(+w[k] > 0);
+        if (!part) return `<div class="ap-part off"><span>${l}</span><small>Ingen uppgift, räknas inte</small></div>`;
+        return `<div class="ap-part ${off ? "off" : part[0] <= 0.3 ? "low" : ""}"><span>${l}</span><small>${esc(part[1].replace(/^./, (c) => c.toUpperCase()))}${off ? " · väger 0" : ""}</small><div class="bar"><b style="width:${Math.round(part[0] * 100)}%"></b></div></div>`;
+      }).join("")}
+      <p class="dim" style="font-size:12px;margin:10px 0 0">${p.price ? "" : "Utan utgångspris är lägenheten inte med i Rangordning än. "}<a href="#" data-goto="rank">Ändra vad som väger tyngst</a></p>`);
+
+  // The förening: Bolagsverket's register, the annual report's key figures, flags with the sentence behind each
+  const b = p.bv || {}, rep = p.report, figs = reportFigs(rep), repUrl = (rep && rep.url) || p.reportUrl;
+  const order = { bad: 0, warn: 1, ask: 2, good: 3 }, flags = (p.flags || []).slice().sort((x, y) => order[x.kind] - order[y.kind]);
+  const same = p.orgnr ? Object.values({ ...(LIST.left || {}), ...LIST.items }).filter((q) => q.orgnr === p.orgnr && q.url !== url) : [];
+  const kvRows = [b.registered && ["Registrerad", b.registered.slice(0, 4)], b.manager && ["Förvaltare", esc(b.manager)],
+    p.orgnr && ["Organisationsnummer", p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6)], ...figs.map(([l, val]) => [l + (rep.reportYear ? " " + rep.reportYear : ""), val])].filter(Boolean);
+  const forening = panel(9, "Föreningen", b.name || kvRows.length || flags.length || p.facts || repUrl ? `
+      ${b.name ? `<p style="margin:0 0 10px;font-size:15px;font-weight:500">${esc(b.name)}</p>` : ""}
+      ${b.winding || b.deregistered || b.isBrf === false ? `<div class="row" style="gap:6px;margin:0 0 10px">${b.winding ? `<span class="chip bad">⚠ Under avveckling</span>` : ""}${b.deregistered ? `<span class="chip bad">⚠ Avregistrerad</span>` : ""}${b.isBrf === false ? `<span class="chip warn">Inte registrerad som bostadsrättsförening</span>` : ""}</div>` : ""}
+      ${kvRows.length ? `<dl class="kv">${kvRows.map(([l, val]) => `<dt>${l}</dt><dd>${val}</dd>`).join("")}</dl>` : ""}
+      ${repUrl ? `<p style="margin:10px 0 0;font-size:14px"><a href="${esc(repUrl)}" target="_blank" rel="noopener">Årsredovisning${rep && rep.reportYear ? " " + esc(rep.reportYear) : ""} ↗</a></p>` : ""}
+      ${flags.length ? `<h4 class="ap-sub">Flaggor</h4><ul class="ap-flags">${flags.map((x) => `<li><span class="chip ${x.kind === "ask" ? "info" : x.kind}">${x.kind === "bad" ? "⚠ " : x.kind === "ask" ? "? " : ""}${esc(x.label)}</span>${x.quote ? `<span>”${esc(x.quote)}”</span>` : ""}</li>`).join("")}</ul>` : ""}
+      ${p.facts ? `<details class="ap-facts"><summary>Allt mäklaren skriver om föreningen${p.factsFrom ? ` (från ${esc(p.factsFrom)}s annons i samma förening)` : ""}</summary>${p.facts.split("\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
+      ${same.length ? `<h4 class="ap-sub">Fler lägenheter i föreningen</h4><ul class="ap-others">${same.slice(0, 8).map((q) => `<li><a href="${aptHref(q)}">${esc(q.addr)}</a><span class="dim">${[q.rooms && num(q.rooms) + " rum", q.kvm && num(q.kvm) + " m²",
+        q.final ? "såld för " + kr(q.final) : q.state === "sold" ? "såld" : q.state === "bidding" && q.bid ? "bud " + kr(q.bid) : q.price ? kr(q.price) : q.soon ? "snart till salu" : ""].filter(Boolean).join(" · ")}</span></li>`).join("")}</ul>${same.length > 8 ? `<p class="dim" style="font-size:12px;margin:6px 0 0">och ${same.length - 8} till</p>` : ""}` : ""}`
+    : `<p class="dim" style="font-size:14px;margin:0">Inga uppgifter om föreningen än.</p>`);
+
+  // Trips to your addresses (saved apartments only) and the nearest shop, gym and bar
+  const t = (TRAVEL.trips || {})[url] || {}, n = (TRAVEL.near || {})[url] || {}, places = (S.show.places || []).filter((x) => x.addr);
+  const trips = saved ? places.filter((pl) => t[pl.id] && t[pl.id].min != null).map((pl) => { const x = t[pl.id];
+    return `<div class="ap-row"><span>${esc(pl.name || "Plats")}<small class="dim" style="display:block">${esc((x.lines || []).join(", ") || "Promenad")}${x.changes ? `, ${x.changes} ${x.changes > 1 ? "byten" : "byte"}` : ""} · framme ${esc(pl.arrive || "08:00")}</small></span><strong>${x.min} min</strong></div>`; }) : [];
+  const near = [["grocery", "Mataffär"], ["gym", "Gym"], ["bar", "Bar"]].filter(([k]) => n[k]).map(([k, l]) =>
+    `<div class="ap-row"><span>${l}<small class="dim" style="display:block">${esc(n[k].name)} · ${n[k].m} m</small></span><strong>${n[k].walk} min promenad</strong></div>`);
+  const travel = panel(10, "Restider och närområde", `${trips.join("")}${near.join("")}
+      ${!trips.length && !near.length ? `<p class="dim" style="font-size:14px;margin:0">Inga restider än.</p>` : ""}
+      ${!trips.length && places.length ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${saved ? (TRAVEL.running ? "Letar resor hos SL…" : "Resorna till dina viktiga adresser är inte uträknade än.") : "Spara lägenheten (♥) så räknas resorna till dina viktiga adresser ut."}</p>` : ""}`);
+
+  const map = p.lat ? `<section class="panel map-panel" style="--o:11;margin:0"><div id="aptmap" data-at="${p.lat},${p.lon}" role="img" aria-label="Karta som visar var ${esc(p.addr)} ligger"></div>
+      <div class="legend"><span>${esc([p.addr, p.area, p.group !== p.area && p.group].filter(Boolean).join(", "))}</span></div></section>` : "";
+
+  return `<div class="ap-page">${back}
+    <div class="ap-head">
+      <div class="lead"><h1>${esc(p.addr)}</h1>
+        <div class="chips"><span class="dim">${esc([p.area, p.group !== p.area && p.group].filter(Boolean).join(", "))}</span><span class="chip ${stKind}">${stText}</span>${p.outside ? `<span class="chip">Utanför tullarna</span>` : ""}
+          ${r ? `<span class="chip ${r === "never" ? "bad" : +r >= 4 ? "good" : +r <= 2 ? "warn" : ""}">${r === "never" ? "Aldrig här" : "Område " + r + "/5"}</span>` : ""}${saved ? `<span class="chip info">${esc(STATUS_SV[saved.status] || "Sparad")}</span>` : ""}</div>
+        <p>${esc(describeListing(p))}</p></div>
+      <div class="acts">${LIST.items[url] || saved ? heartBtn(p, !!saved) : ""}<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Öppna hos ${esc(p.agent || "mäklaren")} ↗</a></div>
+    </div>
+    <div class="aptp">
+      <div class="stack">${gallery}${facts}${bids}${desc}${plan}${forening}</div>
+      <div class="stack">${price}${showings}${watch}${score}${travel}${map}</div>
+    </div>
+    <p class="dim" style="font-size:12px;margin:16px 0 0">${p.read ? `Läst från ${esc(p.agent || "mäklaren")}s sida ${fmtShort(p.read)}.` : ""}</p></div>`;
+}
 
 /* ---------- Events ---------- */
 document.getElementById("tabs").addEventListener("click", (e) => {
@@ -2276,7 +2614,11 @@ app.addEventListener("input", (e) => {
   if (xid) { const x = f.extra.find((i) => i.id === xid); if (x) x[t.dataset.xname ? "name" : "price"] = val; return changed(false); }
 });
 // Fill in a gallery, description or list when it's opened ("toggle" doesn't bubble, so listen while it travels down)
-app.addEventListener("toggle", (e) => { const d = e.target; if (d.open && d.dataset && d.dataset.fill) fillDetails(d); }, true);
+app.addEventListener("toggle", (e) => {
+  const d = e.target; if (!d.dataset || !d.dataset.fill) return;
+  if (d.dataset.fill === "undated") undatedOpen = d.open;
+  if (d.open) fillDetails(d);
+}, true);
 app.addEventListener("change", (e) => {
   const t = e.target;
   if (showChange(t)) return;
@@ -2299,6 +2641,7 @@ app.addEventListener("click", (e) => {
   if (s) { const v = s.dataset.val; set(s.dataset.set, /^\d+$/.test(v) && ["fin.buyers", "value.win"].includes(s.dataset.set) ? +v : v); return changed(true); }
   const th = e.target.closest("th[data-sort]"); if (th) { S.rates.sort = th.dataset.sort; return changed(true); }
   const a = e.target.closest("[data-act]"); if (!a) return;
+  if (aptClick(a, e)) return;
   const sc = showClick(a); if (sc === true) return; if (sc === false) return changed(true);
   if (a.dataset.act === "use-searchto") { S.show.f.maxPrice = Math.floor(affordability().max * (1 - S.search.headroom / 100) / 50000) * 50000; return changed(true); }
   const id = () => Math.random().toString(36).slice(2, 9);
@@ -2320,6 +2663,7 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 render();
 initStore().then(async () => {
   await loadList();
+  loadPlans();
   loadTravel();
   pollStatus();
 });
