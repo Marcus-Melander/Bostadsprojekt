@@ -22,7 +22,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 BUCKET = "data"
-FILES = ("listings.json", "travel.json", "status.json", "digest.json")
+# For anyone with the address (public/), and for the owner only (private/: the important addresses, saved
+# apartments and everything copied from the agents beyond what a list shows)
+FILES = {"status.json": "public/status.json", "listings.json": "private/listings.json",
+         "travel.json": "private/travel.json", "digest.json": "private/digest.json"}
+PUBLIC_DROP = ("desc", "flags")  # the agents' own text, and the flags read from it
+STORE_KEEP = ("items", "found", "booli", "compare", "agents", "lastRun", "history")  # leaves out "followed", your saved ones
 BATCH = 500  # rows per request
 
 
@@ -75,6 +80,27 @@ def write_json(path, data):  # as finder.write_json, without loading the finder 
     os.replace(tmp, path)
 
 
+# ---------- Whose plan the finder follows ----------
+
+def owner(c):
+    """The owner's user id: the one in the `owner` table, or else the first user made in the project, saved there."""
+    s = state()
+    if s.get("owner"):
+        return s["owner"]
+    rows = _call(c, "GET", "/rest/v1/owner?id=eq.1&select=user_id") or []
+    if rows:
+        uid = rows[0]["user_id"]
+    else:
+        users = (_call(c, "GET", "/auth/v1/admin/users?per_page=1000") or {}).get("users", [])
+        if not users:
+            raise RuntimeError("the project has no users yet")
+        uid = min(users, key=lambda u: u["created_at"])["id"]
+        upsert(c, "owner", [{"id": 1, "user_id": uid}], "id")
+    s["owner"] = uid
+    save_state(s)
+    return uid
+
+
 # ---------- The plan ----------
 
 def push_plan(plan=None, scrape=None, c=None):
@@ -82,12 +108,12 @@ def push_plan(plan=None, scrape=None, c=None):
     c = c or config()
     if not c:
         return False
-    row = {"id": 1, "updated_at": dt.datetime.now(dt.timezone.utc).isoformat()}
+    row = {"user_id": owner(c), "updated_at": dt.datetime.now(dt.timezone.utc).isoformat()}
     if plan is not None:
         row["plan"] = plan
     if scrape is not None:
         row["scrape"] = scrape
-    upsert(c, "plan", [row], "id")
+    upsert(c, "plans", [row], "user_id")
     s = state()
     s["planPushed"] = row["updated_at"]
     save_state(s)
@@ -99,7 +125,7 @@ def pull_plan(log=print, timeout=60):
     c = config()
     if not c:
         return False
-    rows = _call(c, "GET", "/rest/v1/plan?id=eq.1&select=plan,scrape,updated_at", timeout=timeout) or []
+    rows = _call(c, "GET", f"/rest/v1/plans?user_id=eq.{owner(c)}&select=plan,scrape,updated_at", timeout=timeout) or []
     if not rows:
         return False
     row, s = rows[0], state()
@@ -124,9 +150,15 @@ def push(log=print):
     if not c:
         return False
     s = state()
-    for name in FILES:
+    for name, to in FILES.items():
         if (DATA / name).exists():
-            upload(c, name, (DATA / name).read_bytes())
+            upload(c, to, (DATA / name).read_bytes())
+    # The listings as anyone may see them: without the agents' descriptions and without your saved apartments
+    store = json.loads((DATA / "listings.json").read_text("utf-8"))
+    public = {k: store[k] for k in STORE_KEEP if k in store}
+    public["items"] = {u: {k: v for k, v in p.items() if k not in PUBLIC_DROP} for u, p in store.get("items", {}).items()
+                       if not p.get("outside")}
+    upload(c, "public/listings.json", json.dumps(public, ensure_ascii=False).encode("utf-8"))
     # Floor plans: the index by apartment, as the planner reads it, and each file once
     index = json.loads((DATA / "floorplans" / "index.json").read_text("utf-8")) if (DATA / "floorplans" / "index.json").exists() else {}
     by = {}
@@ -135,11 +167,11 @@ def push(log=print):
     sent, new = set(s.get("plansSent", [])), 0
     for name in index:
         if name not in sent and (DATA / "floorplans" / name).exists():
-            upload(c, f"floorplans/{name}", (DATA / "floorplans" / name).read_bytes(),
+            upload(c, f"private/floorplans/{name}", (DATA / "floorplans" / name).read_bytes(),
                    "image/" + name.rsplit(".", 1)[-1].replace("jpg", "jpeg"))
             sent.add(name)
             new += 1
-    upload(c, "floorplans.json", json.dumps(by).encode("utf-8"))
+    upload(c, "private/floorplans.json", json.dumps(by).encode("utf-8"))
     s["plansSent"] = sorted(sent)
     # The price history: every apartment (a few thousand rows), and the readings from the day before the last push on
     db = sqlite3.connect(f"file:{DATA / 'history.sqlite'}?mode=ro", uri=True)
@@ -163,9 +195,14 @@ def check():
     c = config()
     if not c:
         sys.exit("No data/supabase.json with the project's url and secret key yet.")
-    _call(c, "GET", "/rest/v1/plan?select=id")
+    for table in ("plans", "owner", "apartments", "readings"):
+        _call(c, "GET", f"/rest/v1/{table}?select=*&limit=1")
     _call(c, "POST", f"/storage/v1/object/list/{BUCKET}", {"prefix": "", "limit": 1})
-    print(f"Supabase reached: the plan table and the '{BUCKET}' bucket are there.")
+    users = (_call(c, "GET", "/auth/v1/admin/users?per_page=1000") or {}).get("users", [])
+    uid = owner(c)
+    print(f"Supabase reached: the tables and the '{BUCKET}' bucket are there, {len(users)} users.")
+    print("The owner (whose plan the finder follows, and who alone sees the private part):",
+          next((u.get("email") for u in users if u["id"] == uid), uid))
 
 
 if __name__ == "__main__":

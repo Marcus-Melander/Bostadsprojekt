@@ -704,7 +704,7 @@ async function flush() {
     return;
   }
   if (ONLINE) {
-    setSaveState((await ONLINE_API.savePlan(S, scrapeConfig())) ? "Sparat på ditt konto" : local ? "Sparat bara i webbläsaren" : "Inte sparat", true);
+    setSaveState((await ONLINE_API.savePlan(S, scrapeConfig())) ? "Sparat på ditt konto" : local ? "Sparat i webbläsaren" : "Inte sparat", true);
     return;
   }
   if (!docRef) { setSaveState(local ? "Sparat i webbläsaren" : "Inte sparat (lagring blockerad)", local); return; }
@@ -1893,7 +1893,7 @@ function crawlPanel() {
     ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Prishistorik: ${LIST.history.apartments} lägenheter, ${LIST.history.readings} dagliga avläsningar, ${LIST.history.withBids} med bud och ${LIST.history.finalPrices} slutpriser hittills. Sparas i data/history.sqlite, med CSV-filer bredvid.</p>` : ""}
     ${trend}
     ${ag.length ? `<details class="agents"><summary>${ag.length} mäklare lästa</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} i innerstaden</td></tr>`).join("")}</table></details>` : ""}
-    ${ONLINE ? `<div class="row" style="margin-top:12px"><span class="dim" style="font-size:13px">Bostadsletaren körs på din Mac; här visas den senaste körningen.</span><button class="btn ghost" data-act="sign-out">Logga ut</button></div>`
+    ${ONLINE ? `<div class="row" style="margin-top:12px"><span class="dim" style="font-size:13px">Bostadsletaren körs varje morgon; här visas den senaste körningen.</span>${ONLINE_API.signedIn ? `<button class="btn ghost" data-act="sign-out">Logga ut</button>` : `<button class="btn ghost" data-act="sign-in">Logga in</button>`}</div>`
       : st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Kör nu</button></div>`}
     <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:25; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 25) ? "i dag" : "i morgon"} 06:25. Missar den morgonen för att datorn är avstängd eller sover, körs den så snart datorn är igång igen.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:25.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
   </section>`;
@@ -2237,6 +2237,7 @@ function showClick(a) {
   switch (a.dataset.act) {
     case "crawl-start": startScrape(); return true;
     case "sign-out": ONLINE_API.signOut(); return true;
+    case "sign-in": ONLINE_API.signIn(); return true;
     case "show-more": showLimit += SHOW_STEP; refresh(); return true;
     case "rank-more": rankLimit += 30; refresh(); return true;
     case "add-place": (S.show.places = S.show.places || []).push({ id: Math.random().toString(36).slice(2, 9), name: "", addr: "", arrive: "08:00" }); return false;
