@@ -559,6 +559,11 @@ def run(args):
         print("Another run is going.", file=sys.stderr)
         return 1  # also a run that's been asleep for hours: it carries on when the Mac wakes
     lock.write_text(str(os.getpid()))
+    import online
+    try:  # a filter changed in the planner online
+        online.pull_plan(log)
+    except Exception as e:
+        log(f"Online: couldn't fetch the plan ({e})")
     try:
         rc = find(args)
     finally:
@@ -568,6 +573,10 @@ def run(args):
         travel.main()
     except Exception as e:
         log(f"Travel: stopped ({e})")
+    try:  # the results, for the planner online (scraper/online.py; nothing without data/supabase.json)
+        online.push(log)
+    except Exception as e:
+        log(f"Online: couldn't send the results ({e})")
     return rc
 
 

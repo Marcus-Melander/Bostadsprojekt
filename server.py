@@ -11,11 +11,14 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
+sys.path.insert(0, str(ROOT / "scraper"))
+import online  # noqa: E402
 PORT = int(os.environ.get("BOSTADSPLAN_PORT", "8765"))
 MAX_BODY = 5 * 1024 * 1024
 PLAN_FILE = re.compile(r"[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)")
@@ -64,9 +67,17 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
             return self.send(200, read(ROOT / "index.html", b""), "text/html; charset=utf-8")
+        if path == "/online.js":  # does nothing on the Mac; the page online uses it (scripts/build-site.sh)
+            return self.send(200, read(ROOT / "online.js", b""), "text/javascript; charset=utf-8")
+        if path == "/config.js":
+            return self.send(200, b"window.BOSTADSPLAN = {};\n", "text/javascript; charset=utf-8")
         if path == "/areas.geojson":
             return self.send(200, read(ROOT / "areas.geojson", b"{}"), "application/geo+json")
         if path == "/api/plan":
+            try:  # changed in the planner online since (scraper/online.py; nothing without data/supabase.json)
+                online.pull_plan(lambda m: None, timeout=5)
+            except Exception:
+                pass
             body = read(DATA / "plan.json")
             return self.send(200, body) if body else self.json(404, {"error": "no plan yet"})
         if path == "/api/listings":
@@ -113,6 +124,9 @@ class Handler(BaseHTTPRequestHandler):
             write_json(DATA / "plan.json", body["plan"])
         if isinstance(body.get("scrape"), dict):
             write_json(DATA / "scrape.json", body["scrape"])
+        if online.config():  # the planner online sees it too; sent after answering, so saving stays quick
+            plan, scrape = body.get("plan"), body.get("scrape")
+            threading.Thread(target=lambda: online.push_plan(plan, scrape), daemon=True).start()
         self.json(200, {"ok": True})
 
     def do_POST(self):

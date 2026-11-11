@@ -77,12 +77,18 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 
 ### Phase 4: Online
 
-- **Host the planner on Vercel (free).** Put the website online so it opens from anywhere, including the phone. Vercel serves the page and small functions, but can't run the daily finder (Chrome and Playwright, about an hour a day); the finder stays on the Mac, or moves to a scheduled runner such as GitHub Actions, and uploads its results.
-- **Keep the data in Supabase (free tier).** A hosted Postgres database, file storage and login, which both the finder and the website can reach:
-  - **Database:** the price history (apartments, daily readings, bids, final prices), the listings, travel times, and your plan, important addresses and ratings, behind a login with row-level security so only you see your own data.
-  - **Storage:** the floor plans, kept at full size (not shrunk). They're about 140 KB each and grow by roughly 1–2 GB a year, so they'll pass the free tier's file storage (about 1 GB) within a year; plan for a paid tier then, or keep older plans on the Mac.
-  - **Limits to check first:** the free tier (about 500 MB of database and 1 GB of files, as last known) and that a free project pauses after a week without activity; the daily runs keep it active. Check Supabase's current pricing page before relying on these.
-- **Keep it private.** Showing the agents' photos, floor plans and descriptions on a public site is republishing. Keep the site behind a login, and check Fastighetsbyrån's hobby permission still covers it.
+Started 2026-11-11. The repo is public, so nothing personal goes in git or in the page: your plan, important addresses, listings, floor plans and price history live in Supabase behind your login.
+
+- **What runs where.** Vercel serves only the page (`index.html`) and the area map, built into `site/` by `scripts/build-site.sh` (so the finder's code and the rest of the repo aren't served). Supabase keeps the data. The Mac keeps running the finder: before each run it fetches your plan and filter from Supabase (a filter changed on the phone reaches the morning run), and after it uploads the results (`scraper/online.py`). Online, the planner reads and writes everything except starting the finder and recomputing travel times, which stay on the Mac.
+- **Supabase (free tier, region Stockholm `eu-north-1`).** `supabase/schema.sql` makes:
+  - **`plan`**: one row with your plan and the finder's filter (today `data/plan.json` and `data/scrape.json`), written by both the local and the online planner; the newest write wins.
+  - **Storage, private bucket `data`**: `listings.json`, `travel.json`, `status.json`, `digest.json`, `floorplans.json` and `floorplans/<file>`. The floor plans are about 150 MB today and grow 1–2 GB a year, so they pass the free tier's 1 GB of files within a year; plan for a paid tier then, or keep older plans only on the Mac.
+  - **`apartments` and `readings`**: the price history, copied from `data/history.sqlite` after each run, for the predictions in Phase 5.
+  - **Who can read it:** row-level security everywhere, open only to the users listed in `members` (you). Sign-up is off; your user is made in Supabase's dashboard.
+  - **Limits to check:** the free tier's 500 MB database and 1 GB files, and that a free project pauses after a week without activity (the daily uploads keep it active).
+- **Keys.** The project's address and its publishable (anon) key go into the page through Vercel's environment variables; they are public by design and only open what row-level security allows. The secret (service role) key, which the Mac's uploads use, stays in `data/supabase.json` (git-ignored, chmod 600) and never in git, the page or chat.
+- **Your steps:** make the Supabase project and your user, run `supabase/schema.sql` in its SQL editor, put the three values in `data/supabase.json`, and import the repo in Vercel with the two environment variables.
+- **Keep it private.** Showing the agents' photos, floor plans and descriptions on a public site is republishing. The site stays behind the login, photos are still loaded from the agents' own sites, and floor plans only through short-lived signed links. Check that Fastighetsbyrån's hobby permission still covers this.
 
 ### Phase 5: Predictions
 
