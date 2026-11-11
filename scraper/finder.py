@@ -320,7 +320,7 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
     # A report behind the page's documents button takes several seconds to find, so it's looked for once per
     # apartment, after everything else on the page is read
     known = known or {}
-    if not d.get("reportUrl") and not known.get("reportChecked"):
+    if not d.get("reportUrl") and known.get("reportChecked", 0) < reports.BUTTONS:
         try:
             if u := reports.report_behind_buttons(page, log):
                 d["reportUrl"] = u
@@ -328,7 +328,7 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
             log(f"Couldn't open the documents on {url} ({e})")
     if not d.get("reportUrl") and known.get("reportUrl"):
         d["reportUrl"] = known["reportUrl"]
-    d["reportChecked"] = True
+    d["reportChecked"] = reports.BUTTONS
     if d["state"] == "sold":
         d["shows"] = []
     d.update({k: v for k, v in agents.parse_card(card).items() if k not in d})
@@ -658,7 +658,7 @@ def find(args):
     try:  # the förening's annual report and its record at Bolagsverket
         import bolagsverket
         status("running", "Läser föreningarnas årsredovisningar", started=started)
-        reports.update(items, log)
+        reports.update(items, log, first={u for u, p in items.items() if fits(p, f)})
         status("running", "Läser föreningarna hos Bolagsverket", started=started)
         bolagsverket.update(items, log)
         for p in items.values():

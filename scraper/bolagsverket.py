@@ -25,6 +25,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import base64
 import urllib.error
 import urllib.parse
@@ -277,9 +278,47 @@ AGENT_KEYS = ("facts", "factsFrom", "factsRead", "apartments", "report")  # what
 BV_KEYS = ("name", "isBrf", "registered", "winding", "deregistered", "manager", "reports", "reportPeriod", *KEY_FIGURES)
 
 
+def _plain(s):
+    s = unicodedata.normalize("NFKD", str(s).lower())
+    return re.sub(r"[^a-z0-9]+", " ", "".join(c for c in s if not unicodedata.combining(c))).strip()
+
+
+def _core(name):
+    """A förening's name without its form, "nr" and town: "HSB Bostadsrättsförening Bågen nr 223 i Stockholm" is "bagen 223"."""
+    n = re.sub(r"\b(?:hsb|riksbyggens?|bostadsrattsforeningen|bostadsrattsforening|brf|nr)\b", " ", _plain(name))
+    return re.sub(r"\s+", " ", re.sub(r"\bi stockholm\b.*", "", n)).strip()
+
+
+def by_name_or_address(items, cache):
+    """The organisationsnummer for apartments whose page and report give none, from a förening we know: the one
+    their own page names ("Brf Folkungaträdet 1"), or else the one other apartments at the same address are in.
+    Only a match to exactly one förening counts."""
+    names = {}
+    for o, c in cache.items():
+        if c.get("name") and len(k := _core(c["name"])) >= 4:
+            names.setdefault(k, set()).add(o)
+    street = lambda p: _plain((p.get("addr") or "").split(",")[0])
+    at = {}
+    for p in items.values():
+        if p.get("orgnr") and p.get("orgnrFrom") not in ("name", "address") and street(p):
+            at.setdefault(street(p), set()).add(p["orgnr"])
+    for p in items.values():
+        if p.get("orgnr") or p.get("outside"):
+            continue
+        text = " " + re.sub(r"\b(?:nr|no)\b ", "", _plain(f"{p.get('facts') or ''}\n{p.get('desc') or ''}")) + " "
+        text = re.sub(r" (?:hsb )?(?:bostadsrattsforeningen|bostadsrattsforening) ", " brf ", text)
+        # "Brf Postsäcken 8" isn't the förening registered as "Postsäcken"
+        hits = {o for k, os_ in names.items() if len(os_) == 1 and re.search(rf" brf {re.escape(k)} (?!\d)", text) for o in os_}
+        if len(hits) == 1:
+            p.update(orgnr=hits.pop(), orgnrFrom="name")
+        elif not hits and len(a := at.get(street(p), set())) == 1:
+            p.update(orgnr=next(iter(a)), orgnrFrom="address")
+
+
 def remember(items, cache):
     """Keep what the agents' pages say about each förening with it, so the next apartment in the same förening
     starts from it: an apartment whose page gives no facts takes the förening's latest ones."""
+    by_name_or_address(items, cache)
     for url, p in items.items():
         o = p.get("orgnr")
         if not o:
