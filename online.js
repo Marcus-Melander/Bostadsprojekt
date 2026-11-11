@@ -16,17 +16,17 @@
     return new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); });
   }
 
-  // The login, opened from "Logga in": e-mail and password, or a link by e-mail. Sign-up is off
+  // The login, opened from "Logga in": e-mail and password, and an account for anyone who wants one
   function loginScreen(msg) {
     if (document.getElementById("login")) return;
     const d = document.createElement("div");
     d.id = "login";
     d.innerHTML = `<form>
         <h2>Bostadsplan</h2>
-        <p>Logga in med e-post och lösenord, eller lämna lösenordet tomt så skickar vi en inloggningslänk.</p>
+        <p>Logga in eller skapa ett konto, så sparas din plan och dina sparade lägenheter på kontot och följs av bostadsletaren.</p>
         <input type="email" name="email" required autocomplete="email" placeholder="namn@exempel.se" aria-label="E-postadress">
-        <input type="password" name="password" autocomplete="current-password" placeholder="Lösenord" aria-label="Lösenord">
-        <div style="display:flex;gap:8px"><button class="btn primary" type="submit">Logga in</button><button class="btn ghost" type="button" data-close>Avbryt</button></div>
+        <input type="password" name="password" required minlength="8" autocomplete="current-password" placeholder="Lösenord, minst 8 tecken" aria-label="Lösenord">
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="submit">Logga in</button><button class="btn" type="button" data-signup>Skapa konto</button><button class="btn ghost" type="button" data-close>Avbryt</button></div>
         <p class="msg" role="status">${msg || ""}</p>
       </form>`;
     const css = document.createElement("style");
@@ -38,19 +38,22 @@
     document.head.appendChild(css);
     document.body.appendChild(d);
     d.querySelector("[data-close]").addEventListener("click", () => d.remove());
+    d.querySelector("[data-signup]").addEventListener("click", async () => {
+      const f = d.querySelector("form"), m = d.querySelector(".msg");
+      if (!f.reportValidity()) return;
+      m.textContent = "Skapar kontot…";
+      const { data, error } = await sb.auth.signUp({ email: f.email.value.trim(), password: f.password.value });
+      if (error) { m.textContent = "Det gick inte: " + error.message; return; }
+      if (data.session) return location.reload();
+      m.textContent = "Klart. Bekräfta adressen med länken i mejlet och logga sedan in.";
+    });
     d.querySelector("form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = e.target.email.value.trim(), password = e.target.password.value, m = d.querySelector(".msg");
-      if (password) {
-        m.textContent = "Loggar in…";
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (!error) return location.reload();
-        m.textContent = "Fel e-post eller lösenord.";
-        return;
-      }
-      m.textContent = "Skickar…";
-      const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname } });
-      m.textContent = error ? "Det gick inte: " + error.message : "Klart. Öppna länken i mejlet på den här enheten.";
+      m.textContent = "Loggar in…";
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (!error) return location.reload();
+      m.textContent = "Fel e-post eller lösenord.";
     });
   }
 

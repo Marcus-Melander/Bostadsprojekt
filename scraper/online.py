@@ -27,7 +27,8 @@ BUCKET = "data"
 FILES = {"status.json": "public/status.json", "listings.json": "private/listings.json",
          "travel.json": "private/travel.json", "digest.json": "private/digest.json"}
 PUBLIC_DROP = ("desc", "flags")  # the agents' own text, and the flags read from it
-STORE_KEEP = ("items", "found", "booli", "compare", "agents", "lastRun", "history")  # leaves out "followed", your saved ones
+# "followed" is the bids of everyone's saved apartments: public on the agents' pages, and it doesn't say who saved them
+STORE_KEEP = ("items", "found", "booli", "compare", "agents", "lastRun", "history", "followed")
 BATCH = 500  # rows per request
 
 
@@ -83,7 +84,8 @@ def write_json(path, data):  # as finder.write_json, without loading the finder 
 # ---------- Whose plan the finder follows ----------
 
 def owner(c):
-    """The owner's user id: the one in the `owner` table, or else the first user made in the project, saved there."""
+    """The owner's user id: the one in the `owner` table, or else the first user made in the project, saved there
+    once (so make your own account before anyone else does)."""
     s = state()
     if s.get("owner"):
         return s["owner"]
@@ -140,6 +142,19 @@ def pull_plan(log=print, timeout=60):
     save_state(s)
     log(f"Online: took the plan saved online at {row['updated_at'][:16]}")
     return True
+
+
+def saved_by_others():
+    """The apartments saved in everyone else's plans online, by their page on the agent's site."""
+    c = config()
+    if not c:
+        return {}
+    out = {}
+    for row in _call(c, "GET", f"/rest/v1/plans?user_id=neq.{owner(c)}&select=plan") or []:
+        for a in (row.get("plan") or {}).get("apts", []):
+            if str(a.get("link", "")).startswith("http"):
+                out.setdefault(a["link"], a.get("address") or a["link"])
+    return out
 
 
 # ---------- After a run ----------

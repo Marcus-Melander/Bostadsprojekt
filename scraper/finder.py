@@ -589,6 +589,12 @@ def find(args):
     visits = plan.get("show", {}).get("visits", {})
     # Apartments you saved, by their page on the agent's site
     saved = {a["link"]: a.get("address") or a["link"] for a in plan.get("apts", []) if str(a.get("link", "")).startswith("http")}
+    try:  # and the ones your friends saved in their plans online, so their bids are followed too
+        import online
+        for u, name in online.saved_by_others().items():
+            saved.setdefault(u, name)
+    except Exception as e:
+        log(f"Online: couldn't read the others' saved apartments ({e})")
     store = read_json(DATA / "listings.json", {})
     if "items" not in store or any(k.startswith(("annons/", "bostad/")) for k in store.get("items", {})):
         store = {"items": {}}  # listings saved by the old Booli scraper are replaced
