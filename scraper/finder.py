@@ -44,6 +44,7 @@ DATA = Path(os.environ.get("BOSTADSPLAN_DATA", ROOT / "data"))  # another folder
 AREAS = geo.Areas(ROOT / "areas.geojson")
 PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
+UNPLACED_EVERY = dt.timedelta(days=7)  # an apartment whose address OpenStreetMap didn't find
 AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
 # A challenge page, not the notice under a contact form ("skyddas av reCAPTCHA", "skyddas mot missbruk av reCAPTCHA")
@@ -202,9 +203,10 @@ def booli_apartments(html):
     return list(out.values())
 
 
-def booli_matched(apts, items, f):
+def booli_matched(apts, items, f, places=None):
     """Each of Booli's apartments with what we have for it: "found" (for sale here too), "unpriced" (here, without
-    an asking price), "filtered" (here, but outside the filter or the inner city as we read it) or "missing".
+    an asking price), "filtered" (here, but outside the filter or the inner city as we read it), "outside" (not
+    here, and its address lies outside the tolls: Booli's innerstad includes Essingeöarna) or "missing".
     Matched on address and m² (within 2), since an address can hold several apartments."""
     key = lambda a: re.sub(r"[^a-z0-9]+", "", agents.ascii_lower((a or "").split(",")[0]))
     by = {}
@@ -214,7 +216,8 @@ def booli_matched(apts, items, f):
     for a in apts:
         ours = [p for p in by.get(key(a["addr"]), []) if a.get("kvm") is None or abs((p.get("kvm") or 0) - a["kvm"]) <= 2]
         if not ours:
-            why = "missing"
+            place = places.lookup(a["addr"]) if places and a.get("addr") else None
+            why = "outside" if place and not place["inner"] else "missing"
         elif any(p.get("price") and not p.get("outside") and fits(p, f, estimate=False) for p in ours):
             why = "found"
         elif any(not p.get("price") and not p.get("outside") for p in ours):
@@ -269,6 +272,13 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
                 except PlaywrightError:
                     pass
         text = page.inner_text("body")
+        d = agents.parse_agent_page(text, now)
+        if not (d.get("rooms") or d.get("kvm")) and not BLOCKED.search(text):
+            # The page wasn't drawn in full yet (Erik Olsson's Blekingegatan 16 on 11 November had only its card's
+            # price): the same page is read once more after a moment, without loading it again
+            page.wait_for_timeout(4000)
+            text = page.inner_text("body")
+            d = agents.parse_agent_page(text, now)
     except PlaywrightError as e:
         log(f"Couldn't open {url} ({e})")
         return None, False
@@ -278,11 +288,10 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
         return None, True
     if resp is not None and resp.status >= 400:
         return None, False
-    d = agents.parse_agent_page(text, now)
     d.update(agents.parse_bidding(text))
     h1 = page.locator("h1").first.inner_text() if page.locator("h1").count() else ""
     title = page.title()
-    addr = agents.find_address(h1, title, card, text[:600])
+    addr = agents.find_address(h1, title, card, text[:600], url=url)
     if not addr:
         log(f"No address found on {url}")
         return None, False
@@ -290,8 +299,10 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
     if not d.get("floor") and (m := re.search(r",\s*(\d+(?:[.,]5)?)\s*tr\b", h1, re.I)):
         d["floor"] = m.group(1).replace(",", ".")
     place = places.lookup(addr)
+    if not place:  # not found on OpenStreetMap: a misread address or another town's, looked at again in a week
+        log(f"{addr} on {url} wasn't found on OpenStreetMap")
     if not place or not place["inner"]:
-        return {"url": url, "addr": addr, "outside": True, "read": stamp()}, False
+        return {"url": url, "addr": addr, "outside": True, "read": stamp(), **({} if place else {"unplaced": True})}, False
     d.update(url=url, addr=addr, read=stamp(), photos=agents.photos(page), **{k: place[k] for k in ("lat", "lon", "area", "group")})
     AREAS.rename(d)
     try:  # the förening's facts, with its tabs and folded sections opened
@@ -463,6 +474,14 @@ def carry_over(p, old, store, hist):
         p["relisted"] = {"at": stamp(), "left": e["last_seen"], "agent": e["agent"], "price": e["last_price"], "url": e["url"]}
 
 
+def misread_sale(p):
+    """A sale that may be a misreading: the final price is the asking price. Before 10 November "Bevaka slutpris"
+    followed by the asking price read as sold (31 of Länsförsäkringar's on 11 November), and a sold apartment with a
+    final price was never read again. One still on its agent's list is read again like any other; one really sold
+    at its asking price stays sold."""
+    return bool(p.get("final")) and p.get("final") == p.get("price")
+
+
 def read_agent(ag, sh):
     """One agent's list and apartments, in a browser of its own. Shared data is changed under the lock."""
     items, f, now, robots = sh["items"], sh["f"], sh["now"], sh["robots"]
@@ -477,8 +496,13 @@ def read_agent(ag, sh):
             for n, (url, card) in enumerate(want.items(), 1):
                 with sh["lock"]:
                     old = items.get(url)
-                    if old and (old.get("outside") or old.get("state") == "sold"):
-                        continue  # outside the inner city or sold: nothing more to read
+                    # Outside for good when its address was found outside; one OpenStreetMap didn't know is read again
+                    # after a week, since until 12 November a heading ("Charmig 2a") was often taken for the address
+                    if old and old.get("outside") and (sh["places"].lookup(old.get("addr") or "")
+                                                       or now - dt.datetime.fromisoformat(old.get("read") or "2000-01-01") < UNPLACED_EVERY):
+                        continue
+                    if old and old.get("state") == "sold" and not misread_sale(old):
+                        continue  # sold: follow_left reads it for the final price
                     if old and old.get("read") and now - dt.datetime.fromisoformat(old["read"]) < READ_EVERY:
                         old["seen"] = stamp()
                         kept += not old.get("outside")
@@ -648,14 +672,14 @@ def find(args):
     if same:
         day.update(booliForSale=b["forSale"], **({"booliSoon": b["soon"]} if b.get("soon") is not None else {}))
         if b.get("apartments"):
-            b["matched"] = booli_matched(b["apartments"], items, f)
-            tally = {w: sum(1 for a in b["matched"] if a["here"] == w) for w in ("found", "unpriced", "filtered", "missing")}
+            b["matched"] = booli_matched(b["apartments"], items, f, places)
+            tally = {w: sum(1 for a in b["matched"] if a["here"] == w) for w in ("found", "unpriced", "filtered", "outside", "missing")}
             miss = {}
             for a in b["matched"]:
                 if a["here"] == "missing":
                     miss[a["agent"] or "?"] = miss.get(a["agent"] or "?", 0) + 1
             log(f"Booli's first page: {len(b['matched'])} for sale; {tally['found']} found here, {tally['unpriced']} here without a price, "
-                f"{tally['filtered']} here but filtered out, {tally['missing']} missing"
+                f"{tally['filtered']} here but filtered out, {tally['outside']} outside the tolls, {tally['missing']} missing"
                 + (" (" + ", ".join(f"{k} {v}" for k, v in sorted(miss.items(), key=lambda kv: -kv[1])) + ")" if miss else ""))
     store.setdefault("compare", {})[stamp()[:10]] = day
     with open(DATA / "compare.csv", "w", encoding="utf-8") as fh:

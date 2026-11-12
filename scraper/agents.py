@@ -43,7 +43,8 @@ AGENTS = [
      "obj": r"/kopa-bostad/objekt/", "anywhere": True},
     {"name": "BOSTHLM", "lists": ["https://www.bosthlm.se/till-salu"], "obj": r"bosthlm\.se/\d+/"},
     {"name": "Historiska Hem", "lists": ["https://historiskahem.se/till-salu/"], "obj": r"/object/tillsalu-"},
-    {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/"},
+    # Many of Tradition's cards give only the street ("Folkskolegatan 6, vån 5/5 35 kvm, 1.5 rok"), so its address decides
+    {"name": "Tradition", "lists": ["https://tradition.se/till-salu"], "obj": r"/bostad/", "anywhere": True},
     {"name": "Innerstadsspecialisten", "lists": ["https://innerstadsspecialisten.se/till-salu"], "obj": r"/bostad/"},
     {"name": "Bronze", "lists": ["https://bronzefast.se/bostader/"], "obj": r"bronzefast\.se/bostader/lagenhet-"},
     {"name": "Södermäklarna", "lists": ["https://www.sodermaklarna.se/till-salu"], "obj": r"/bostad/"},
@@ -393,7 +394,8 @@ AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
 # HusmanHagberg marks a coming apartment "Kommande®", SkandiaMäklarna one sold before the open market "REDO™"
 SOON_RX = re.compile(r"kommande®|redo™|snart till salu|kommer snart|\bpå gång\b|snart på marknaden|kommande försäljning|på förhand|förhandsvisning", re.I)
 SOLD_RX = re.compile(r"(?<![a-zåäö])(?:såld|sålt)(?![a-zåäö])|(?<!bevaka )(?<!uppskattat )slutpris\s*:?\s*\d|kr\s*\(slutpris\)", re.I)
-ADDR_RX = re.compile(r"([A-ZÅÄÖ][A-Za-zÅÄÖåäöéü.'\-]+(?: [A-Za-zÅÄÖåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
+# Capital É and Ü too: "ANNA STECKSÉNS GATA 15" (Bergets Ro) was read as "Ns gata 15"
+ADDR_RX = re.compile(r"([A-ZÅÄÖÉÜ][A-Za-zÅÄÖÉÜåäöéü.'\-]+(?: [A-Za-zÅÄÖÉÜåäöéü.'\-]+){0,3} \d{1,3} ?[A-Za-z]?)(?!\d)")
 FEATURE_RX = [
     ("stambyte done", r"stamby(?:te|tet|ten)\s+(?:är\s+|har\s+)?(?:gjor|genomför|utför|klar|färdig)|nya stammar|stambytt"),
     ("stambyte coming", r"stambyte\s+(?:är\s+)?(?:planera|beslut|kommer|inplanera|påbörja)"),
@@ -444,14 +446,25 @@ def is_sold(text):
     return bool(SOLD_RX.search(text[:4000]))
 
 
-def find_address(*texts):
-    """The street address in a heading or page title, e.g. "Hornsgatan 153" from "Hornsgatan 153, 4 tr"."""
+def find_address(*texts, url=None):
+    """The street address in a heading or page title, e.g. "Hornsgatan 153" from "Hornsgatan 153, 4 tr". Where the
+    page's address names it ("/ola-hanssonsgatan-1-stockholm-…"), the first one whose street is in the address wins:
+    many headings are a selling line with a number in it ("Charmig 2a", "Välplanerad 30 kvm"), which reads like an
+    address and isn't one."""
+    found = []
     for t in texts:
-        if t and (m := ADDR_RX.search(re.sub(r"\s+", " ", t))):
+        for m in ADDR_RX.finditer(re.sub(r"\s+", " ", t or "")):
             a = m.group(1).strip()
             a = re.sub(r"(\d) ([A-Za-z])$", r"\1\2", a)
-            return a[0] + a[1:].lower() if a.isupper() else a
-    return None
+            found.append(a[0] + a[1:].lower() if a.isupper() else a)
+    slug = re.sub(r"[^a-z0-9]+", "", ascii_lower(urlparse(url).path)) if url else ""
+    for a in found:
+        if slug and re.sub(r"[^a-z0-9]+", "", ascii_lower(a)) in slug:
+            return a
+    for a in found:  # the street without its number: "/houses/anna-stecksens-gata-15-3/"
+        if slug and len(street := re.sub(r"[^a-z]+", "", ascii_lower(re.sub(r"\s*\d.*$", "", a)))) >= 5 and street in slug:
+            return a
+    return found[0] if found else None
 
 
 def _date(day, month_idx, now):
