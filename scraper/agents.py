@@ -663,6 +663,11 @@ def _photo_key(url):
     return re.sub(r"^\d{3,4}_|_(?:\d{3,4}|thumb)$|-\d+x\d+$", "", stem)
 
 
+# The agents' own portraits: Notar keeps them under /agents/ on its image server, and one on a dark backdrop
+# passed for a floor plan (13 of Notar's in November 2026)
+PORTRAIT_RX = re.compile(r"maklare|broker|staff|/agents?/|/employees?/|medarbetare", re.I)
+
+
 def photos(page, limit=15):
     """The listing's photos: the page's share image first, then the large gallery images."""
     urls = page.eval_on_selector_all('meta[property="og:image"]', "els => els.map(e => e.content.trim())")
@@ -670,7 +675,7 @@ def photos(page, limit=15):
         "img", "els => els.filter(i => i.naturalWidth >= 600).map(i => i.currentSrc || i.src)")
     out, seen = [], set()
     for u in urls:
-        if not u.startswith("http") or re.search(r"\.svg(\?|$)|logo|icon|avatar|maklare|broker|staff", u, re.I):
+        if not u.startswith("http") or re.search(r"\.svg(\?|$)|logo|icon|avatar", u, re.I) or PORTRAIT_RX.search(u):
             continue
         k = _photo_key(u)
         if k not in seen:
@@ -727,14 +732,63 @@ _PLAN_JS = r"""([rx, minW]) => {
   return out;
 }"""
 
+# The page's own data names the floor plan where nothing on the page does: Notar's (Nuxt) lists every gallery image
+# as {category: "Planlösning", file: "MED….png", order: 21} and shows only the first five. Its file sits in the same folder
+# on the image server as a gallery photo the page does show.
+_PLAN_DATA_JS = r"""(rx) => {
+  const el = document.getElementById("__NUXT_DATA__");
+  if (!el) return [];
+  let a;
+  try { a = JSON.parse(el.textContent); } catch (e) { return []; }
+  const re = new RegExp(rx, "i"), val = (o, k) => typeof o[k] === "number" ? a[o[k]] : o[k];
+  const files = [], plans = [];
+  for (const o of a) {
+    if (!o || typeof o !== "object" || Array.isArray(o) || !("file" in o && "order" in o)) continue;  // the gallery's, not the agent's portrait
+    const f = val(o, "file");
+    if (typeof f !== "string") continue;
+    files.push(f.replace(/\.\w+$/, ""));
+    if (re.test(String(val(o, "category") || "") + " " + String(val(o, "title") || ""))) plans.push(f);
+  }
+  if (!plans.length) return [];
+  for (const img of document.querySelectorAll("img")) {
+    const u = (img.currentSrc || img.src || "").split("?")[0], name = u.split("/").pop();
+    if (/^https?:/.test(u) && files.includes(name.replace(/\.\w+$/, ""))) return plans.map((f) => u.slice(0, -name.length) + f);
+  }
+  return [];
+}"""
+
+_GALLERY_RX = re.compile(r"^\s*(?:visa\s+)?(?:alla\s+)?(?:bilder|bildvisning|galleri|visa alla)\s*(?:\(?\d+\)?)?\s*$", re.I)
+
+
+def gallery_button(page):
+    """The button that opens the whole gallery: "Visa alla bilder", or Länsförsäkringar's icon alone."""
+    b = page.locator("button:visible, a:visible, [role=button]:visible")
+    return b.filter(has=page.locator("img[alt*='bildvisning' i], img[alt*='galleri' i]")).or_(b.filter(has_text=_GALLERY_RX))
+
+
+def _plan_button(page):
+    return page.locator("button:visible, a:visible").filter(has_text=re.compile(rf"^\s*(?:visa\s+)?(?:\d+\s+)?(?:{PLAN_WORDS})(?:ar|en|er)?\s*$", re.I))
+
 
 def floorplans(page, limit=4):
-    """The listing's floor plans. Most agents name them (alt text, a caption, a "Planritning" section);
-    otherwise the page's floor plan button is pressed and the large images it shows are taken."""
-    found = page.evaluate(_PLAN_JS, [PLAN_WORDS, 300])
+    """The listing's floor plans. Most agents name them (alt text, a caption, a "Planritning" section, the page's
+    own data); otherwise the page's floor plan button is pressed and the large images it shows are taken.
+    Länsförsäkringar's floor plan button is in its gallery, so the gallery is opened first when there's none."""
+    found = page.evaluate(_PLAN_JS, [PLAN_WORDS, 300]) or page.evaluate(_PLAN_DATA_JS, PLAN_WORDS)
     if not found:
         before = set(page.eval_on_selector_all("img", "els => els.map(i => i.currentSrc || i.src)"))
-        btn = page.locator("button:visible, a:visible").filter(has_text=re.compile(rf"^\s*(?:visa\s+)?(?:\d+\s+)?(?:{PLAN_WORDS})(?:ar|en|er)?\s*$", re.I))
+        btn = _plan_button(page)
+        if not btn.count():
+            gallery = gallery_button(page)
+            try:
+                if gallery.count():
+                    gallery.first.click(timeout=3000)
+                    page.wait_for_timeout(1500)
+                    btn = _plan_button(page)
+                    if not btn.count():
+                        page.keyboard.press("Escape")
+            except Exception:
+                pass
         if btn.count():
             try:
                 btn.first.click(timeout=3000)
