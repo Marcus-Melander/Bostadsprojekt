@@ -118,7 +118,6 @@ def nearest(pt, places):
 def run():
     plan = finder.read_json(DATA / "plan.json", {})
     places = [p for p in (plan.get("show") or {}).get("places", []) if (p.get("addr") or "").strip()]
-    f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
     items = finder.read_json(DATA / "listings.json", {}).get("items", {})
     store = finder.read_json(DATA / "travel.json", {})
     now = dt.datetime.now()
@@ -148,8 +147,10 @@ def run():
             time.sleep(PAUSE)
     store["places"] = known
 
-    # Every apartment in your filter gets its nearest shop and gym; the ones you saved get a trip to each address
-    want = {u: p for u, p in items.items() if p.get("lat") and not p.get("outside") and finder.fits(p, f)}
+    # Every apartment in the inner city gets its nearest shop, gym and bar (worked out here, from the weekly list of
+    # shops, so it costs nothing, and friends online with other filters see them too); the ones you saved get a trip
+    # to each address
+    want = {u: p for u, p in items.items() if p.get("lat") and not p.get("outside")}
     saved = {a.get("link") for a in plan.get("apts", []) if a.get("link")}
     near, trips = store.get("near", {}), store.get("trips", {})
     for u, p in want.items():

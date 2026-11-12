@@ -98,6 +98,8 @@ Needs months of final prices, which the daily runs collect meanwhile.
 
 ## Done
 
+- **The nearest shops for every apartment, online too (2026-11-12).** The nearest grocery store, gym and bar were worked out only for the apartments in your filter, and online they sat in the private travel file with your addresses, so visitors saw none. They're now worked out for every apartment in the inner city (1 199 instead of 599; it's arithmetic on the weekly list of shops from OpenStreetMap, no extra requests), and uploaded on their own as `public/near.json`, while your places and trips stay private.
+
 - **Expected final prices and the showing-day route in the planner (2026-11-12).** Each card in Visningar and each stop on the route has a "Väntat 3,7–4,6 Mkr" chip (hover for the expected price and what it rests on), and the apartment's own page has "Väntat slutpris" in its price panel with the basis, for example "+11,3 % över utropspris i Kungsholmen (19 försäljningar)". A new Visningsrunda tab under Visningar shows each showing day of the coming week: the stops in order with arrival time, waiting and booked or saved marks, each leg's minutes on foot or by SL (line and changes, "uppskattat" where SL wasn't asked) and the minutes to spare, and the showings left out with the reason in Swedish (a clash with another showing, or too far to make it in time). Online, the expected prices are public and the route is shown only to you, since it comes from your plan.
 
 - **Five parallel pieces merged (2026-11-12).**
