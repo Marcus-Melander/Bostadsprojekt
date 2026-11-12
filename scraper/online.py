@@ -175,6 +175,10 @@ def push(log=print):
     public["items"] = {u: {k: v for k, v in p.items() if k not in PUBLIC_DROP} for u, p in store.get("items", {}).items()
                        if not p.get("outside")}
     upload(c, "public/listings.json", json.dumps(public, ensure_ascii=False).encode("utf-8"))
+    # The nearest grocery store, gym and bar for each apartment: travel.json without your places and trips
+    if (DATA / "travel.json").exists():
+        near = json.loads((DATA / "travel.json").read_text("utf-8")).get("near", {})
+        upload(c, "public/near.json", json.dumps({"near": near}, ensure_ascii=False).encode("utf-8"))
     # Floor plans: the index by apartment, as the planner reads it, and each file once
     index = json.loads((DATA / "floorplans" / "index.json").read_text("utf-8")) if (DATA / "floorplans" / "index.json").exists() else {}
     by = {}

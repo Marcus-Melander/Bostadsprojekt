@@ -82,7 +82,10 @@
   async function get(path) {
     if (path === "/api/floorplans") return floorplans();
     // The owner gets the full listings (with the agents' descriptions); anyone else the public ones
+    // The owner gets the full listings (with the agents' descriptions) and travel times; anyone else the public ones,
+    // and of the travel file only the nearest shops
     const out = path === "/api/listings" ? (await file("private/listings.json")) || (await file("public/listings.json"))
+      : path === "/api/travel" ? (await file("private/travel.json")) || (await file("public/near.json"))
       : FILES[path] ? await file(FILES[path]) : null;
     if (out && path === "/api/travel") { delete out.shops; out.running = false; }
     if (out && path === "/api/status") { out.running = false; out.scheduled = true; out.online = true; }
