@@ -186,14 +186,24 @@ SCAN_JS = r"""([day, month, time, months]) => {
 }"""
 
 # The buttons on the page that open a sign-up, nearest this showing first
+# What would send a form when pressed: a submit input, a <button> in a form (its type is submit unless it says
+# otherwise), anything with formaction, and whatever sits inside one of those. The button searches never press these.
+SENDS_JS = r"""const sends = (e) => {
+    if (e.matches("input[type=submit], input[type=image], [formaction]")) return true;
+    if (e.tagName === "BUTTON" && (e.getAttribute("type") || "submit").toLowerCase() === "submit" && (e.form || e.closest("form"))) return true;
+    const b = e.parentElement && e.parentElement.closest("button, input[type=submit], input[type=image], [formaction]");
+    return !!b && sends(b);
+  };"""
+
 # A button for this very showing ("sön 15 nov. 14:00"), in a booking widget that lists times as buttons
 SLOT_JS = r"""([day, months, time, tried]) => {
+  %SENDS%
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(e).visibility !== "hidden"; };
   const dayRx = new RegExp(`(^|\\D)0?${day}(\\s*(${months.join("|")})|/)`, "i"), timeRx = new RegExp(`(^|\\D)${time.replace(":", "[:.]")}`);
   for (const e of document.querySelectorAll("[data-bp-open]")) e.removeAttribute("data-bp-open");
   const b = [...document.querySelectorAll("button, [role=button], [role=option], label")].find((e) => {
     const t = (e.innerText || "").trim().replace(/\s+/g, " ");
-    if (!vis(e) || t.length > 45 || !timeRx.test(t) || tried.includes(t + "|") || e.closest("a[href]") || e.type === "submit") return false;
+    if (!vis(e) || t.length > 45 || !timeRx.test(t) || tried.includes(t + "|") || e.closest("a[href]") || sends(e)) return false;
     if (dayRx.test(t)) return true;
     // Only the time on the button ("12:45"): the day is written next to it
     for (let x = e.parentElement, k = 0; x && k < 3; x = x.parentElement, k++) if (dayRx.test((x.innerText || "").slice(0, 300))) return t.length < 14;
@@ -205,12 +215,16 @@ SLOT_JS = r"""([day, months, time, tried]) => {
 }"""
 
 TRIGGERS_JS = r"""([rx, notRx, day, months, time, tried]) => {
+  %SENDS%
+  // A sign-up form's opener sits outside it: nothing inside a form with contact fields is pressed
+  const inForm = (e) => { const f = e.closest("form"); return !!f && !!f.querySelector("input[type=email], input[type=tel], input[name*=mail i], input[name*=phone i]"); };
   const open = new RegExp(rx, "i"), not = new RegExp(notRx, "i");
   const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(e).visibility !== "hidden"; };
   const dayRx = new RegExp(`(^|\\D)0?${day}\\s*(${months.join("|")})|(^|\\D)0?${time.replace(":", "[:.]")}`, "i");
   // Buttons, and the divs and spans some sites make clickable instead (cursor: pointer)
   const all = [...document.querySelectorAll("button, a, [role=button], input[type=button], div, span")].filter((e) => vis(e) &&
-    (!/^(DIV|SPAN)$/.test(e.tagName) || getComputedStyle(e).cursor === "pointer" && (e.innerText || "").length < 60 && !e.closest("button, a")));
+    (!/^(DIV|SPAN)$/.test(e.tagName) || getComputedStyle(e).cursor === "pointer" && (e.innerText || "").length < 60 && !e.closest("button, a")) &&
+    !sends(e) && !inForm(e));
   for (const e of document.querySelectorAll("[data-bp-open]")) e.removeAttribute("data-bp-open");
   const hits = [];
   all.forEach((e, i) => {
@@ -236,6 +250,8 @@ BLOCK_JS = r"""() => {
   if (/(så fort|när|efter att) du (har )?loggat in|logga in för att (kunna )?(boka|anmäla)|du behöver logga in/i.test(dlg + " " + body)) return "login";
   return "";
 }"""
+
+SLOT_JS, TRIGGERS_JS = (s.replace("%SENDS%", SENDS_JS) for s in (SLOT_JS, TRIGGERS_JS))
 
 MARK_JS = r"""(msg) => {
   const f = document.querySelector("[data-bp=form]");
