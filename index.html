@@ -453,6 +453,10 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .ap-row { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
 .ap-row:last-of-type { border-bottom: 0; }
 .ap-row.past { color: var(--muted); }
+.book { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 2px; flex-basis: 100%; }
+.book small { flex-basis: 100%; font-size: 12px; line-height: 1.4; }
+.book .bad-ink { color: var(--bad); }
+.book .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .ap-row > span:first-child { min-width: 0; }
 .ap-score { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
 .ap-score b { font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -0.02em; }
@@ -664,7 +668,8 @@ const DEFAULT = () => ({
   },
   value: { area: "sodermalm", win: 10, mode: "regression", manual: 2 },
   bid: { ask: 2395000, walk: 2600000, step: 25000 },
-  show: { f: { minPrice: null, maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true, skipPricey: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [],
+  contact: { name: "", email: "", phone: "" }, // for the agents' viewing sign-up forms (scraper/booking.py)
+  show: { f: { minPrice: null, maxPrice: 4500000, minRooms: 1.5, minArea: 35, maxAvgift: null, notGround: true, includeSoon: true, skipPricey: true }, days: "week", filter: "", pasteMsg: "", on: {}, extra: [], ratings: {}, visits: {}, hideNever: true, places: [], booked: {},
     w: { budget: 3, monthly: 2, area: 3, flags: 2, travel: 2, near: 1, size: 2, avgift: 1, features: 1, drop: 1, relisted: 1 } },
 });
 let S = DEFAULT();
@@ -2079,6 +2084,7 @@ function showCard(p, s, a, cr) {
       ${(p.plans || []).length ? `<details class="plan" data-fill="plan" data-key="${esc(p.url)}"><summary>Planlösning${p.plans.length > 1 ? "ar (" + p.plans.length + ")" : ""}</summary><div class="fill"></div></details>` : ""}
       ${p.desc ? `<details class="desc" data-fill="desc" data-key="${esc(p.url)}"><summary>Beskrivning från ${esc(p.agent)}</summary><div class="fill"></div></details>` : ""}
       <div class="facts"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.agent)} ↗</a><span>${price ? kr(price) : "Pris ej satt"}</span>${p.avgift ? `<span>Avgift ${kr(p.avgift)}</span>` : ""}${mc ? `<span>${kr(mc.total)}/mån allt inräknat</span>` : ""}${fit}</div>
+      ${s ? bookBox(p, s.start) : ""}
       ${v ? `<div class="visit">${ratingSelect(`data-visit-r="${esc(p.url)}" aria-label="Ditt betyg för ${esc(p.addr)}"`, v.r ?? "")}
         <input type="text" data-visit-note="${esc(p.url)}" value="${esc(v.note || "")}" placeholder="Anteckningar från visningen"></div>` : ""}
     </div>
@@ -2236,7 +2242,7 @@ function showView() {
     <p>Lägenheter innanför tullarna med visning, hittade på mäklarnas egna sajter varje morgon och jämförda med din budget. Betygsätt områden allteftersom: platser du sätter till <strong>Aldrig här</strong> försvinner ur listan.</p>
     ${DIGEST && DIGEST.summary ? `<a class="dg-strip" href="#" data-goto="digest"><span class="eyebrow">Morgonkoll</span> ${esc(DIGEST.summary)} →</a>` : ""}</div>
     <div class="bench show">
-      <div class="stack">${crawlPanel()}${filterPanel()}${placesPanel()}${myAreasPanel()}${areasPanel(list)}</div>
+      <div class="stack">${crawlPanel()}${filterPanel()}${placesPanel()}${contactPanel()}${myAreasPanel()}${areasPanel(list)}</div>
       <div>
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
           <div class="seg">${[["week", "Nästa vecka"], ["8", "Närmaste 8 dagarna"], ["all", "Alla kommande"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
@@ -2249,6 +2255,7 @@ function showView() {
     </div>`;
 }
 function showInput(t) {
+  if (t.dataset.contact) { S.contact = { ...(S.contact || {}), [t.dataset.contact]: t.value }; bookNote = null; changed(false); return true; }
   if (t.dataset.place) { const x = (S.show.places || []).find((y) => y.id === t.dataset.place); if (x) x[t.dataset.k] = t.value; changed(false); return true; }
   if (t.dataset.hoodNote != null) { const n = t.dataset.hoodNote; S.show.ratings[n] = { ...(S.show.ratings[n] || {}), note: t.value }; changed(false); return true; }
   if (t.dataset.visitNote != null) { const v = S.show.visits[t.dataset.visitNote]; if (v) v.note = t.value; changed(false); return true; }
@@ -2273,16 +2280,77 @@ function showClick(a) {
     case "went": if (p) S.show.visits[p.url] = { at: a.dataset.at, r: "", note: "", addr: p.addr, area: p.area || p.group }; return false;
     case "unwent": delete S.show.visits[a.dataset.key]; return false;
     case "untrack": S.apts = S.apts.filter((x) => x.link !== a.dataset.key); setTimeout(flush); return false;
-    case "track":
-      if (p && (S.show.places || []).some((x) => x.addr)) setTimeout(lookUpTrips); // the trips to your addresses, for this apartment
-      if (p) S.apts.unshift({ id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${p.area || p.group || ""}`, price: p.price || null, bid: p.price || null,
-        avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: p.url, status: "Viewing booked",
-        photo: (p.photos || [])[0] || null, agent: p.agent || null });
+    case "track": if (p) trackApt(p); return false;
+    case "book": book(a.dataset.key, a.dataset.start); return true;
+    case "booked": { // only you know the form was sent; the route then puts this showing first (scraper/route.py reads the status)
+      const x = S.apts.find((y) => y.link === a.dataset.key) || (p && trackApt(p));
+      if (x) x.status = "Viewing booked";
+      S.show.booked[a.dataset.key] = { start: a.dataset.start, at: isoLocal(new Date()) };
       return false;
+    }
+    case "unbook": {
+      const x = S.apts.find((y) => y.link === a.dataset.key);
+      if (x && x.status === "Viewing booked") x.status = "Watching";
+      delete S.show.booked[a.dataset.key];
+      return false;
+    }
   }
   return null;
 }
 VIEWS.show = showView;
+function trackApt(p) {
+  if ((S.show.places || []).some((x) => x.addr)) setTimeout(lookUpTrips); // the trips to your addresses, for this apartment
+  const x = { id: Math.random().toString(36).slice(2, 9), address: `${p.addr}, ${p.area || p.group || ""}`, price: p.price || null, bid: p.price || null,
+    avgift: p.avgift || null, kvm: p.kvm || null, rooms: p.rooms || null, debtKvm: null, link: p.url, status: "Viewing booked",
+    photo: (p.photos || [])[0] || null, agent: p.agent || null };
+  S.apts.unshift(x);
+  return x;
+}
+
+/* ---------- Signing up for a viewing: on the Mac, scraper/booking.py fills in the agent's form in a Chrome window ---------- */
+let BOOKINGS = {}, bookTimer = null, bookNote = null; // data/bookings.json by apartment; bookNote: { url, start, text } before it starts
+const BOOK_SV = { opening: "Öppnar mäklarens sida…", filled: "Ifyllt, skicka i fönstret", partial: "Delvis ifyllt, titta i fönstret",
+  noform: "Hittade inget formulär", captcha: "Stannade vid en captcha", bankid: "Kräver BankID, fortsätt i fönstret",
+  login: "Kräver inloggning, fortsätt i fönstret", refused: "Mäklarens sajt sa nej", error: "Något gick fel" };
+const BOOK_KIND = { opening: "info", filled: "good", partial: "warn", noform: "warn" };
+async function loadBookings() {
+  if (!LOCAL) return;
+  try { const r = await fetch("/api/bookings", { cache: "no-store" }); if (r.ok) BOOKINGS = await r.json(); } catch (e) {}
+  clearTimeout(bookTimer);
+  if (Object.values(BOOKINGS).some((b) => b.state === "opening")) bookTimer = setTimeout(() => loadBookings().then(refresh), 2500);
+}
+async function book(url, start) {
+  const c = S.contact || {};
+  bookNote = !c.name || !(c.email || c.phone) ? { url, start, text: "Fyll i ditt namn och din e-post eller telefon under Dina uppgifter i Visningar först." } : null;
+  if (bookNote) return refresh();
+  await flush(); // booking.py reads your details from data/plan.json
+  const r = await fetch("/api/book", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, start }) }).catch(() => null);
+  if (!r || !r.ok) bookNote = { url, start, text: r && r.status === 409 ? "Fönstret för den här lägenheten är redan öppet." : "Den lokala servern svarar inte." };
+  await loadBookings(); refresh();
+}
+// The sign-up for one showing: the button, how it went, and "Jag har anmält mig" once you've sent it
+function bookBox(p, start) {
+  if (!p || !p.url || !start) return "";
+  const url = p.url, done = S.show.booked[url];
+  if (done && done.start === start) return `<div class="book"><span class="chip good">Anmäld</span><button class="btn ghost" data-act="unbook" data-key="${esc(url)}">Ångra</button></div>`;
+  if (start < isoLocal(new Date()) || !LIST.items[url]) return "";
+  const b = BOOKINGS[url] && BOOKINGS[url].start === start ? BOOKINGS[url] : null, note = bookNote && bookNote.url === url && bookNote.start === start ? bookNote.text : "";
+  const sent = `<button class="btn ghost" data-act="booked" data-key="${esc(url)}" data-start="${esc(start)}">Jag har anmält mig</button>`;
+  if (!LOCAL) return `<div class="book"><button class="btn" disabled title="Anmälan körs från Macen">Anmäl till visning</button>${sent}<small class="dim">Anmälan fylls i från planeraren på Macen.</small></div>`;
+  return `<div class="book">
+    <button class="btn" data-act="book" data-key="${esc(url)}" data-start="${esc(start)}" ${b && b.state === "opening" ? "disabled" : ""}>${b && b.state !== "opening" ? "Öppna igen" : "Anmäl till visning"}</button>
+    ${b ? `<span class="chip ${BOOK_KIND[b.state] || "bad"}">${BOOK_SV[b.state] || esc(b.state)}</span>${b.state !== "opening" ? sent : ""}` : ""}
+    ${b && b.msg && b.state !== "opening" ? `<small class="dim">${esc(b.msg)}</small>` : note ? `<small class="bad-ink">${esc(note)}</small>` : ""}
+  </div>`;
+}
+function contactPanel() {
+  const c = S.contact || {}, f = (k, label, type, auto, ph) => `<div class="field"><label for="ct-${k}">${label}</label>
+    <input id="ct-${k}" type="${type}" data-contact="${k}" value="${esc(c[k] || "")}" autocomplete="${auto}" placeholder="${ph}"></div>`;
+  return `<section class="panel"><h3>Dina uppgifter för visningsanmälan</h3>
+    <p class="dim" style="font-size:13px;margin:0 0 4px">När du trycker <strong>Anmäl till visning</strong> fyller planeraren i dem i mäklarens formulär i ett Chrome-fönster på Macen. Du kontrollerar och skickar själv. De sparas i din plan, bara för dig.</p>
+    ${f("name", "Namn", "text", "name", "För- och efternamn")}${f("email", "E-post", "email", "email", "namn@exempel.se")}${f("phone", "Telefon", "tel", "tel", "070-123 45 67")}
+  </section>`;
+}
 
 /* ---------- Ranking: one score per apartment from what we already know, with weights you set ---------- */
 const RANK = [
@@ -2500,19 +2568,20 @@ function routeView() {
   const addrOf = (u) => (all[u] || aptOf(u) || {}).addr || "en annan visning";
   const why = { booked: ["good", "Bokad"], saved: ["info", "Sparad"], filter: ["", ""] };
   const leg = (g) => g ? `<li class="rt-leg"><span>↓</span><span>${g.min} min ${g.mode === "walk" ? "till fots" : "med " + esc((g.lines || []).join(", ") || "SL")}${g.changes ? `, ${g.changes} byte${g.changes > 1 ? "n" : ""}` : ""}${g.source === "estimate" ? " (uppskattat)" : ""}</span>${g.spare != null ? `<span class="dim">${g.spare} min till godo</span>` : ""}</li>` : "";
-  const stop = (s) => {
+  const stop = (s, date) => {
     const p = aptOf(s.url) || s, [k, t] = why[s.why] || ["", ""];
     return `<li class="rt-stop">
       <span class="mono rt-time">${esc(s.arrive)}</span>
       <div><div class="row" style="gap:8px"><a class="dg-addr" href="${aptHref(p)}">${esc(s.addr)}</a>${t ? `<span class="chip ${k}">${t}</span>` : ""}${predChip(p)}</div>
-        <div class="facts">${[s.area, "Visning " + s.show.start + "–" + s.show.end, s.price ? kr(s.price) : "", s.agent].filter(Boolean).map((x) => `<span>${esc(x)}</span>`).join("")}${s.wait ? `<span>${s.wait} min väntan</span>` : ""}</div></div>
+        <div class="facts">${[s.area, "Visning " + s.show.start + "–" + s.show.end, s.price ? kr(s.price) : "", s.agent].filter(Boolean).map((x) => `<span>${esc(x)}</span>`).join("")}${s.wait ? `<span>${s.wait} min väntan</span>` : ""}</div>
+        ${bookBox(aptOf(s.url) || s, date + "T" + s.show.start)}</div>
     </li>`;
   };
   const day = (d) => {
     const legs = {};
     for (const g of d.legs) legs[g.from] = g;
     return `<section class="panel"><h3>${fmtDay(d.date)} <span class="dim">${d.stops.length} av ${d.showings} visningar, ${d.travel} min resa</span></h3>
-      <ol class="rt-list">${d.stops.map((s, i) => stop(s) + (i < d.stops.length - 1 ? leg(legs[s.url]) : "")).join("")}</ol>
+      <ol class="rt-list">${d.stops.map((s, i) => stop(s, d.date) + (i < d.stops.length - 1 ? leg(legs[s.url]) : "")).join("")}</ol>
       ${d.left.length ? `<details class="dg-more"><summary>${d.left.length} visningar som inte ryms</summary><ul class="dg-list">${d.left.map((x) =>
         `<li><div class="row" style="gap:8px"><span class="mono dg-time">${esc(x.show.start)}–${esc(x.show.end)}</span><a class="dg-addr" href="${aptHref(aptOf(x.url) || x)}">${esc(x.addr)}</a></div><div class="dg-what dim">${leftReason(x, addrOf)}</div></li>`).join("")}</ul></details>` : ""}
     </section>`;
@@ -2693,7 +2762,7 @@ function aptPage() {
   const now = isoLocal(new Date()), shows = (p.shows || []).slice().sort((x, y) => (x.start < y.start ? -1 : 1));
   const lastPast = shows.filter((s) => s.start < now).pop();
   const showings = panel(3, "Visningar", `
-      ${shows.length ? shows.map((s) => `<div class="ap-row ${s.start < now ? "past" : ""}"><span><strong>${fmtDay(s.start)}</strong></span><span>${s.start.slice(11)}${s.end ? "–" + s.end : ""}${s.start < now ? " · har varit" : ""}</span></div>`).join("")
+      ${shows.length ? shows.map((s) => `<div class="ap-row ${s.start < now ? "past" : ""}"><span><strong>${fmtDay(s.start)}</strong></span><span>${s.start.slice(11)}${s.end ? "–" + s.end : ""}${s.start < now ? " · har varit" : ""}</span>${bookBox(p, s.start)}</div>`).join("")
         : `<p class="dim" style="font-size:14px;margin:0">${p.state === "sold" ? "Lägenheten är såld." : p.soon ? "Ingen visning än; lägenheten är inte ute till salu." : "Ingen visning utlagd just nu."}</p>`}
       ${v ? `<div class="visit" style="grid-template-columns:minmax(0,1fr)"><span class="dim" style="font-size:13px">Du var här${v.at ? " " + fmtShort(v.at) : ""}. Ditt betyg och dina anteckningar:</span>
           ${ratingSelect(`data-visit-r="${esc(url)}" aria-label="Ditt betyg för ${esc(p.addr)}"`, v.r ?? "")}
@@ -2862,6 +2931,7 @@ app.addEventListener("click", (e) => {
 // Save at once when the page is hidden or closed, so a change made just before isn't lost
 addEventListener("pagehide", () => { if (saveTimer) flush(); });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && saveTimer) flush(); });
+addEventListener("focus", () => { if (LOCAL) loadBookings().then(refresh); }); // back from the agent's window
 
 render();
 initStore().then(async () => {
@@ -2870,6 +2940,7 @@ initStore().then(async () => {
   loadTravel();
   loadDigest();
   loadForecasts();
+  loadBookings();
   pollStatus();
 });
 </script>

@@ -6,17 +6,19 @@ computer only.
 
     .venv/bin/python server.py
 """
+import fcntl
 import json
 import os
 import re
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data"
+DATA = Path(os.environ.get("BOSTADSPLAN_DATA", ROOT / "data"))  # another folder for test runs, as the finder
 sys.path.insert(0, str(ROOT / "scraper"))
 import online  # noqa: E402
 PORT = int(os.environ.get("BOSTADSPLAN_PORT", "8765"))
@@ -39,9 +41,16 @@ def write_json(path, data):
 
 def pid_alive(lock):
     try:
-        os.kill(int(lock.read_text()), 0)
+        return pid_running(lock.read_text())
+    except OSError:
+        return False
+
+
+def pid_running(pid):
+    try:
+        os.kill(int(pid), 0)
         return True
-    except (ValueError, OSError):
+    except (ValueError, TypeError, OSError):
         return False
 
 
@@ -100,6 +109,11 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/predictions", "/api/routes"):  # scraper/predict.py and scraper/route.py, after the morning run
             body = read(DATA / (path[5:] + ".json"))
             return self.send(200, body) if body else self.json(404, {"error": "not made yet"})
+        if path == "/api/bookings":  # how each viewing sign-up went (scraper/booking.py), by apartment
+            b = json.loads(read(DATA / "bookings.json", b"{}") or b"{}")
+            for v in b.values():
+                v["open"] = bool(v.get("pid")) and pid_running(v["pid"])
+            return self.json(200, b)
         if path == "/api/digest":  # what changed since the last morning (scraper/digest.py)
             body = read(DATA / "digest.json")
             return self.send(200, body) if body else self.json(404, {"error": "no digest yet"})
@@ -136,10 +150,12 @@ class Handler(BaseHTTPRequestHandler):
         self.json(200, {"ok": True})
 
     def do_POST(self):
-        if self.path not in ("/api/scrape", "/api/travel"):
+        if self.path not in ("/api/scrape", "/api/travel", "/api/book"):
             return self.send(404, b"Not found", "text/plain")
         if not self.same_origin():
             return self.json(403, {"error": "wrong origin"})
+        if self.path == "/api/book":
+            return self.book()
         if self.path == "/api/travel":  # after you change an important address
             if not pid_alive(DATA / ".travel.lock"):
                 log = open(DATA / "scraper.out", "ab")
@@ -151,6 +167,31 @@ class Handler(BaseHTTPRequestHandler):
         DATA.mkdir(exist_ok=True)
         log = open(DATA / "scraper.out", "ab")
         subprocess.Popen([sys.executable, str(ROOT / "scraper" / "finder.py")], cwd=ROOT,
+                         stdout=log, stderr=log, start_new_session=True)
+        self.json(202, {"ok": True})
+
+    def book(self):
+        """Sign up for one showing: scraper/booking.py fills in the agent's form in a Chrome window, and you send it."""
+        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(n)) if 0 < n < 10000 else {}
+        except ValueError:
+            body = {}
+        url, start = body.get("url"), body.get("start")
+        p = json.loads(read(DATA / "listings.json", b"{}") or b"{}").get("items", {}).get(url) if isinstance(url, str) else None
+        if not p or not any(s.get("start") == start for s in p.get("shows") or []):  # only the finder's own apartments and showings
+            return self.json(400, {"error": "unknown showing"})
+        was = json.loads(read(DATA / "bookings.json", b"{}") or b"{}").get(url) or {}
+        if was.get("pid") and pid_running(was["pid"]):
+            return self.json(409, {"error": "already open"})
+        with open(DATA / ".bookings.lock", "w") as lock:  # as booking.record, which writes the rest
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            b = json.loads(read(DATA / "bookings.json", b"{}") or b"{}")
+            b[url] = {"start": start, "state": "opening", "msg": "Öppnar mäklarens sida…", "agent": p.get("agent"),
+                      "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            write_json(DATA / "bookings.json", b)
+        log = open(DATA / "scraper.out", "ab")
+        subprocess.Popen([sys.executable, str(ROOT / "scraper" / "booking.py"), url, start], cwd=ROOT,
                          stdout=log, stderr=log, start_new_session=True)
         self.json(202, {"ok": True})
 
