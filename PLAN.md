@@ -70,7 +70,6 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 
 ### Phase 3: Showing days
 
-- **A showing-day route, in the planner.** `scraper/route.py` works out each showing day of the coming week after the morning run (see Done; your routes are private online). Still to do: show them in the planner, under Visningar, with each leg's minutes and the showings left out and why.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
 
 ### Phase 4: Online
@@ -93,11 +92,13 @@ Started 2026-11-11; the Supabase project is made (`razkgnubpubxhspngtma`, Stockh
 
 Needs months of final prices, which the daily runs collect meanwhile.
 
-- **Predict the final price, two ways, side by side.** The first, from price history, runs every morning since 2026-11-12 (see Done); still to do: show its range on the cards and the apartment's own page, and the second way below.
+- **Predict the final price, two ways, side by side.** The first, from price history, is in the planner since 2026-11-12 (see Done); still to do: the second way below, and putting both side by side.
   - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **Expected final prices and the showing-day route in the planner (2026-11-12).** Each card in Visningar and each stop on the route has a "Väntat 3,7–4,6 Mkr" chip (hover for the expected price and what it rests on), and the apartment's own page has "Väntat slutpris" in its price panel with the basis, for example "+11,3 % över utropspris i Kungsholmen (19 försäljningar)". A new Visningsrunda tab under Visningar shows each showing day of the coming week: the stops in order with arrival time, waiting and booked or saved marks, each leg's minutes on foot or by SL (line and changes, "uppskattat" where SL wasn't asked) and the minutes to spare, and the showings left out with the reason in Swedish (a clash with another showing, or too far to make it in time). Online, the expected prices are public and the route is shown only to you, since it comes from your plan.
 
 - **Five parallel pieces merged (2026-11-12).**
   - **Closer to Booli.** Apartments wrongly kept as sold or outside the inner city are read again, pages that draw their facts late get time to, and Tradition's cards without the apartment's name are opened. On a copy of 11 November's data: 34 for sale instead of 30, and 27 of the 35 on Booli's first page found instead of 23 (Fastighetsbyrån, Bjurfors, Notar and Erik Olsson are first re-read in the morning run of 13 November).

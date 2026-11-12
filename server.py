@@ -97,6 +97,9 @@ class Handler(BaseHTTPRequestHandler):
             t.pop("shops", None)  # the planner needs only each apartment's nearest
             t["running"] = pid_alive(DATA / ".travel.lock")
             return self.json(200, t)
+        if path in ("/api/predictions", "/api/routes"):  # scraper/predict.py and scraper/route.py, after the morning run
+            body = read(DATA / (path[5:] + ".json"))
+            return self.send(200, body) if body else self.json(404, {"error": "not made yet"})
         if path == "/api/digest":  # what changed since the last morning (scraper/digest.py)
             body = read(DATA / "digest.json")
             return self.send(200, body) if body else self.json(404, {"error": "no digest yet"})
