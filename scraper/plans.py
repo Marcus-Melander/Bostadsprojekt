@@ -29,6 +29,9 @@ DATA = ROOT / "data"
 DIR = DATA / "floorplans"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Bostadsplan/1.0 (personal apartment planner)"
 LOCK = threading.Lock()  # the finder reads several agents at once; index.json is written by one at a time
+# Raised when the plans are looked for in more places: an apartment read before with no plan (or only a portrait)
+# is opened once more. 2: Länsförsäkringar's plan inside its gallery, Notar's in its page data, no portraits
+VERSION = 2
 DETAILS = ("addr", "area", "group", "agent", "rooms", "kvm", "price", "avgift", "floor", "built", "lat", "lon")
 
 
@@ -76,12 +79,15 @@ def keep(candidates, listing, log=print, limit=3):
 
 
 def _keep(candidates, listing, log, limit):
+    import agents
     DIR.mkdir(parents=True, exist_ok=True)
     index, kept = load_index(), []
     by_source = {v["src"]: k for k, v in index.items()}
     for u in candidates:
         if len(kept) >= limit:
             break
+        if agents.PORTRAIT_RX.search(u):  # the agent's portrait, which on a dark backdrop looks like a drawing
+            continue
         if u in by_source:  # downloaded before
             kept.append(u)
             continue
@@ -105,15 +111,33 @@ def _keep(candidates, listing, log, limit):
     return kept
 
 
+# The gallery's last four images: the box holding the most large images is the gallery, and what follows it
+# on the page (Länsförsäkringar's ad, map and other apartments) isn't. With show, they're scrolled into view first.
+_GALLERY_END_JS = r"""(show) => {
+  const shown = [...document.querySelectorAll("img")].filter((i) => i.getBoundingClientRect().width > 200);
+  const count = new Map();
+  for (const img of shown) {
+    let el = img.parentElement;
+    for (let i = 0; i < 3 && el; i++, el = el.parentElement) count.set(el, (count.get(el) || 0) + 1);
+  }
+  let box = null, most = 4;
+  for (const [el, n] of count) if (n > most) { box = el; most = n; }  // ties go to the nearest box, met first
+  if (!box) return [];
+  const imgs = shown.filter((i) => box.contains(i)).slice(-4);
+  if (show) { imgs.forEach((i) => { i.loading = "eager"; i.scrollIntoView(); }); return []; }
+  return imgs.filter((i) => i.naturalWidth >= 500).map((i) => i.currentSrc || i.src);
+}"""
+
+
 def candidates(page, photos):
-    """What to test: the images the page names as a floor plan, else the gallery's last four photos."""
+    """What to test: the images the page names as a floor plan, else the gallery's last photos."""
     import agents
     named = agents.floorplans(page)
     if named:
         return named
     # Unnamed: floor plans usually come last in the gallery, so open the whole gallery if the page has a button for it
     gallery = []
-    btn = page.locator("button:visible, a:visible").filter(has_text=re.compile(r"^\s*(?:alla bilder|visa alla bilder|bilder|visa alla)\s*(?:\(?\d+\)?)?\s*$", re.I))
+    btn = agents.gallery_button(page)
     if btn.count():
         try:
             btn.first.click(timeout=3000)
@@ -121,9 +145,12 @@ def candidates(page, photos):
             for _ in range(4):
                 page.mouse.wheel(0, 3000)
                 page.wait_for_timeout(400)
-            gallery = [u for u in dict.fromkeys(page.eval_on_selector_all(
-                "img", "els => els.filter(i => i.naturalWidth >= 500).map(i => i.currentSrc || i.src)"))
-                if u.startswith("http") and not re.search(r"logo|icon|avatar|maklare|broker", u, re.I)][-6:]
+            page.evaluate(_GALLERY_END_JS, True)  # lazy images load only when shown (Länsförsäkringar's)
+            page.wait_for_timeout(1500)
+            last = page.evaluate(_GALLERY_END_JS, False)
+            gallery = [u for u in dict.fromkeys(last + page.eval_on_selector_all(
+                "img", "els => els.filter(i => i.naturalWidth >= 500).map(i => i.currentSrc || i.src)")[-6:])
+                if u.startswith("http") and not re.search(r"logo|icon|avatar", u, re.I) and not agents.PORTRAIT_RX.search(u)]
             page.keyboard.press("Escape")
         except Exception:
             pass
@@ -139,9 +166,10 @@ def backfill():
     store = finder.read_json(DATA / "listings.json", {})
     f = finder.read_json(DATA / "scrape.json", {}).get("filter", {})
     # Every apartment in your filter (counted the way Booli counts, so an unpriced one whose price is still wrong is in)
-    todo = [u for u, p in store.get("items", {}).items() if ("plans" not in p or stale_facts(p) or "pageChecked" not in p or "orgnrChecked" not in p)
+    todo = [u for u, p in store.get("items", {}).items() if (stale_plans(p) or stale_facts(p) or "pageChecked" not in p or "orgnrChecked" not in p)
             and p.get("lat") and not p.get("outside") and finder.fits(p, f, estimate=False)]
     finder.log(f"Backfill: {len(todo)} apartments to look at for floor plans and förening facts")
+    drop_portraits()
     robots, refused, found = agents.Robots(), set(), {}
     with finder.launch(False) as browser:
         page = browser.new_page()
@@ -172,8 +200,8 @@ def backfill():
                     if orgnr := agents.find_orgnr(ftext, page.inner_text("body"), page.content()):
                         got["orgnr"] = orgnr
                     got["orgnrChecked"] = True
-                if "plans" not in p:
-                    got["plans"] = keep(candidates(page, p.get("photos") or []), p, finder.log)
+                if stale_plans(p):
+                    got.update(plans=keep(candidates(page, p.get("photos") or []), p, finder.log), plansVersion=VERSION)
                 found[u] = got
             except Exception as e:
                 finder.log(f"Floor plans: couldn't open {u} ({e})")
@@ -184,6 +212,27 @@ def backfill():
         browser.close()
     merge(found)
     finder.log("Backfill: done")
+
+
+def stale_plans(p):
+    """No floor plans looked for yet, or none (or only the agent's portrait) found where an older version looked."""
+    import agents
+    if "plans" not in p:
+        return True
+    return p.get("plansVersion", 1) < VERSION and all(agents.PORTRAIT_RX.search(u) for u in p["plans"])
+
+
+def drop_portraits():
+    """The agents' portraits kept as floor plans before they were told apart, out of the training set."""
+    import agents
+    with LOCK:
+        index = load_index()
+        bad = [k for k, v in index.items() if agents.PORTRAIT_RX.search(v["src"])]
+        for k in bad:
+            (DIR / k).unlink(missing_ok=True)
+            del index[k]
+        if bad:
+            save_index(index)
 
 
 def stale_facts(p):

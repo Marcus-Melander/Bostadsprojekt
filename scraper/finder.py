@@ -321,7 +321,7 @@ def read_listing(page, url, card, now, places, opens=(), known=None):
         log(f"Couldn't read the links on {url} ({e})")
     d["flags"] = agents.red_flags(d.get("desc"), d.get("built"), facts=d.get("facts"), kvm=d.get("kvm"), bv=d.get("bv"), report=d.get("report"))
     try:  # last, since finding the plan may press the page's floor plan button
-        d["plans"] = plans.keep(plans.candidates(page, d["photos"]), d, log)
+        d.update(plans=plans.keep(plans.candidates(page, d["photos"]), d, log), plansVersion=plans.VERSION)
     except Exception as e:
         log(f"Couldn't read the floor plan on {url} ({e})")
     # A report behind the page's documents button takes several seconds to find, so it's looked for once per
