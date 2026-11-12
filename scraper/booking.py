@@ -164,8 +164,9 @@ SCAN_JS = r"""([day, month, time, months]) => {
     if (/intresseanmälan|anmäl intresse/i.test(text) && !viewing) sc -= 3;
     if (f.querySelector("input[type=password]")) sc -= 20;
     if ((f.innerText || "").length > 2500) sc -= 5;  // most of a page, not a form
-    if (!fields.length) sc = -99;
-    return { i, sc, f, fields, keep, boxes, visible: vis(f) && fields.some((x) => x.v), text };
+    if (/om din bostad|din nuvarande bostad/i.test(text) && !/visning/i.test(text)) sc -= 8;
+    if (!fields.length || !viewing && !keep.length) sc = -99;  // nothing about a showing: a contact or valuation form
+    return { i, sc, f, fields, keep, boxes, visible: vis(f) && fields.some((x) => x.v), text, own: /visning/i.test(text) || keep.length > 0 };
   }).filter((x) => x.sc >= 5).sort((a, b) => b.sc - a.sc || b.visible - a.visible);
   for (const e of document.querySelectorAll("[data-bp]")) e.removeAttribute("data-bp");
   if (!out.length) return null;
@@ -179,7 +180,7 @@ SCAN_JS = r"""([day, month, time, months]) => {
     o.el.setAttribute("data-bp", "choose" + n); return { n, picked: true, sel: false, text: o.text.trim().replace(/\s+/g, " ").slice(0, 60) };
   });
   const r = best.f.getBoundingClientRect();
-  return { sc: best.sc, visible: best.visible, fields: best.fields.map((x) => x.k), labels: best.fields.map((x) => label(x.el).slice(0, 30)), choices, boxes: best.boxes.filter((b) => b.v).map((b) => b.l),
+  return { sc: best.sc, visible: best.visible, own: best.own, fields: best.fields.map((x) => x.k), labels: best.fields.map((x) => label(x.el).slice(0, 30)), choices, boxes: best.boxes.filter((b) => b.v).map((b) => b.l),
     captcha: !!best.f.querySelector("iframe[src*='recaptcha/api2/anchor']:not([src*='size=invisible']), iframe[src*='hcaptcha'], iframe[src*='turnstile'], .g-recaptcha:not([data-size=invisible]), .h-captcha, .cf-turnstile"),
     bankid: /bankid/i.test(best.text) && !best.fields.length, text: best.text.slice(0, 200).replace(/\s+/g, " "), height: r.height };
 }"""
@@ -327,6 +328,27 @@ class Refused(Exception):
     pass
 
 
+def choose(fr, got):
+    """Pick the showing where the form asks; some forms show the rest of their fields only then."""
+    picked = 0
+    for c in got["choices"]:
+        if not c["picked"]:
+            continue
+        el = fr.locator(f'[data-bp="choose{c["n"]}"]').first
+        try:
+            if c["sel"]:
+                el.select_option(value=c["value"], timeout=4000)
+            else:
+                try:
+                    el.check(timeout=3000, force=True)
+                except Exception:  # a radio drawn as a button: its own click
+                    el.evaluate("e => { (e.labels && e.labels[0] || e).click(); e.checked = true; e.dispatchEvent(new Event('change', { bubbles: true })); }")
+            picked += 1
+        except Exception:
+            pass
+    return picked
+
+
 def fill(fr, got, me):
     first, last = split_name(me["name"])
     has_last = "last" in got["fields"]
@@ -344,20 +366,7 @@ def fill(fr, got, me):
             done.append(k)
         except Exception:
             pass
-    picked = 0
-    for c in got["choices"]:
-        if not c["picked"]:
-            continue
-        try:
-            el = fr.locator(f'[data-bp="choose{c["n"]}"]').first
-            if c["sel"]:
-                el.select_option(value=c["value"], timeout=4000)
-            else:
-                el.check(timeout=4000, force=True)
-            picked += 1
-        except Exception:
-            pass
-    return done, picked
+    return done
 
 
 def book(url, start, me, show_window=True, shot=None, log=print):
@@ -389,7 +398,7 @@ def book(url, start, me, show_window=True, shot=None, log=print):
                 state = b
                 break
             fr, got = scan(page, show)
-            if got and got["visible"] and (got["choices"] or got["sc"] >= 6):
+            if got and got["visible"] and got["own"]:  # a form that's itself about the showing; else look for its button
                 break
             nxt = open_form(page, show, agent, tried, robots, log)
             if not nxt:
@@ -408,7 +417,13 @@ def book(url, start, me, show_window=True, shot=None, log=print):
         elif got["captcha"]:
             state, msg = "captcha", "Formuläret har en captcha. Bostadsplan rör den inte; fyll i själv i fönstret."
         else:
-            done, picked = fill(fr, got, me)
+            picked = choose(fr, got)
+            if picked:  # the fields the showing's choice brought out
+                page.wait_for_timeout(1000)
+                fr2, again = scan(page, show)
+                if again and again["fields"]:
+                    fr, got = fr2, {**again, "choices": got["choices"]}
+            done = fill(fr, got, me)
             wanted = {"email", "phone"} & set(got["fields"]) | ({"first"} if "first" in got["fields"] else {"full"} if "full" in got["fields"] else set())
             whole = wanted <= set(done) and done and (picked or not got["choices"])
             state = "filled" if whole else "partial" if done else "noform"
