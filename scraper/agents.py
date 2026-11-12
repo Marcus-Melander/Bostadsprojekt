@@ -386,8 +386,13 @@ MONTH_RX = "|".join(m[:3] for m in SV_MONTHS)
 SHOW_RX = re.compile(
     rf"(?<!\d)(\d{{1,2}})\s*(?:\|\s*)?({MONTH_RX})[a-zåäö]*\.?(?:\s*\d{{4}})?[^0-9]{{0,40}}?"
     rf"(\d{{1,2}})[:.](\d{{2}})(?:\s*[-–]\s*(\d{{1,2}})[:.](\d{{2}}))?", re.I)
-# SkandiaMäklarna writes thousands with commas (6,795,000 kr)
-PRICE_RX = re.compile(r"(\d{1,3}(?:[ ., ]\d{3}){1,3})\s*kr(?!\s*/\s*m)", re.I)
+# SkandiaMäklarna writes thousands with commas (6,795,000 kr). Not an amount a month, a year or per m²: the förening's
+# "lokalintäkter på ca 305 000 kr/år" (Bjurfors) or "503 227 kr per år" (Bronze) was read as the price until 12 November
+PRICE_RX = re.compile(r"(\d{1,3}(?:[ ., ]\d{3}){1,3})\s*kr(?!\s*(?:/|per)\s*(?:m|år|kvm))", re.I)
+# Tradition's "Pris på förfrågan", Bronze's "UTGÅNGSPRIS | PÅ FÖRFRÅGAN": the page has no price, so none is looked for
+ON_REQUEST_RX = re.compile(r"(?:pris|utgångspris|utropspris)\s*:?\s*(?:\|\s*)?(?:på förfrågan|enligt överenskommelse)", re.I)
+# A line with one of these is about something else than the price: the förening's income, savings, loans or fees
+NOT_PRICE_RX = re.compile(r"intäkt|intäker|kassa|behållning|\blån|skuld|belån|hyr|avgäld|överstig|cirka|\bca\b|per år|/\s*år", re.I)
 ROOMS_RX = re.compile(r"(\d+(?:[.,]5)?)\s*(?:rum|rok)\b", re.I)
 KVM_RX = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:\+\s*\d+(?:[.,]\d+)?\s*)?(?:kvm|m²|m2)\b", re.I)
 AVGIFT_RX = re.compile(r"(\d{1,2}[ . ]?\d{3})\s*kr\s*/\s*mån", re.I)
@@ -419,9 +424,10 @@ SKIP_PARA = re.compile(r"cookie|samtycke|personuppgift|integritet|nyhetsbrev|gdp
 
 
 def _price(m):
-    """An asking price from a match, or None for amounts too small to be one (an avgift, a fee)."""
+    """An asking price from a match, or None for amounts too small to be one (an avgift, a fee) or not a round
+    thousand, as asking prices are (HusmanHagberg's 774 193 kr and Notar's 753 548 kr were something else)."""
     v = int(re.sub(r"\D", "", m.group(1)))
-    return v if v >= 300000 else None
+    return v if v >= 300000 and v % 1000 == 0 else None
 
 
 def _num(s):
@@ -537,10 +543,16 @@ def parse_agent_page(text, now):
     v = value(r"boarea|boyta|storlek|bostadsyta")
     if v and (m := re.match(r"\s*(\d+(?:[.,]\d+)?)", v)):
         out["kvm"] = _num(m.group(1))
-    # Otherwise the first price, rooms, size and avgift the page mentions
-    if "price" not in out:
-        for m in PRICE_RX.finditer(flat[:3000]):
-            if p := _price(m):
+    # Otherwise the first price, rooms, size and avgift the page mentions. For the price, not one in the description
+    # or about the förening's money ("lokalintäkter om cirka 650 000 kr per år", "Kassabehållning om ca 5 000 000 kr",
+    # "tomträttsavgälden ökat till 763 200 kr"), nor a bid (Tradition's "Aktuellt bud: 11 700 000 kr" above
+    # "Pris på förfrågan"), and none when the page says the price is on request
+    if "price" not in out and not ON_REQUEST_RX.search(flat[:3000]):
+        b = parse_bidding(text)
+        bids = {b.get("bid")} | {x["amount"] for x in b.get("bidList", [])}
+        short = " | ".join(l for l in flat[:3000].split(" | ") if len(l) < 160 and not NOT_PRICE_RX.search(l))
+        for m in PRICE_RX.finditer(short):
+            if (p := _price(m)) and p not in bids:
                 out["price"] = p
                 break
     if "rooms" not in out and (m := ROOMS_RX.search(flat[:3000])):
