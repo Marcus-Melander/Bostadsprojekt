@@ -5,6 +5,7 @@ Since 2023 every bostadsrättsförening's annual report has the same key figures
 also gives the förening's organisationsnummer, which some agents don't show on the page. The report is read once
 per link and kept in the förening's store (bolagsverket.py); a scanned report has no text and is skipped.
 """
+import datetime as dt
 import io
 import re
 import unicodedata
@@ -21,23 +22,31 @@ LINK_RX = re.compile(r"årsredovisning|arsredovisning|årsredoovisning", re.I)
 
 # Each key figure by the words its row starts with, matched without accents (text recognition reads "å" as "a").
 # The debt per m² of bostadsrätt area is the one the agents give and the red flags compare; the debt per m² of
-# the whole building is kept beside it. Text recognition reads HSB's small "kr/kvm" as "kr/kum"
-U = r"(?:k[vu]m|m2|m²)"
-BR = r"(?:bostadsratt|br[f-]?[ -]?yta|bostadsyta|upplaten)"
+# the whole building is kept beside it. Text recognition reads HSB's small "kr/kvm" as "kr/kum", and a scan's
+# "Årsavgift", "Sparande" and "Energikostnad" as "Arsavaitt", "Soarande" and "Enerdikostnad". Some write it
+# short: "Skuldsättn/kvm uppl m borätt", "Energi/kvm", or the debt as "Lån/kvm bostadsrättsyta"; an energy use
+# in kWh per m² is not its cost. One template has the savings as "Sparande till underhåll och investeringar",
+# without its "per kvm". A report whose font maps "Å", "å" and "ä" wrong ("#rsavgift", "R"ntek"nslighet",
+# "bostadsr tt") is read with those put back (BROKEN)
+U = r"(?:k[vu]m|kvadratmeter|m2|m²)"
+BR = r"(?:bostadsr ?a?tt|bo-?ratt|br[f-]?[ -]?yta|bostadsyta|boarea|upplaten)"
+DEBT = r"(?:skuld\w*|lan)\b"
 ROWS = [
-    ("avgiftKvm", rf"^arsavg\w*\b[^\d\n]*?{U}"),
-    ("skuldKvm", rf"^skuld\w*\b(?=[^\d\n]*{U})(?=[^\d\n]*{BR})[^\d\n]*?(?:{U}|{BR})(?:[^\d\n]*?(?:{U}|{BR}))?"),
-    ("skuldKvmTotal", rf"^skuld\w*\b[^\d\n]*?{U}"),
-    ("sparandeKvm", rf"^sparande\w*\b[^\d\n]*?{U}"),
-    ("energiKvm", rf"^ener[gq]ikostnad\w*\b[^\d\n]*?{U}"),
-    ("rantekanslighet", r"^rantekanslighet"),
+    ("avgiftKvm", rf"^arsav\w*\b[^\d\n]*?{U}"),
+    ("skuldKvm", rf"^{DEBT}(?=[^\d\n]*{U})(?=[^\d\n]*{BR})[^\d\n]*?(?:{U}|{BR})(?:[^\d\n]*?(?:{U}|{BR}))?"),
+    ("skuldKvmTotal", rf"^{DEBT}[^\d\n]*?{U}"),
+    ("sparandeKvm", rf"^s[po]arande\w*\b(?:[^\d\n]*?{U}| till underhall och investeringar\b)"),
+    ("energiKvm", rf"^ener[gqda]i(?:kostnad\w*\b|(?=/| per\b))(?![^\d\n]*kwh)[^\d\n]*?{U}"),
+    ("rantekanslighet", r"^r ?a?ntek ?a?nslighet"),
 ]
+BROKEN = re.compile(r"[#!]rsredovisning|[#!]rsavgift|R\"ntek\"nslighet")
 YEAR = re.compile(r"\b(20[1-3]\d)(?:/(?:20)?\d\d)?\b")
 # One number of a row: 1–3 digits that may go on in groups of three, a number written without spaces, a
 # decimal (with a comma, or a full stop as text recognition sometimes reads it), or "-" for none
 NUM = re.compile(r"-?(?:0|[1-9]\d{0,2})(?:[,.]\d{1,2})?|-?[1-9]\d{3,}|-?\d+[,.]\d{1,2}|-")
+# A row's formula, by the numbers of the rows it is worked out from: "(=P4/P3)", "(=(P8/P4)/100)", "(P14/P2)"
+FORMULA = re.compile(r"\(=?\(?P\d+[^()]*(?:\)[^()]*)?\)")
 FOLD = str.maketrans("åäöÅÄÖ", "aaoAAO")
-ROWS_KEYS = [k for k, _ in ROWS]
 # What a förening's key figure can be, kr per m² (räntekänslighet in %). Text recognition sometimes drops a
 # column, and the row's numbers then split wrong (an årsavgift of 375 338 kr per m²); such a value is left out.
 # A förening's debt is none or at least DEBT_MIN kr per m²: below that, "5 125 5 125" was split as four numbers
@@ -97,13 +106,40 @@ def _values(toks, n, dash=None, ok=lambda vals: True):
     return None
 
 
+# One cell of a table that gives each cell a line of its own
+CELL = re.compile(r"-|-?\d{1,3}(?: \d{3})*(?:[,.]\d+)?%?|-?\d+(?:[,.]\d+)?%?")
+
+
+def _cells(lines):
+    """A table written one cell a line ("Sparande / kvm", "63", "64", "224", "227", and its years the same way) put
+    back one row a line, each run of cells onto the label above it. A "- " cell before a number is its minus sign."""
+    out, building, minus = [], False, False
+    for raw in lines:
+        s = raw.strip()
+        if out and out[-1].strip() and CELL.fullmatch(s) and (building or not re.search(r"\d", out[-1])):
+            if s == "-" and raw.endswith(" "):
+                out[-1] += " -"
+                minus = True
+            else:
+                out[-1] += ("" if minus else " ") + s
+                minus = False
+            building = True
+        else:
+            out.append(raw)
+            building = minus = False
+    return out
+
+
 def figures(text):
     """The key figures for the latest year in a report's text, and the year."""
     # Some reports write "å" as "a" and a ring after it, and a dash or minus as "–" or "−"
     text = unicodedata.normalize("NFC", text)
-    lines = [re.sub(r"[\u00a0\u202f\u2009]", " ", l).replace("\u2212", "-").replace("\u2013", "-").strip() for l in text.splitlines()]
-    # "*" marks the key figures the law requires ("*Årsavgift per kvm")
+    lines = _cells([re.sub(r"[\u00a0\u202f\u2009]", " ", l).replace("\u2212", "-").replace("\u2013", "-") for l in text.splitlines()])
+    lines = [l.strip() for l in lines]
+    # "*" marks the key figures the law requires ("*Årsavgift per kvm"). Some number the rows and say how each is
+    # worked out, with "kr" after every year: "6 Årsavg/kvm uppl m bostadsrätt kr (=P4/P3) 845 kr 695 kr"
     lines = [l.lstrip("*") for l in lines]
+    lines = [re.sub(r"(?<=\d) kr\b", "", re.sub(r"^\d{1,2} +(?=[A-ZÅÄÖ])", "", re.sub(FORMULA, "", l))).strip() for l in lines]
     for k, l in enumerate(lines):
         # A header's years as text recognition reads HSB's ("2025 7074 7023 2022"), a broken year written
         # "2024 - 2025", years in short ("24/25 23/24") and years as months ("2501-2512")
@@ -113,6 +149,7 @@ def figures(text):
             l = re.sub(r"\b7(0[1-3]\d)\b", r"2\1", l)
             lines[k] = re.sub(r"\b(20[1-3]\d) ?- ?(20[1-3]\d)\b", lambda m: f"{m[1]}/{m[2]}" if int(m[2]) == int(m[1]) + 1 else m[0], l)
         lines[k] = re.sub(r"\b([1-3]\d)01-\1 ?12\b", r"20\1", lines[k])
+    broken = BROKEN.search(text)
     heads = [k for k, l in enumerate(lines) if len(YEAR.findall(l)) >= 2 and len(re.sub(r"[\d\s/-]", "", l)) < 40]
     out = {}
     for i, line in enumerate(lines):
@@ -122,6 +159,8 @@ def figures(text):
         if not re.search(r"\d", line) and (nxt[:1].islower() or re.fullmatch(r"[-\d\s,.%]+", nxt)):
             line = line + " " + nxt
         low = line.lower().translate(FOLD)
+        if broken:
+            low = re.sub(r'["#!]', "a", low)
         for key, rx in ROWS:
             if key in out or not (m := re.match(rx, low)):
                 continue
@@ -142,7 +181,13 @@ def figures(text):
             # A header text recognition split over two lines ("2025 2024" / "2023 2022")
             if k - 1 in heads and not set(YEAR.findall(lines[k - 1])) & set(head):
                 head = YEAR.findall(lines[k - 1]) + head
-            at = head.index(max(head))
+            # A year after this one is text recognition misreading another ("2025 2024 2023 2027"); the header
+            # still counts when its other years follow each other, not when it's garbled ("2029/2022 2020/2024 2010/2020")
+            rest = [int(y) for y in head if int(y) <= dt.date.today().year]
+            if len(rest) < len(head) and not (len(rest) >= 2 and all(abs(a - b) == 1 for a, b in zip(rest, rest[1:]))):
+                continue
+            latest = str(max(rest))
+            at = head.index(latest)
             ok = lambda v: v and v[at] is not None and RANGE[key][0] <= v[at] <= RANGE[key][1] and \
                 not (key.startswith("skuld") and 0 < v[at] < DEBT_MIN)
             # A debt row's "-" is a förening without loans: no debt that year
@@ -150,10 +195,12 @@ def figures(text):
             vals = _values(toks, len(head), dash, ok)
             if not ok(vals) and at == 0:  # text recognition can miss a year in the header: try one column more
                 vals = _values(toks, len(head) + 1, dash, ok)
+            if not ok(vals) and at == 0 and len(toks) <= 3:  # the first year a report gives the new figures, there's one
+                vals = _values(toks, 1, dash, ok)
             if not ok(vals):
                 continue
             out[key] = round(vals[at], 2) if key == "rantekanslighet" else round(vals[at])
-            out.setdefault("reportYear", int(max(head)))
+            out.setdefault("reportYear", int(latest))
             break
     # The bostadsrätt area is part of the total, so its debt per m² is never the smaller; a misread one is left out
     if out.get("skuldKvm") is not None and out.get("skuldKvmTotal") and out["skuldKvm"] < 0.9 * out["skuldKvmTotal"]:
@@ -191,11 +238,34 @@ def ocr(data, log=print, tiles=False):
         return None
 
 
+def count(f):
+    """How many of the five key figures a read has (the debt on either area)."""
+    return sum(k in f for k in ("avgiftKvm", "sparandeKvm", "energiKvm", "rantekanslighet")) + any(k in f for k in ("skuldKvm", "skuldKvmTotal"))
+
+
+def merge(a, b):
+    """Two reads of one report together (its text, then text recognition): a's figure where both have one. Reads
+    of different years aren't mixed; the one with more figures is kept."""
+    if a.get("reportYear") and b.get("reportYear") and a["reportYear"] != b["reportYear"]:
+        return a if count(a) >= count(b) else b
+    return {**b, **a}
+
+
+def derive(f):
+    """Räntekänslighet is the interest-bearing debt over a year's årsavgifter, so a report that leaves it out (or
+    whose row wasn't read) gets it from the debt and the årsavgift per m² of bostadsrätt; "derived" says so. In
+    135 of 138 reports with all three, that is within 15 % of the one the report gives."""
+    if f.get("rantekanslighet") is None and f.get("skuldKvm") is not None and f.get("avgiftKvm"):
+        f.update(rantekanslighet=round(f["skuldKvm"] / f["avgiftKvm"], 1), derived="rantekanslighet")
+    return f
+
+
 def read(url, robots, log=print, scans=True, tiles=True):
-    """Download one annual report and read it: {"orgnr", the key figures, "reportYear"}. A scan (or a report
-    whose key figures are a picture) is read by text recognition when `scans` is set; "scanned" says so.
-    Where that finds too little, the pages are read again in parts when `tiles` is set ("tiled" says so),
-    or else the report waits for another day."""
+    """Download one annual report and read it: {"orgnr", the key figures, "reportYear"}. A scan, or a report
+    whose text gives only some of the key figures (a picture of the table, labels apart from their numbers), is
+    also read by text recognition when `scans` is set ("ocred" says so; "scanned" where that found figures the
+    text didn't). Where that still finds too little, the pages are read again in parts when `tiles` is set
+    ("tiled" says so). A report that waits for either is "ocrWaiting", for another day."""
     if not robots.allowed(url):
         return {"blocked": True}
     data = web.get(url, timeout=60)
@@ -205,34 +275,36 @@ def read(url, robots, log=print, scans=True, tiles=True):
     pages = pypdf.PdfReader(io.BytesIO(data)).pages
     text = "\n".join((p.extract_text() or "") for p in pages[:30])
     out = figures(text)
-    if sum(k in out for k in ROWS_KEYS) < 3:
+    # Before 2023 the law didn't ask for the key figures, so an older report's missing ones aren't looked for
+    if count(out) < 3 or (count(out) < 5 and out.get("reportYear", 0) >= 2023):
         if not scans:
-            return {**out, "scanned": True, "ocrWaiting": True}
+            return {**out, "ocrWaiting": True, **({"scanned": True} if count(out) < 3 else {})}
         # HSB's flerårsöversikt can be a small picture of a table, which only a read in parts finds
         for parts in (False, True):
+            if parts and count(out) >= 3:
+                break
             if parts and not tiles:
                 out["ocrWaiting"] = True
                 break
             if not (seen := ocr(data, log, parts)):
                 break
-            if sum(k in (f := figures(seen)) for k in ROWS_KEYS) > sum(k in out for k in ROWS_KEYS):
-                out, text = {**f, "scanned": True}, seen + "\n" + text
+            out["ocred"] = True
+            if count(both := merge(out, figures(seen))) > count(out):
+                out, text = {**both, "scanned": True}, seen + "\n" + text
             out["tiled"] = parts
-            if sum(k in out for k in ROWS_KEYS) >= 3:
-                break
         if not out.get("scanned") and len(re.sub(r"\s", "", text)) < 500:
             out["scanned"] = True
     if o := agents.find_orgnr(text[:8000]):
         out["orgnr"] = o
-    return out
+    return derive(out)
 
 
 DONE = Path(__file__).resolve().parent.parent / "data" / "reports.json"
-FIGURES = ("avgiftKvm", "skuldKvm", "skuldKvmTotal", "sparandeKvm", "energiKvm", "rantekanslighet", "reportYear")
+FIGURES = ("avgiftKvm", "skuldKvm", "skuldKvmTotal", "sparandeKvm", "energiKvm", "rantekanslighet", "reportYear", "derived")
 PER_RUN = 200  # reports downloaded per morning run, a second apart; the rest wait for the next morning
-SCANS_PER_RUN = 20  # scans read by text recognition per run, about half a minute each
+SCANS_PER_RUN = 30  # reports read by text recognition per run, about half a minute each
 TILES_PER_RUN = 5  # of those, read again in parts, two to four minutes each
-READER = 2  # the reader's version: a report an older one read is read once more, after the new links
+READER = 3  # the reader's version: a report an older one read without all five figures is read once more, after the new links
 
 
 # A failed name lookup or no network: the Mac is offline, not the site refusing
@@ -251,37 +323,38 @@ def update(items, log=print, limit=PER_RUN, first=()):
     """Read the annual reports the agents link, each link once (kept in data/reports.json). Each apartment
     gets its report's figures as "report", and the organisationsnummer from the report's first page when
     its own page didn't give one. The links of the apartments in `first` (those in the filter) are read first."""
-    import datetime as dt
     import json
     import time
     done = json.loads(DONE.read_text()) if DONE.exists() else {}
     robots = agents.Robots()
     # Föreningar that already have figures from another apartment's report, which they share by number
-    have = {r["orgnr"] for r in done.values() if r.get("orgnr") and sum(k in r for k in ROWS_KEYS) >= 3}
+    have = {r["orgnr"] for r in done.values() if r.get("orgnr") and count(r) >= 3}
     have |= {p["orgnr"] for p in items.values() if p.get("orgnr") and p.get("report")}
     by_url = {}
     for u, p in items.items():
         if p.get("reportUrl") and not p.get("outside") and p.get("state") != "sold":
             by_url.setdefault(p["reportUrl"], []).append((u, p))
-    # The filter's apartments first, then those whose förening has no figures yet, those without a number first
-    todo = sorted(set(by_url) - set(done), key=lambda u: (
-        not any(a in first for a, _ in by_url[u]), all(p.get("orgnr") in have for _, p in by_url[u]),
-        any(p.get("orgnr") for _, p in by_url[u])))
-    n = 0
+    todo = list(set(by_url) - set(done))
     # Reports that waited for text recognition on an earlier day are read again
     todo += [u for u, r in done.items() if r.get("ocrWaiting") and u not in todo]
-    # Reports an older reader read (version 1 missed HSB's pictured flerårsöversikt and a debt-free förening's "–")
-    todo += [u for u, r in done.items() if r.get("reader", 1) < READER and not any(k in r for k in ("error", "blocked", "notPdf"))
-             and u not in todo]
+    # Reports an older reader read (version 1 missed HSB's pictured flerårsöversikt and a debt-free förening's "–",
+    # version 2 numbered rows, "Lån/kvm", a font that maps "å" wrong, and a text's missing figures that a picture has)
+    todo += [u for u, r in done.items() if r.get("reader", 1) < READER and count(r) < 5
+             and not any(k in r for k in ("error", "blocked", "notPdf")) and u not in todo]
     # A report robots.txt kept out, from a host whose owner has since said yes (agents.PERMITTED)
     todo = [u for u, r in done.items() if r.get("blocked") and urllib.parse.urlparse(u).netloc in agents.PERMITTED] + todo
     # Reports that failed only because the Mac was offline (just woken from sleep) are read again
     todo += [u for u, r in done.items() if OFFLINE_RX.search(r.get("error", "")) and u not in todo]
+    # The filter's apartments first, also those read again (a scan that waited for text recognition would otherwise
+    # wait for the whole backlog), then those whose förening has no figures yet, those without a number first
+    n, at = 0, {u: i for i, u in enumerate(todo)}
+    todo.sort(key=lambda u: (not any(a in first for a, _ in by_url.get(u, ())), all(p.get("orgnr") in have for _, p in by_url.get(u, ())),
+                             any(p.get("orgnr") for _, p in by_url.get(u, ())), u in done, at[u]))
     scans = tiled = 0
     for url in todo[:limit]:
         try:
             r = read(url, robots, log, scans=scans < SCANS_PER_RUN, tiles=tiled < TILES_PER_RUN)
-            scans += bool(r.get("scanned") and not r.get("ocrWaiting"))
+            scans += r.pop("ocred", False)
             tiled += r.pop("tiled", False)
         except Exception as e:  # never retried: a link that fails today is left
             if offline(e):  # not the link's fault: the rest wait for the next run
