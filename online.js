@@ -77,7 +77,8 @@
   // The local server's addresses, answered from Supabase
   // Travel times and the digest are the owner's (they show the owner's addresses and saved apartments): for anyone else
   // they're not there, and the page shows the apartments without them
-  const FILES = { "/api/status": "public/status.json", "/api/travel": "private/travel.json", "/api/digest": "private/digest.json" };
+  const FILES = { "/api/status": "public/status.json", "/api/predictions": "public/predictions.json",
+    "/api/travel": "private/travel.json", "/api/digest": "private/digest.json", "/api/routes": "private/routes.json" };
   async function get(path) {
     if (path === "/api/floorplans") return floorplans();
     // The owner gets the full listings (with the agents' descriptions); anyone else the public ones

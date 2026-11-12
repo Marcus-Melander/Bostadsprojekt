@@ -67,12 +67,10 @@ Work goes in phases; each one builds on the one before. A phase is done when eve
 ### Phase 2: Decide faster each day
 
 
-- **Ranking, next steps.** Add price drops and relistings as a factor once they're marked, and the monthly cost against what you have left each month.
-- **The morning digest in the planner.** The digest is written after every morning run (see Done); still to do: a Morgonkoll view in the planner that shows `data/digest.json`, and a click on the notification that opens it (needs `brew install terminal-notifier`; without it the notification opens nothing).
 
 ### Phase 3: Showing days
 
-- **A showing-day route.** For each day with showings, put them in an order you can travel between by T-bana or on foot, with the time it takes, and flag showings that overlap.
+- **A showing-day route, in the planner.** `scraper/route.py` works out each showing day of the coming week after the morning run (see Done; your routes are private online). Still to do: show them in the planner, under Visningar, with each leg's minutes and the showings left out and why.
 - **Sign up for viewings from the planner.** One button per showing fills in the agent's booking form with your name, e-mail and phone. It only runs when you press it, and it stops at a captcha or BankID.
 
 ### Phase 4: Online
@@ -95,11 +93,18 @@ Started 2026-11-11; the Supabase project is made (`razkgnubpubxhspngtma`, Stockh
 
 Needs months of final prices, which the daily runs collect meanwhile.
 
-- **Predict the final price, two ways, side by side.**
+- **Predict the final price, two ways, side by side.** The first, from price history, runs every morning since 2026-11-12 (see Done); still to do: show its range on the cards and the apartment's own page, and the second way below.
   - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **Five parallel pieces merged (2026-11-12).**
+  - **Closer to Booli.** Apartments wrongly kept as sold or outside the inner city are read again, pages that draw their facts late get time to, and Tradition's cards without the apartment's name are opened. On a copy of 11 November's data: 34 for sale instead of 30, and 27 of the 35 on Booli's first page found instead of 23 (Fastighetsbyrån, Bjurfors, Notar and Erik Olsson are first re-read in the morning run of 13 November).
+  - **More förening figures.** The report reader takes more key figures per report and reads the filter's apartments' reports again first: apartments in the filter with all five figures went from 75 to 86 on the same reports (37 before the backlog is re-read).
+  - **Morgonkoll in the planner.** A Morgonkoll tab under Visningar, and a strip at the top of Visningar, show the morning digest (online, for the owner only). Rangordning has three more factors: a lowered asking price, an apartment for sale again, and what's left each month after the apartment's monthly cost.
+  - **Final-price predictions (`scraper/predict.py`).** Every morning each apartment for sale gets a guessed final price with a range: how far final prices land over asking in its neighbourhood (falling back to its district), leaning by the agent, or, without an asking price, its size times the price per m² against Svensk Mäklarstatistik's district price. Known false finals and misread prices are left out. Checked by leaving each sale out in turn: a median error of 3.4 %, against 9.4 % for the asking price alone. On 12 November: 1 142 of 1 144 apartments, from 122 sales.
+  - **Showing-day routes (`scraper/route.py`).** Every morning, for each day of the coming week, the showings you can get to in order (booked viewings first, then saved apartments, then the filter's), walking or by SL's journey planner (the same as the travel times; answers cached), with the ones left out and why. On 12 November: 2 days, 9 stops, 64 lookups. Written to `data/routes.json`, private online.
 
 - **The finder reads the web through Scrapling (2026-11-11).** [Scrapling](https://github.com/d4vinci/Scrapling) (0.5.1, `scraper/web.py`) now does every fetch: the agents' pages and lists in its StealthySession on your installed Chrome, and robots.txt, sitemaps, annual reports and floor plans through its Fetcher. Both run with Scrapling's defaults, Chrome's TLS fingerprint, a browser's headers and three tries on a failed connection (per Marcus, 2026-11-11). Its Cloudflare solving and proxies are not used, robots.txt and the agents' written permissions still decide what is read, and a 403 or captcha still ends that agent for the day. In a test on 2026-11-11, every agent's list gave at least as many apartments as that morning's run: Erik Olsson 134 (128), Mäklarhuset 41 (38), Notar 57 (55), Alicia Edelman 255 (252), Fastighetsbyrån 1 342 (496), the rest the same. Geocoding, travel times and Bolagsverket's API stay on plain requests, since those are APIs with their own terms.
 

@@ -597,6 +597,16 @@ def run(args):
         travel.main()
     except Exception as e:
         log(f"Travel: stopped ({e})")
+    try:  # a guessed final price for each apartment, from the price history (scraper/predict.py)
+        import predict
+        predict.update(DATA, log)
+    except Exception as e:
+        log(f"Predictions: stopped ({e})")
+    try:  # the coming week's showing-day routes (scraper/route.py)
+        import route
+        route.update(DATA, log)
+    except Exception as e:
+        log(f"Routes: stopped ({e})")
     try:  # the results, for the planner online (scraper/online.py; nothing without data/supabase.json)
         online.push(log)
     except Exception as e:

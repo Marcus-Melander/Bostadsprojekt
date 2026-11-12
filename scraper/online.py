@@ -24,8 +24,9 @@ DATA = ROOT / "data"
 BUCKET = "data"
 # For anyone with the address (public/), and for the owner only (private/: the important addresses, saved
 # apartments and everything copied from the agents beyond what a list shows)
-FILES = {"status.json": "public/status.json", "listings.json": "private/listings.json",
-         "travel.json": "private/travel.json", "digest.json": "private/digest.json"}
+FILES = {"status.json": "public/status.json", "predictions.json": "public/predictions.json",
+         "listings.json": "private/listings.json", "travel.json": "private/travel.json",
+         "digest.json": "private/digest.json", "routes.json": "private/routes.json"}
 PUBLIC_DROP = ("desc", "flags")  # the agents' own text, and the flags read from it
 # "followed" is the bids of everyone's saved apartments: public on the agents' pages, and it doesn't say who saved them
 STORE_KEEP = ("items", "found", "booli", "compare", "agents", "lastRun", "history", "followed")
