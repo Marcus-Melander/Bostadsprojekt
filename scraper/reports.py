@@ -223,7 +223,10 @@ def ocr(data, log=print, tiles=False):
     With `tiles`, each page is also read in parts, for small text the whole page misses (three times as
     slow). None where it can't run."""
     import subprocess
+    import sys
     import tempfile
+    if sys.platform != "darwin":
+        return ocr_tesseract(data, log, tiles)
     try:
         if not OCR_BIN.exists() or OCR_BIN.stat().st_mtime < OCR_SRC.stat().st_mtime:
             OCR_BIN.parent.mkdir(parents=True, exist_ok=True)
@@ -233,6 +236,27 @@ def ocr(data, log=print, tiles=False):
             f.flush()
             return subprocess.run([str(OCR_BIN), f.name, "25"] + ["tiles"] * tiles, check=True, capture_output=True, text=True,
                                   timeout=900 if tiles else 300).stdout
+    except (OSError, subprocess.SubprocessError) as e:
+        log(f"Text recognition couldn't run ({e})")
+        return None
+
+
+def ocr_tesseract(data, log=print, tiles=False, pages=25):
+    """The same on Linux (the morning run on GitHub's servers): each page drawn by pdftoppm and read by Tesseract
+    in Swedish. With `tiles` the pages are drawn larger instead, which is what helps Tesseract with small text."""
+    import subprocess
+    import tempfile
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            pdf = Path(d) / "r.pdf"
+            pdf.write_bytes(data)
+            subprocess.run(["pdftoppm", "-r", "400" if tiles else "300", "-l", str(pages), "-gray", "-png", str(pdf), f"{d}/p"],
+                           check=True, capture_output=True, timeout=600)
+            out = []
+            for png in sorted(Path(d).glob("p-*.png")):
+                out.append(subprocess.run(["tesseract", str(png), "-", "-l", "swe+eng", "--psm", "4"], check=True,
+                                          capture_output=True, text=True, timeout=300).stdout)
+            return "\f".join(out)
     except (OSError, subprocess.SubprocessError) as e:
         log(f"Text recognition couldn't run ({e})")
         return None

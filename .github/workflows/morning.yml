@@ -1,0 +1,77 @@
+# The morning run on GitHub's servers, so it no longer depends on the Mac being awake (PLAN.md, Phase 4).
+# It fetches the finder's state from Supabase (scraper/state.py), runs the finder, which uploads the results for the
+# planner (scraper/online.py), and saves the state again. The repo is public and so are these logs: the run's own
+# output goes to data/scraper.out inside the private state, and only its one-line summary is printed here.
+name: Morning run
+
+on:
+  schedule:
+    - cron: "10 4 * * *"  # 05:10 in Stockholm in winter, 06:10 in summer; GitHub often starts it some minutes late
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "run: the morning run. probe: read each agent's list once and print the counts, changing nothing."
+        type: choice
+        options: [run, probe]
+        default: run
+
+concurrency:
+  group: finder
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Europe/Stockholm
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-swe poppler-utils xvfb > /dev/null
+          pip install -q -r requirements.txt
+          python -m patchright install-deps chromium > /dev/null 2>&1 || true
+
+      - name: Keys
+        env:
+          SUPABASE_JSON: ${{ secrets.SUPABASE_JSON }}
+          BOLAGSVERKET_JSON: ${{ secrets.BOLAGSVERKET_JSON }}
+        run: |
+          mkdir -p data
+          umask 077
+          printf '%s' "$SUPABASE_JSON" > data/supabase.json
+          if [ -n "$BOLAGSVERKET_JSON" ]; then printf '%s' "$BOLAGSVERKET_JSON" > data/bolagsverket.json; fi
+
+      - name: Probe the agents
+        if: inputs.mode == 'probe'
+        run: xvfb-run -a python scripts/probe_agents.py
+
+      - name: Fetch the state
+        id: fetch
+        if: inputs.mode != 'probe'
+        run: python scraper/state.py --pull --everything > /dev/null
+
+      - name: Morning run
+        if: inputs.mode != 'probe'
+        run: |
+          set +e
+          xvfb-run -a python scraper/finder.py --daily > data/scraper.out 2>&1
+          code=$?
+          python -c "import json; s = json.load(open('data/status.json')); print(s.get('state'), '-', s.get('msg'))" || true
+          exit $code
+
+      - name: Save the state
+        if: always() && steps.fetch.outcome == 'success'
+        run: python scraper/state.py --push
