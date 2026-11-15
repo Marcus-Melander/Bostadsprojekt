@@ -654,11 +654,12 @@ def find(args):
                 status("running", f"Följer {len(saved)} sparade {'lägenheter' if len(saved) > 1 else 'lägenhet'}", started=started)
                 follow(page, store, saved, robots, hist)
             follow_left(page, store, robots, hist, started)
-            if not args.no_count:
-                status("running", "Läser Boolis antal", started=started)
-                b = booli_count(f)
-                store["booli"] = {**b, "filter": f} if b else {**(store.get("booli") or {}), "missing": stamp()}
-            browser.close()
+        # Booli's own Chrome window, after the first browser is closed: Scrapling's browser won't start a second
+        # one in the same thread while another is open (Booli's count failed this way on 12 November)
+        if not args.no_count:
+            status("running", "Läser Boolis antal", started=started)
+            b = booli_count(f)
+            store["booli"] = {**b, "filter": f} if b else {**(store.get("booli") or {}), "missing": stamp()}
     except Exception as e:  # keep what was read, and say what went wrong
         write_json(DATA / "listings.json", store)
         log(f"Failed: {e!r}")
