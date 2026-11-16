@@ -10,12 +10,14 @@ import fcntl
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("BOSTADSPLAN_DATA", ROOT / "data"))  # another folder for test runs, as the finder
@@ -56,6 +58,27 @@ def pid_running(pid):
 
 def scraper_running():
     return pid_alive(DATA / ".scrape.lock")
+
+
+HISTORY_COLS = "day, at, price, state, bid, bids, final, on_list"
+
+
+def history(url):
+    """An apartment's readings, oldest first, and the first day the finder read anything (so "ute i" can say "minst")."""
+    out = {"since": None, "readings": []}
+    db = DATA / "history.sqlite"
+    if not url or not db.exists():
+        return out
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        con.row_factory = sqlite3.Row
+        out["since"] = con.execute("SELECT min(day) FROM readings").fetchone()[0]
+        out["readings"] = [dict(r) for r in con.execute(f"SELECT {HISTORY_COLS} FROM readings WHERE url = ? ORDER BY day", (url,))]
+    except sqlite3.Error:
+        pass
+    finally:
+        con.close()
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -109,6 +132,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/predictions", "/api/routes"):  # scraper/predict.py and scraper/route.py, after the morning run
             body = read(DATA / (path[5:] + ".json"))
             return self.send(200, body) if body else self.json(404, {"error": "not made yet"})
+        if path == "/api/history":  # one apartment's daily readings (scraper/history.py), read-only
+            url = parse_qs(urlsplit(self.path).query).get("url", [""])[0]
+            return self.json(200, history(url))
         if path == "/api/bookings":  # how each viewing sign-up went (scraper/booking.py), by apartment
             b = json.loads(read(DATA / "bookings.json", b"{}") or b"{}")
             for v in b.values():
