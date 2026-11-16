@@ -574,11 +574,26 @@ def finder_running(pid):
     return any(n in cmd for n in ("finder.py", "bolagsverket.py")) and int(pid) != os.getpid()
 
 
+# The morning run happens on GitHub's servers (.github/workflows/morning.yml). The Mac's hourly job (--fallback)
+# fetches what that run saved, and runs the finder itself only when the cloud hasn't finished today's by this hour
+FALLBACK_HOUR = 9
+
+
 def run(args):
     DATA.mkdir(exist_ok=True)
+    lock = DATA / ".scrape.lock"
+    if args.fallback:
+        if lock.exists() and finder_running(lock.read_text()):
+            return 0  # the Mac's own run is going: its files aren't replaced under it
+        try:
+            import state
+            state.pull(log, if_newer=True)
+        except Exception as e:
+            log(f"State: couldn't fetch the cloud's ({e})")
     if args.daily and done_today():
         return 0  # the catch-up start: today's run already finished
-    lock = DATA / ".scrape.lock"
+    if args.fallback and dt.datetime.now().hour < FALLBACK_HOUR:
+        return 0  # the cloud's run may still be going
     if lock.exists() and finder_running(lock.read_text()):
         print("Another run is going.", file=sys.stderr)
         return 1  # also a run that's been asleep for hours: it carries on when the Mac wakes
@@ -617,6 +632,12 @@ def run(args):
         online.push(log)
     except Exception as e:
         log(f"Online: couldn't send the results ({e})")
+    try:  # and the state, so the next run, in the cloud or on the Mac, starts from this one (scraper/state.py)
+        if online.config():
+            import state
+            state.push(log)
+    except Exception as e:
+        log(f"State: couldn't save ({e})")
     return rc
 
 
@@ -738,4 +759,6 @@ if __name__ == "__main__":
     ap.add_argument("--no-count", action="store_true", help="don't read Booli's count")
     ap.add_argument("--show", action="store_true", help="show the browser window")
     ap.add_argument("--daily", action="store_true", help="do nothing if today's run already finished (the scheduled starts)")
+    ap.add_argument("--fallback", action="store_true", help="the Mac's hourly job: fetch the cloud's state, and run only if "
+                    f"the cloud hasn't finished today's run by {FALLBACK_HOUR}:00")
     sys.exit(run(ap.parse_args()))

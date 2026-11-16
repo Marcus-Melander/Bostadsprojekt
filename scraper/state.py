@@ -30,8 +30,9 @@ KEEP = ("listings.json", "history.sqlite", "reports.json", "foreningar.json", "g
         "plan.json", "scrape.json", "status.json", "bookings.json", "floorplans/index.json", "scraper.log", "scraper.out")
 LOG_LINES = 5000  # the logs are kept to their last lines
 # What the Mac doesn't take from the cloud: your plan and filter (the local planner may have changed them since,
-# and both go through Supabase's plans table anyway) and the cloud run's own upload bookkeeping
-CLOUD_ONLY = ("plan.json", "scrape.json", "online.json", "status.json")
+# and both go through Supabase's plans table anyway) and the cloud run's own upload bookkeeping. It does take
+# status.json, which tells the Mac's fallback whether today's run is done
+CLOUD_ONLY = ("plan.json", "scrape.json", "online.json")
 KEEP_DIRS = ("cache",)
 SAVED = DATA / ".state.json"  # when this Mac or runner last fetched or saved the state
 
