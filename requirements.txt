@@ -3,3 +3,4 @@ scrapling[fetchers]>=0.5.1  # every page and file the finder fetches (scraper/we
 shapely>=2.0          # only for scripts/build_areas.py
 pillow>=10          # tells floor plans from photos, and saves them for training
 pypdf>=5            # reads the förening's annual report
+scikit-learn>=1.5   # the price model from the apartment itself (scraper/model.py)
