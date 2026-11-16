@@ -93,6 +93,12 @@ Needs months of final prices, which the daily runs collect meanwhile.
   - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
+### Maybe
+
+Ideas worth weighing later, not planned yet.
+
+- **Rebuild the planner's UI on Vercel's UI SDK** ([vercel-labs/ui](https://github.com/vercel-labs/ui), Apache-2.0; suggested by Marcus, 2026-11-16). It's a library of behaviours, not a look: keyboard navigation, focus, menus and popups that open and close correctly, drag and drop, and the accessibility they need, with adapters for React, Vue, Svelte, Solid and Web Components, and a skill meant to help coding agents build with it. Against it for now: it's in beta, it needs npm packages and a build step where the planner is one `index.html` with none, and adopting it means rewriting every view in a framework. Worth trying first on one widget through its Web Components adapter (a dialog or a menu), and only then deciding; splitting `index.html` into modules without a build step would get some of the same ease of building at far less cost.
+
 ## Done
 
 - **Price history on the apartment page, and a second price model (2026-11-16).**
