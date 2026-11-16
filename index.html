@@ -49,7 +49,9 @@
   --f-mono: var(--f-body);
   --r: 8px; --r-control: 6px;
   --gap: 12px; --pad: 24px; --control-height: 36px;
-  --fs-title: 24px; --fs-section: 16px; --fs-kpi: 30px; --fs-body: 14px; --fs-small: 12px;
+  /* the type scale: every font size on the page is one of these (.claude/skills/bostadsplan-ui) */
+  --fs-axis: 11px; --fs-small: 12px; --fs-meta: 13px; --fs-body: 14px; --fs-lead: 15px; --fs-section: 16px;
+  --fs-figure: 22px; --fs-title: 24px; --fs-kpi: 34px;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --ground: #0b0b0b; --surface: #141414; --raised: #1c1c1c; --active: #262626; --border: #262626; --rule: #1f1f1f; --control: #3d3d3d;
@@ -75,7 +77,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ground); border-bottom: 1px solid var(--border); }
 .topbar { display: flex; align-items: center; gap: 28px; height: 56px; }
 .topbar .save-state { margin-left: auto; white-space: nowrap; }
-.brand-name { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.brand-name { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: var(--fs-lead); letter-spacing: -0.01em; }
 .brand-name svg { flex: none; }
 .brand-name span { color: var(--muted); font-weight: 500; }
 .save-state { font-size: var(--fs-small); color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -83,14 +85,14 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; b
 .save-state.ok i { background: var(--positive); }
 nav.tabs { display: flex; gap: 22px; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
 nav.tabs::-webkit-scrollbar { display: none; }
-nav.tabs button { flex: none; font: 500 15px var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-nav.tabs .count { font-size: 12px; font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--raised); color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+nav.tabs button { flex: none; font: 500 var(--fs-lead) var(--f-body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 0; margin-bottom: -1px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+nav.tabs .count { font-size: var(--fs-small); font-weight: 600; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--raised); color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
 nav.tabs .count:empty { display: none; }
 nav.subtabs { display: flex; gap: 4px; margin: -8px 0 24px; overflow-x: auto; scrollbar-width: none; }
-nav.subtabs button { flex: none; font: 500 13px var(--f-body); color: var(--muted); background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+nav.subtabs button { flex: none; font: 500 var(--fs-meta) var(--f-body); color: var(--muted); background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
 nav.subtabs button:hover { color: var(--text); background: var(--raised); }
 nav.subtabs button[aria-current="true"] { color: var(--text); background: var(--surface); border-color: var(--border); }
-@media (max-width: 560px) { .topbar { gap: 14px; } .topbar .brand-name { font-size: 0; gap: 0; } .topbar .save-state span { display: none; } nav.tabs { gap: 16px; } nav.tabs button { font-size: 14px; } }
+@media (max-width: 560px) { .topbar { gap: 14px; } .topbar .brand-name { font-size: 0; gap: 0; } .topbar .save-state span { display: none; } nav.tabs { gap: 16px; } nav.tabs button { font-size: var(--fs-body); } }
 nav.tabs button:hover { color: var(--text); }
 nav.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--data); outline-offset: 2px; }
@@ -98,7 +100,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 main { padding-block: 32px 64px; }
 .lead { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
 .lead h1 { font-size: var(--fs-title); line-height: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
-.lead p { margin: 0; color: var(--muted); font-size: 15px; line-height: 22px; max-width: 72ch; }
+.lead p { margin: 0; color: var(--muted); font-size: var(--fs-lead); line-height: 22px; max-width: 72ch; }
 .lead p strong { color: var(--text); font-weight: 500; }
 .bench { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
 .bench.rev { grid-template-columns: minmax(0, 1fr) minmax(0, 340px); }
@@ -106,14 +108,14 @@ main { padding-block: 32px 64px; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; min-width: 0; }
 .panel h3 { font-size: var(--fs-section); line-height: 22px; margin: 0 0 12px; font-weight: 500; }
 .stack { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
-.eyebrow { font-size: 13px; line-height: 18px; color: var(--muted); font-weight: 500; }
+.eyebrow { font-size: var(--fs-meta); line-height: 18px; color: var(--muted); font-weight: 500; }
 
 .field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding-block: 8px; border-bottom: 1px solid var(--rule); }
 .field:last-child { border-bottom: 0; }
-.field label { font-size: 14px; }
+.field label { font-size: var(--fs-body); }
 .field small { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
 .num { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--control); border-radius: var(--r-control); padding: 0 8px; height: 32px; }
-.num input, .num input[type="text"] { border: 0; border-radius: 0; background: transparent; min-width: 0; width: 7.5em; border: 0; background: transparent; color: var(--text); font: 500 14px var(--f-body); font-variant-numeric: tabular-nums; text-align: right; padding: 0 2px; height: 30px; }
+.num input, .num input[type="text"] { border: 0; border-radius: 0; background: transparent; min-width: 0; width: 7.5em; border: 0; background: transparent; color: var(--text); font: 500 var(--fs-body) var(--f-body); font-variant-numeric: tabular-nums; text-align: right; padding: 0 2px; height: 30px; }
 .num input:focus { outline: none; }
 .num input[data-custom] { color: var(--data); }
 .field .slider { grid-column: 1 / -1; width: 100%; height: 20px; margin: 2px 0 0; background: none; -webkit-appearance: none; appearance: none; cursor: pointer; }
@@ -128,11 +130,11 @@ main { padding-block: 32px 64px; }
 input[type="text"], input[type="url"], select { font: 14px var(--f-body); color: var(--text); background: var(--surface); border: 1px solid var(--control); border-radius: var(--r-control); height: 32px; padding: 0 8px; min-width: 0; }
 select { cursor: pointer; }
 .seg { display: inline-flex; background: var(--raised); border-radius: 8px; padding: 2px; gap: 2px; flex-wrap: wrap; }
-.seg button { border: 1px solid transparent; background: none; font: 500 13px var(--f-body); color: var(--muted); height: 28px; padding: 0 10px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; }
+.seg button { border: 1px solid transparent; background: none; font: 500 var(--fs-meta) var(--f-body); color: var(--muted); height: 28px; padding: 0 10px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--border); }
 
-.btn { font: 500 14px var(--f-body); border-radius: var(--r-control); height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); background: var(--surface); color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: background-color .12s, transform .08s; }
+.btn { font: 500 var(--fs-body) var(--f-body); border-radius: var(--r-control); height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); background: var(--surface); color: var(--text); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: background-color .12s, transform .08s; }
 .btn:hover { background: var(--raised); }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
@@ -143,9 +145,9 @@ select { cursor: pointer; }
 .mono, .money { font-variant-numeric: tabular-nums; }
 .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--gap); align-items: start; }
 @media (max-width: 900px) { .hero { grid-template-columns: minmax(0, 1fr); } }
-.bigfig { font-weight: 700; font-size: 34px; line-height: 40px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 4px; }
-.bigfig small { font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
-.kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; font-size: 14px; margin: 0; }
+.bigfig { font-weight: 700; font-size: var(--fs-kpi); line-height: 40px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.bigfig small { font-size: var(--fs-section); font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; font-size: var(--fs-body); margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .kv .total { border-top: 1px solid var(--rule); padding-top: 8px; font-weight: 500; color: var(--text); }
@@ -154,18 +156,18 @@ select { cursor: pointer; }
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
 .tile { background: var(--surface); border: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; min-width: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; transition: background-color .12s; }
 .tile:hover { background: var(--raised); }
-.tile .v { font-weight: 500; font-size: 22px; line-height: 28px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.tile .v { font-weight: 500; font-size: var(--fs-figure); line-height: 28px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .tile .s { font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
 @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; height: 20px; padding: 0 8px; border-radius: 999px; white-space: nowrap; flex: none; background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-small); font-weight: 500; height: 20px; padding: 0 8px; border-radius: 999px; white-space: nowrap; flex: none; background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); }
 .chip.good { background: var(--pill-positive-bg); color: var(--pill-positive-ink); }
 .chip.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
 .chip.bad { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
 .chip.ex, .chip.info { background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); }
 
 .limits { display: flex; flex-direction: column; gap: 12px; }
-.limit { display: grid; grid-template-columns: 10em 1fr 5.5em; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+.limit { display: grid; grid-template-columns: 10em 1fr 5.5em; align-items: center; gap: 12px; font-size: var(--fs-meta); color: var(--muted); }
 .limit .mono { text-align: right; color: var(--text); }
 .bar { height: 8px; background: var(--raised); border-radius: 4px; overflow: hidden; }
 .bar b { display: block; height: 100%; background: var(--chart-2); border-radius: 4px; }
@@ -173,17 +175,17 @@ select { cursor: pointer; }
 .limit.binding .bar b { background: var(--data); }
 @media (max-width: 480px) { .limit { grid-template-columns: 1fr auto; } .limit .bar { grid-column: 1 / -1; grid-row: 2; } }
 
-.note { font-size: 13px; line-height: 19px; color: var(--muted); background: var(--raised); border-radius: 8px; padding: 10px 12px; }
+.note { font-size: var(--fs-meta); line-height: 19px; color: var(--muted); background: var(--raised); border-radius: 8px; padding: 10px 12px; }
 .note strong { color: var(--text); font-weight: 500; }
-.banner-ex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--pill-warning-bg); border: 1px solid var(--notice-border); color: var(--pill-warning-ink); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: var(--gap); }
+.banner-ex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--pill-warning-bg); border: 1px solid var(--notice-border); color: var(--pill-warning-ink); border-radius: 8px; padding: 8px 12px; font-size: var(--fs-meta); margin-bottom: var(--gap); }
 .banner-ex .chip { display: none; }
 .banner-ex button { margin-left: auto; height: 30px; }
 
 .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
-table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+table { border-collapse: collapse; width: 100%; font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
 th, td { padding: 0 16px; height: 44px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
-thead th { height: 38px; font-size: 12px; color: var(--muted); font-weight: 400; background: none; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+thead th { height: 38px; font-size: var(--fs-small); color: var(--muted); font-weight: 400; background: none; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
 thead th[aria-sort] { color: var(--text); font-weight: 500; }
 thead th[aria-sort]::after { content: " ↑"; }
 tbody tr:last-child td { border-bottom: 0; }
@@ -199,22 +201,22 @@ td a:hover { text-decoration: underline; }
 .apt-photo { grid-column: 1 / -1; display: block; aspect-ratio: 16 / 6; border-radius: 6px; overflow: hidden; background: var(--raised); margin: -4px -4px 0; }
 .apt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .apt-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; grid-column: 1 / -1; }
-.apt-head input[type="text"] { flex: 1 1 220px; font-weight: 500; font-size: 15px; height: 36px; }
+.apt-head input[type="text"] { flex: 1 1 220px; font-weight: 500; font-size: var(--fs-lead); height: 36px; }
 .apt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--gap); }
-.apt-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.apt-grid label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); color: var(--muted); }
 .apt-grid .num, .apt-grid .num input { width: 100%; }
 .apt-out { background: var(--raised); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .apt-out .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .rooms { columns: 2 440px; column-gap: var(--gap); }
 .rooms > .room { break-inside: avoid; margin-bottom: var(--gap); }
-.room h4 { margin: 0 0 4px; display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; }
-.room h4 span { font-weight: 500; color: var(--muted); font-size: 14px; }
-.item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; min-height: 44px; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.room h4 { margin: 0 0 4px; display: flex; justify-content: space-between; font-size: var(--fs-lead); font-weight: 500; }
+.room h4 span { font-weight: 500; color: var(--muted); font-size: var(--fs-body); }
+.item { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; min-height: 44px; border-bottom: 1px solid var(--rule); font-size: var(--fs-body); }
 .item:last-child { border-bottom: 0; }
 .item.have .nm { text-decoration: line-through; color: var(--muted); }
 .item .num input { width: 5.2em; }
-.item .ess { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.item .ess { font-size: var(--fs-small); color: var(--muted); font-weight: 400; margin-left: 4px; }
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--text); cursor: pointer; }
 
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
@@ -223,8 +225,8 @@ ol.steps.two > .step { break-inside: avoid; }
 .step { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--rule); align-items: start; }
 .steps:not(.two) .step:last-child { border-bottom: 0; }
 .step .n { display: none; }
-.step h4 { margin: 0; font-size: 15px; font-weight: 500; }
-.step p { margin: 2px 0 0; color: var(--muted); font-size: 14px; max-width: 72ch; }
+.step h4 { margin: 0; font-size: var(--fs-lead); font-weight: 500; }
+.step p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-body); max-width: 72ch; }
 .step.done h4 { color: var(--muted); text-decoration: line-through; }
 .progress { height: 8px; background: var(--raised); border-radius: 4px; overflow: hidden; }
 .progress b { display: block; height: 100%; background: var(--data); border-radius: 4px; }
@@ -234,14 +236,14 @@ a { color: var(--text); text-underline-offset: 2px; }
 .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
 .evid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; }
 .evid > div { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
-.evid p { margin: 0; font-size: 14px; }
-.evid a { font-size: 12px; color: var(--muted); }
+.evid p { margin: 0; font-size: var(--fs-body); }
+.evid a { font-size: var(--fs-small); color: var(--muted); }
 svg text { font-family: var(--f-body); }
 @media (prefers-reduced-motion: no-preference) { .bar b, .progress b { transition: width .35s ease; } }
 /* Map */
 .map-panel { padding: 0; overflow: hidden; margin: 8px 0 4px; }
 #map { height: 380px; background: var(--raised); }
-.map-panel .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: 12px; border-top: 1px solid var(--border); }
+.map-panel .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 16px; font-size: var(--fs-small); border-top: 1px solid var(--border); }
 .map-panel .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .map-panel .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .leaflet-container { font: 13px var(--f-body); }
@@ -253,10 +255,10 @@ svg text { font-family: var(--f-body); }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); box-shadow: 0 2px 10px rgb(0 0 0 / .18); }
 @media (max-width: 640px) { #map { height: 300px; } }
 /* Showings */
-.show input[type="text"]:not([data-num]), .show input[type="url"], .show select { font: 400 13px var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
-.show label.paste { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 12px; }
+.show input[type="text"]:not([data-num]), .show input[type="url"], .show select { font: 400 var(--fs-meta) var(--f-body); height: 32px; border: 1px solid var(--control); border-radius: var(--r-control); background: var(--surface); color: var(--text); padding: 0 8px; min-width: 0; }
+.show label.paste { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-small); color: var(--muted); margin-top: 12px; }
 .show label.paste input { width: 100%; }
-.crawl { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 20px; }
+.crawl { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-body); line-height: 20px; }
 .crawl > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .crawl .dot { margin-top: 6px; }
 .crawl .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--control); flex: none; }
@@ -265,15 +267,15 @@ svg text { font-family: var(--f-body); }
 .crawl .dot.partial { background: var(--warning); }
 .answer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
 .answer div { display: flex; flex-direction: column; gap: 2px; }
-.answer .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.answer .s { font-size: 12px; color: var(--muted); }
+.answer .v { font-size: var(--fs-figure); font-weight: 600; font-variant-numeric: tabular-nums; }
+.answer .s { font-size: var(--fs-small); color: var(--muted); }
 .answer .booli { border-left: 1px solid var(--rule); padding-left: 10px; }
-details.agents { margin-top: 10px; font-size: 13px; }
+details.agents { margin-top: 10px; font-size: var(--fs-meta); }
 details.agents summary, details.undated > summary { cursor: pointer; }
 details.agents table { width: 100%; margin-top: 6px; border-collapse: collapse; }
 details.agents td { padding: 3px 0; border-top: 1px solid var(--rule); }
 details.agents td + td { text-align: right; color: var(--muted); }
-details.compare th { font-weight: 500; color: var(--muted); text-align: right; padding: 3px 0; font-size: 12px; }
+details.compare th { font-weight: 500; color: var(--muted); text-align: right; padding: 3px 0; font-size: var(--fs-small); }
 details.compare th:first-child { text-align: left; }
 details.compare td { font-variant-numeric: tabular-nums; }
 details.undated { margin-top: 22px; }
@@ -283,7 +285,7 @@ details.undated { margin-top: 22px; }
 .bidchart .day { stroke: var(--rule); stroke-width: 1; }
 .bidchart svg { width: 100%; height: auto; display: block; overflow: visible; }
 .bidchart .grid { stroke: var(--rule); stroke-width: 1; }
-.bidchart .ax, .bidchart .ref text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bidchart .ax, .bidchart .ref text { fill: var(--muted); font-size: var(--fs-axis); font-variant-numeric: tabular-nums; }
 .bidchart .ref line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
 .bidchart .ref.max line { stroke: var(--text); }
 .bidchart .ref.max text { fill: var(--text); font-weight: 600; }
@@ -291,8 +293,8 @@ details.undated { margin-top: 22px; }
 .bidchart .dot { stroke: var(--surface); stroke-width: 2; }
 .bidchart .hit { fill: transparent; }
 .bidchart .pt:hover .dot { r: 6.5; }
-.bidchart .lastv { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.bid-facts { margin: 0; font-size: 13px; color: var(--muted); }
+.bidchart .lastv { fill: var(--text); font-size: var(--fs-small); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bid-facts { margin: 0; font-size: var(--fs-meta); color: var(--muted); }
 .bid-facts strong { color: var(--negative); }
 .bid-facts strong.plain { color: var(--text); }
 .pricehist .askline { fill: none; stroke: var(--data); stroke-width: 2; stroke-linejoin: round; }
@@ -303,15 +305,15 @@ details.undated { margin-top: 22px; }
 .pricehist .hl { stroke: var(--muted); stroke-width: 1; opacity: 0; }
 .pricehist .hd:hover .hl { opacity: .5; }
 .pricehist .hd:hover .dot { r: 5; }
-.pricehist .end { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.pricehist .end { font-size: var(--fs-axis); fill: var(--muted); font-variant-numeric: tabular-nums; }
 .pricehist .end.ask { fill: var(--data); font-weight: 600; }
 .pricehist .end.fin { fill: var(--text); font-weight: 600; }
 .bid-legend .h-ask { background: var(--data); }
 .bid-legend .h-bid { background: var(--muted); }
 .bid-legend .h-fin { background: var(--text); }
-.bid-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.bid-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-small); color: var(--muted); }
 .bid-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-.bid-table { font-size: 12px; }
+.bid-table { font-size: var(--fs-small); }
 .bid-table summary { cursor: pointer; color: var(--text); }
 .bid-table table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .bid-table th { text-align: left; font-weight: 500; color: var(--muted); padding: 3px 0; }
@@ -326,7 +328,7 @@ details.undated { margin-top: 22px; }
 .bidchart .b6, .bid-legend .b6 { fill: var(--bid-6); background: var(--bid-6); }
 .bidchart .b7, .bid-legend .b7 { fill: var(--bid-7); background: var(--bid-7); }
 .bidchart .b8, .bid-legend .b8 { fill: var(--bid-8); background: var(--bid-8); }
-.follow .bids { margin: 0; padding: 0; list-style: none; font-size: 12px; display: grid; gap: 2px; }
+.follow .bids { margin: 0; padding: 0; list-style: none; font-size: var(--fs-small); display: grid; gap: 2px; }
 .follow .bids li { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); }
 details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .hood-row > span:first-child { min-width: 0; }
@@ -335,24 +337,24 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 @media (prefers-reduced-motion: reduce) { .crawl .dot.running { animation: none; } }
 #tabs button.busy::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--data); margin-left: 6px; vertical-align: middle; }
 .hood-group { border-top: 1px solid var(--rule); }
-.hood-group > summary { display: flex; align-items: center; gap: 8px; padding: 10px 0; cursor: pointer; font-weight: 600; font-size: 14px; }
-.hood-group > summary .dim { font-weight: 400; font-size: 12px; }
+.hood-group > summary { display: flex; align-items: center; gap: 8px; padding: 10px 0; cursor: pointer; font-weight: 600; font-size: var(--fs-body); }
+.hood-group > summary .dim { font-weight: 400; font-size: var(--fs-small); }
 .hood-row.parent > span:first-child { font-weight: 600; }
 .hood-row.child > span:first-child { padding-left: 14px; }
-.hood-row small { font-size: 11px; }
-.hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.hood-row small { font-size: var(--fs-axis); }
+.hood-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: var(--fs-body); }
 .hood-row label { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .hood-row input[type="text"] { grid-column: 1 / -1; }
 .hood-row.never label { color: var(--muted); text-decoration: line-through; }
-.my-area { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.my-area { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 4px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--rule); font-size: var(--fs-body); }
 .my-area:first-of-type { border-top: 0; }
 .my-area > input[type="text"], .my-area > details { grid-column: 1 / -1; }
-.my-area > input[type="text"] { font-size: 13px; padding-top: 4px; padding-bottom: 4px; }
-.my-area > details { font-size: 12px; color: var(--muted); }
+.my-area > input[type="text"] { font-size: var(--fs-meta); padding-top: 4px; padding-bottom: 4px; }
+.my-area > details { font-size: var(--fs-small); color: var(--muted); }
 .my-area > details summary { cursor: pointer; }
 .place { display: grid; grid-template-columns: minmax(0, 1fr) 96px 32px; gap: 4px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--rule); }
 .place > input[data-k="addr"], .place > small { grid-column: 1 / -1; }
-.place > small { font-size: 11px; }
+.place > small { font-size: var(--fs-axis); }
 .place .btn { padding: 0; width: 32px; justify-content: center; }
 .facts.travel { margin-top: 4px; }
 .show-card .flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
@@ -363,13 +365,13 @@ details.undated > summary { font-weight: 600; margin-bottom: 8px; }
 .heart[aria-pressed="true"] { color: var(--negative); border-color: currentColor; }
 .heart[aria-pressed="true"] svg { fill: currentColor; }
 .facts.travel strong { color: var(--text); font-weight: 600; }
-.rank-wait ul { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 4px; font-size: 14px; }
+.rank-wait ul { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 4px; font-size: var(--fs-body); }
 .rank-wait a { color: var(--text); }
 ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rank-row { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) auto; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 16px; }
 .rank-row .rk { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
 .rank-row .sc { display: grid; gap: 4px; }
-.rank-row .sc b { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.rank-row .sc b { font-size: var(--fs-figure); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
 .rank-row .sc i { display: block; height: 4px; border-radius: 2px; background: var(--data); }
 .rank-row .facts { margin: 4px 0 6px; }
 .rank-row .why { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -377,27 +379,27 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rt-list { list-style: none; margin: 0; padding: 0; }
 .rt-stop { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 8px 0; min-width: 0; }
 .rt-stop > div { min-width: 0; display: grid; gap: 4px; }
-.rt-time { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
-.rt-leg { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0 2px 54px; font-size: 13px; color: var(--muted); }
+.rt-time { font-size: var(--fs-body); font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.rt-leg { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0 2px 54px; font-size: var(--fs-meta); color: var(--muted); }
 .dg-list li { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border); min-width: 0; }
 .dg-list li:first-child { border-top: 0; padding-top: 4px; }
 .dg-addr { color: var(--text); font-weight: 600; }
-.dg-what { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
-.dg-hint { font-size: 13px; margin: -4px 0 6px; }
-.dg-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.dg-day { font-size: 13px; font-weight: 600; margin: 14px 0 2px; color: var(--muted); }
+.dg-what { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--fs-meta); }
+.dg-hint { font-size: var(--fs-meta); margin: -4px 0 6px; }
+.dg-time { font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+.dg-day { font-size: var(--fs-meta); font-weight: 600; margin: 14px 0 2px; color: var(--muted); }
 .dg-day:first-of-type { margin-top: 4px; }
-.dg-more summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 8px 0 0; }
+.dg-more summary { cursor: pointer; font-size: var(--fs-meta); color: var(--muted); padding: 8px 0 0; }
 .dg h3 .dim { font-weight: 400; }
-.dg-strip { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; margin-top: 6px; padding: 8px 12px; border-radius: 8px; background: var(--raised); color: var(--text); font-size: 14px; text-decoration: none; }
+.dg-strip { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; margin-top: 6px; padding: 8px 12px; border-radius: 8px; background: var(--raised); color: var(--text); font-size: var(--fs-body); text-decoration: none; }
 .dg-strip:hover { background: var(--border); }
-.chip.score { border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500; }
+.chip.score { border: 0; cursor: pointer; font: inherit; font-size: var(--fs-small); font-weight: 500; }
 @media (max-width: 640px) { .rank-row { grid-template-columns: 24px minmax(0, 1fr) auto; } .rank-row .sc { grid-column: 2; grid-row: 2; } }
-.my-area ul { margin: 0; padding: 0; list-style: none; font-size: 13px; display: grid; gap: 4px; }
+.my-area ul { margin: 0; padding: 0; list-style: none; font-size: var(--fs-meta); display: grid; gap: 4px; }
 .my-area li { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .my-area li em { flex-basis: 100%; color: var(--muted); }
 .show-day { font-size: var(--fs-section); margin: 22px 0 8px; display: flex; gap: 8px; align-items: baseline; }
-.show-day .dim { font-size: 13px; font-weight: 400; }
+.show-day .dim { font-size: var(--fs-meta); font-weight: 400; }
 .show-card { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; }
 .show-card + .show-card { margin-top: 8px; }
 .btn.more { margin: 14px auto 0; display: flex; }
@@ -405,22 +407,22 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .show-card.has-photo { grid-template-columns: 92px 168px minmax(0, 1fr) auto; }
 .show-card .thumb { display: block; width: 168px; aspect-ratio: 3 / 2; border-radius: 6px; overflow: hidden; background: var(--raised); }
 .show-card .thumb img, .gallery .strip img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gallery { margin: 0 0 8px; font-size: 13px; }
+.gallery { margin: 0 0 8px; font-size: var(--fs-meta); }
 .gallery summary { cursor: pointer; }
 .gallery .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; margin-top: 8px; }
 .gallery .strip a { display: block; aspect-ratio: 3 / 2; border-radius: 4px; overflow: hidden; background: var(--raised); }
 .show-card .t { font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
-.show-card p { margin: 4px 0 6px; font-size: 14px; }
+.show-card p { margin: 4px 0 6px; font-size: var(--fs-body); }
 .show-card a { color: var(--text); }
-.show-card details.plan { margin: 0 0 8px; font-size: 13px; }
+.show-card details.plan { margin: 0 0 8px; font-size: var(--fs-meta); }
 .show-card details.plan summary { cursor: pointer; font-weight: 600; }
 .show-card details.plan .fill { display: grid; gap: 8px; margin-top: 8px; }
 .show-card details.plan img { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
-.show-card details.desc { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
-.show-card details.desc summary { cursor: pointer; color: var(--text); font-size: 13px; }
-.show-card details.desc p { margin: 6px 0 0; font-size: 13px; }
+.show-card details.desc { font-size: var(--fs-meta); color: var(--muted); margin: 0 0 8px; }
+.show-card details.desc summary { cursor: pointer; color: var(--text); font-size: var(--fs-meta); }
+.show-card details.desc p { margin: 6px 0 0; font-size: var(--fs-meta); }
 .facts a { color: var(--text); }
-.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: var(--fs-meta); color: var(--muted); }
 .visit { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; margin-top: 10px; }
 .sc-act { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 @media (max-width: 900px) { .bench.show > div:last-child { order: -1; } }
@@ -431,7 +433,7 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .visit { grid-template-columns: minmax(0, 1fr); }
 }
 /* An apartment's own page */
-.ap-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); text-decoration: none; margin: -12px 0 14px; min-height: 32px; }
+.ap-back { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-meta); color: var(--muted); text-decoration: none; margin: -12px 0 14px; min-height: 32px; }
 .ap-back:hover { color: var(--text); }
 .ap-head { display: flex; gap: 12px 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
 .ap-head .lead { margin: 0; flex: 1 1 320px; min-width: 0; }
@@ -445,7 +447,7 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .ap-nav:hover { background: var(--surface); }
 .ap-nav.prev { left: 12px; }
 .ap-nav.next { right: 12px; }
-.ap-count { position: absolute; right: 12px; bottom: 12px; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); }
+.ap-count { position: absolute; right: 12px; bottom: 12px; font-size: var(--fs-small); padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); }
 .ap-strip { display: flex; gap: 6px; padding: 8px; overflow-x: auto; scrollbar-width: thin; border-top: 1px solid var(--border); }
 .ap-strip button { flex: none; width: 84px; aspect-ratio: 3 / 2; padding: 0; border: 2px solid transparent; border-radius: 4px; overflow: hidden; background: var(--raised); cursor: pointer; opacity: .7; }
 .ap-strip button:hover, .ap-strip button[aria-current="true"] { opacity: 1; }
@@ -454,41 +456,41 @@ ol.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .ap-page .tile { cursor: default; }
 .ap-page .tile:hover { background: var(--surface); }
 .ap-page .tiles { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-.ap-page .panel h3 small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 6px; }
-.ap-desc p { margin: 0 0 12px; max-width: 72ch; font-size: 15px; line-height: 23px; }
+.ap-page .panel h3 small { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); margin-left: 6px; }
+.ap-desc p { margin: 0 0 12px; max-width: 72ch; font-size: var(--fs-lead); line-height: 23px; }
 .ap-desc p:last-child { margin-bottom: 0; }
 .ap-feats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
 .ap-plan { display: grid; gap: 8px; }
 .ap-plan img { display: block; width: 100%; max-height: 85vh; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
 .ap-month { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 18px 0 10px; padding-top: 16px; border-top: 1px solid var(--rule); }
-.ap-month b { font-size: 22px; line-height: 28px; font-weight: 500; }
-.ap-max { display: grid; gap: 6px; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.ap-month b { font-size: var(--fs-figure); line-height: 28px; font-weight: 500; }
+.ap-max { display: grid; gap: 6px; margin: 0 0 14px; font-size: var(--fs-meta); color: var(--muted); }
 .ap-max .bar b { background: var(--data); }
 .ap-max.over .bar b { background: var(--negative); }
-.ap-row { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+.ap-row { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: var(--fs-body); }
 .ap-row:last-of-type { border-bottom: 0; }
 .ap-row.past { color: var(--muted); }
 .book { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 2px; flex-basis: 100%; }
-.book small { flex-basis: 100%; font-size: 12px; line-height: 1.4; }
+.book small { flex-basis: 100%; font-size: var(--fs-small); line-height: 1.4; }
 .book .bad-ink { color: var(--bad); }
 .book .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .ap-row > span:first-child { min-width: 0; }
 .ap-score { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
-.ap-score b { font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -0.02em; }
+.ap-score b { font-size: var(--fs-kpi); line-height: 40px; font-weight: 700; letter-spacing: -0.02em; }
 .ap-score .bar { flex: 1; }
 .ap-score .bar b, .ap-part .bar b { display: block; height: 100%; font-size: 0; background: var(--data); }
-.ap-part { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 2px 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--rule); font-size: 14px; }
-.ap-part small { grid-column: 1; color: var(--muted); font-size: 12px; line-height: 16px; }
+.ap-part { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 2px 12px; align-items: center; padding: 7px 0; border-top: 1px solid var(--rule); font-size: var(--fs-body); }
+.ap-part small { grid-column: 1; color: var(--muted); font-size: var(--fs-small); line-height: 16px; }
 .ap-part .bar { grid-column: 2; grid-row: 1 / span 2; height: 6px; }
 .ap-part.low .bar b { background: var(--warning); }
 .ap-part.off { color: var(--muted); }
 .ap-flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.ap-flags li { display: grid; gap: 3px; justify-items: start; font-size: 13px; line-height: 18px; color: var(--muted); }
-.ap-sub { font-size: 13px; font-weight: 500; color: var(--muted); margin: 18px 0 8px; }
-.ap-facts { font-size: 13px; margin-top: 14px; }
+.ap-flags li { display: grid; gap: 3px; justify-items: start; font-size: var(--fs-meta); line-height: 18px; color: var(--muted); }
+.ap-sub { font-size: var(--fs-meta); font-weight: 500; color: var(--muted); margin: 18px 0 8px; }
+.ap-facts { font-size: var(--fs-meta); margin-top: 14px; }
 .ap-facts summary { cursor: pointer; }
 .ap-facts p { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
-.ap-others { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.ap-others { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--fs-body); }
 .ap-others li { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
 #aptmap { height: 260px; background: var(--raised); }
 .aptp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: var(--gap); align-items: start; }
@@ -1281,10 +1283,10 @@ const VIEWS = {
     const x = (i) => L + (i * (W - L - R)) / 4, yv = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
     const ticks = []; for (let v = lo; v <= hi + 1e-6; v += step) ticks.push(v);
     const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pengar kvar varje månad per scenario" style="width:100%;height:auto;display:block">
-      ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${yv(v)}" y2="${yv(v)}" stroke="${v === 0 ? "var(--muted)" : "var(--line)"}" stroke-width="${v === 0 ? 1.5 : 1}"/><text x="${L - 8}" y="${yv(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${nf.format(v)}</text>`).join("")}
-      ${[0, 1, 2, 3, 4].map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">År ${i + 1}</text>`).join("")}
+      ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${yv(v)}" y2="${yv(v)}" stroke="${v === 0 ? "var(--muted)" : "var(--line)"}" stroke-width="${v === 0 ? 1.5 : 1}"/><text x="${L - 8}" y="${yv(v) + 4}" text-anchor="end" style="font-size:var(--fs-axis)" fill="var(--muted)">${nf.format(v)}</text>`).join("")}
+      ${[0, 1, 2, 3, 4].map((i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" style="font-size:var(--fs-axis)" fill="var(--muted)">År ${i + 1}</text>`).join("")}
       ${all.map((rows, si) => { const on = keys[si] === pick; const c = on ? "var(--data)" : "var(--chart-2)"; return `<polyline fill="none" stroke="${c}" stroke-width="${on ? 2.5 : 1.5}" points="${rows.map((r, i) => `${x(i)},${yv(r.left)}`).join(" ")}"/>${on ? rows.map((r, i) => `<circle cx="${x(i)}" cy="${yv(r.left)}" r="3.5" fill="${c}"/>`).join("") : ""}`; }).join("")}
-      ${(() => { const ls = all.map((rows, si) => ({ y: yv(rows[4].left), name: F.scen[keys[si]].name, on: keys[si] === pick })).sort((a, b) => a.y - b.y); for (let i = 1; i < ls.length; i++) ls[i].y = Math.max(ls[i].y, ls[i - 1].y + 14); return ls.map((l) => `<text x="${x(4) + 10}" y="${l.y + 4}" font-size="12" fill="${l.on ? "var(--text)" : "var(--muted)"}" font-weight="${l.on ? 500 : 400}">${esc(l.name)}</text>`).join(""); })()}
+      ${(() => { const ls = all.map((rows, si) => ({ y: yv(rows[4].left), name: F.scen[keys[si]].name, on: keys[si] === pick })).sort((a, b) => a.y - b.y); for (let i = 1; i < ls.length; i++) ls[i].y = Math.max(ls[i].y, ls[i - 1].y + 14); return ls.map((l) => `<text x="${x(4) + 10}" y="${l.y + 4}" style="font-size:var(--fs-small)" fill="${l.on ? "var(--text)" : "var(--muted)"}" font-weight="${l.on ? 500 : 400}">${esc(l.name)}</text>`).join(""); })()}
     </svg>`;
     const sum = all.map((rows, i) => ({ k: keys[i], min: Math.min(...rows.map((r) => r.left)), end: rows[4] }));
     return `
@@ -1353,8 +1355,8 @@ const VIEWS = {
     const fitFrom = R.pts[0][0], fit = []; for (let yr = fitFrom; yr <= BUY_YEAR - 1; yr++) fit.push([yr, R.pred(yr).mid]);
     const band = proj.map(([yr, p]) => `${x(yr)},${y(p.hi)}`).join(" ") + " " + proj.slice().reverse().map(([yr, p]) => `${x(yr)},${y(p.lo)}`).join(" ");
     const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pris per kvm över tid och trend för ${esc(A.name)}" style="width:100%;height:auto;display:block">
-      ${ticks.map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v ? nf.format(v / 1000) + "k" : "0"}</text>`).join("")}
-      ${xt.map((yr) => `<text x="${x(yr)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${yr}</text>`).join("")}
+      ${ticks.map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" style="font-size:var(--fs-axis)" fill="var(--muted)">${v ? nf.format(v / 1000) + "k" : "0"}</text>`).join("")}
+      ${xt.map((yr) => `<text x="${x(yr)}" y="${H - 8}" text-anchor="middle" style="font-size:var(--fs-axis)" fill="var(--muted)">${yr}</text>`).join("")}
       <rect x="${x(fitFrom) - 4}" y="${T}" width="${x(BUY_YEAR - 1) - x(fitFrom) + 8}" height="${H - T - B}" fill="var(--accent-soft)" opacity=".5"/>
       <polygon points="${band}" fill="var(--accent)" opacity=".15"/>
       <polyline fill="none" stroke="var(--muted)" stroke-width="1.5" points="${allPts.map(([yr, v]) => `${x(yr)},${y(v)}`).join(" ")}"/>
@@ -1462,7 +1464,7 @@ const VIEWS = {
       <p>Vad varje lägenhet kostar i månaden, hur frisk föreningen ser ut och, när budgivningen börjar, hur den går bud för bud. Spara en från Visningar med hjärtat, eller lägg till den här med en länk till mäklarens sida.</p></div>
       <div class="bench rev">
         <div>
-          <div class="row" style="margin:0 0 12px"><span class="dim" style="font-size:13px">${S.apts.length} sparade</span><span class="spacer"></span><button class="btn" data-act="add-apt">Lägg till lägenhet</button></div>
+          <div class="row" style="margin:0 0 12px"><span class="dim" style="font-size:var(--fs-meta)">${S.apts.length} sparade</span><span class="spacer"></span><button class="btn" data-act="add-apt">Lägg till lägenhet</button></div>
           <div class="apts">${S.apts.length ? S.apts.map(aptCard).join("") : `<div class="panel dim">Inget sparat än. Tryck på hjärtat på en visning för att följa den här.</div>`}</div>
         </div>
         <div class="stack">
@@ -1589,10 +1591,10 @@ function aptCard(p) {
 function followBlock(p) {
   const f = (LIST.followed || {})[p.link];
   if (!p.link || !/^https?:/.test(p.link)) return "";
-  if (!f) return `<p class="dim" style="font-size:12px;margin:0 0 10px">Bostadsletaren följer den här lägenheten från nästa körning.</p>`;
+  if (!f) return `<p class="dim" style="font-size:var(--fs-small);margin:0 0 10px">Bostadsletaren följer den här lägenheten från nästa körning.</p>`;
   const ask = +p.price || 0;
-  const head = f.state === "sold" ? `<span class="chip">Såld${f.final ? " för " + kr(f.final) : ""}</span>${f.final && ask ? `<span class="dim" style="font-size:12px">${f.final >= ask ? "+" : ""}${kr(f.final - ask)} mot utgångspriset</span>` : ""}`
-    : f.state === "bidding" ? `<span class="chip warn">Budgivning${f.bid ? ": " + kr(f.bid) : ""}</span>${f.bid && ask && !bidChart(p, f) ? `<span class="dim" style="font-size:12px">${f.bid >= ask ? "+" : ""}${kr(f.bid - ask)} mot utgångspriset${f.bids ? ", " + f.bids + " bud" : ""}</span>` : ""}`
+  const head = f.state === "sold" ? `<span class="chip">Såld${f.final ? " för " + kr(f.final) : ""}</span>${f.final && ask ? `<span class="dim" style="font-size:var(--fs-small)">${f.final >= ask ? "+" : ""}${kr(f.final - ask)} mot utgångspriset</span>` : ""}`
+    : f.state === "bidding" ? `<span class="chip warn">Budgivning${f.bid ? ": " + kr(f.bid) : ""}</span>${f.bid && ask && !bidChart(p, f) ? `<span class="dim" style="font-size:var(--fs-small)">${f.bid >= ask ? "+" : ""}${kr(f.bid - ask)} mot utgångspriset${f.bids ? ", " + f.bids + " bud" : ""}</span>` : ""}`
     : f.state === "gone" ? `<span class="chip">Borttagen av mäklaren</span>` : `<span class="chip info">Till salu, inga bud än</span>`;
   return `<div class="follow"><div class="row" style="gap:8px">${head}</div></div>`;
 }
@@ -1994,13 +1996,13 @@ function crawlPanel() {
   const st = CRAWL.state, found = LIST.found, b = LIST.booli || {};
   const last = LIST.lastRun ? new Date(LIST.lastRun).toLocaleString("sv-SE", { weekday: "short", hour: "2-digit", minute: "2-digit" }) : null;
   if (!LOCAL && !ONLINE) return `<section class="panel"><h3>Bostadsletaren</h3>
-    <p style="margin:0;font-size:14px">Bostadsletaren körs på din Mac. Starta den lokala servern och öppna <strong>http://localhost:8765</strong> för att se lägenheterna här.</p></section>`;
+    <p style="margin:0;font-size:var(--fs-body)">Bostadsletaren körs på din Mac. Starta den lokala servern och öppna <strong>http://localhost:8765</strong> för att se lägenheterna här.</p></section>`;
   const text = st === "running" || st === "error" ? CRAWL.msg : last ? `Senast körd ${last}.` : "Inte körd än.";
   const key = found ? `<div class="answer">
       <div><span class="v">${found.forSale}</span><span class="s">till salu hittade</span></div>
       <div><span class="v">${found.soon}</span><span class="s">snart till salu hittade</span></div>
       ${b.forSale != null ? `<div class="booli"><span class="v">${b.forSale}${b.soon != null ? " · " + b.soon : ""}</span><span class="s">${b.soon != null ? "" : "till salu "}på Booli${b.missing ? ", från " + fmtShort(b.at) : ""}</span></div>` : ""}
-    </div>${b.forSale ? `<p class="dim" style="font-size:12px;margin:8px 0 0">Boolis antal för samma filter i Stockholms innerstad är facit: skillnaden är det bostadsletaren inte täcker än.</p>` : ""}` : "";
+    </div>${b.forSale ? `<p class="dim" style="font-size:var(--fs-small);margin:8px 0 0">Boolis antal för samma filter i Stockholms innerstad är facit: skillnaden är det bostadsletaren inte täcker än.</p>` : ""}` : "";
   const ag = LIST.agents ? Object.entries(LIST.agents) : [];
   // Ours against Booli, one row a day, newest first: how far the gap has closed while agents were added
   const days = Object.entries(LIST.compare || {}).sort((x, y) => (x[0] < y[0] ? 1 : -1)).slice(0, 14);
@@ -2008,22 +2010,22 @@ function crawlPanel() {
   const trend = days.length > 1 ? `<details class="agents compare"><summary>Jämfört med Booli, dag för dag</summary><table>
       <thead><tr><th>Dag</th><th>Till salu</th><th>Snart</th><th>Täckning</th><th>Mäklare</th></tr></thead>
       <tbody>${days.map(([d, c]) => `<tr><td>${fmtShort(d)}</td><td>${c.forSale}${c.booliForSale != null ? ` / ${c.booliForSale}` : ""}</td><td>${c.soon}${c.booliSoon != null ? ` / ${c.booliSoon}` : ""}</td><td>${cover(c)}</td><td>${c.agents}</td></tr>`).join("")}</tbody>
-    </table><p class="dim" style="font-size:12px;margin:6px 0 0">Vårt antal / Boolis. Täckning är hur stor del av Boolis till salu vi hittar.</p></details>` : "";
+    </table><p class="dim" style="font-size:var(--fs-small);margin:6px 0 0">Vårt antal / Boolis. Täckning är hur stor del av Boolis till salu vi hittar.</p></details>` : "";
   return `<section class="panel">
     <h3>Bostadsletaren</h3>
     <div class="crawl"><span class="dot ${st}"></span><span>${esc(text)}${st !== "running" && CRAWL.msg && st !== "error" ? " " + esc(CRAWL.msg) : ""}</span></div>
     ${key}
-    ${LIST.history ? `<p class="dim" style="font-size:12px;margin:10px 0 0">Prishistorik: ${LIST.history.apartments} lägenheter, ${LIST.history.readings} dagliga avläsningar, ${LIST.history.withBids} med bud och ${LIST.history.finalPrices} slutpriser hittills. Sparas i data/history.sqlite, med CSV-filer bredvid.</p>` : ""}
+    ${LIST.history ? `<p class="dim" style="font-size:var(--fs-small);margin:10px 0 0">Prishistorik: ${LIST.history.apartments} lägenheter, ${LIST.history.readings} dagliga avläsningar, ${LIST.history.withBids} med bud och ${LIST.history.finalPrices} slutpriser hittills. Sparas i data/history.sqlite, med CSV-filer bredvid.</p>` : ""}
     ${trend}
     ${ag.length ? `<details class="agents"><summary>${ag.length} mäklare lästa</summary><table>${ag.map(([n, r]) => `<tr><td>${esc(n)}</td><td>${r.inner} i innerstaden</td></tr>`).join("")}</table></details>` : ""}
-    ${ONLINE ? `<div class="row" style="margin-top:12px"><span class="dim" style="font-size:13px">Bostadsletaren körs varje morgon; här visas den senaste körningen.</span>${ONLINE_API.signedIn ? `<button class="btn ghost" data-act="sign-out">Logga ut</button>` : `<button class="btn ghost" data-act="sign-in">Logga in</button>`}</div>`
+    ${ONLINE ? `<div class="row" style="margin-top:12px"><span class="dim" style="font-size:var(--fs-meta)">Bostadsletaren körs varje morgon; här visas den senaste körningen.</span>${ONLINE_API.signedIn ? `<button class="btn ghost" data-act="sign-out">Logga ut</button>` : `<button class="btn ghost" data-act="sign-in">Logga in</button>`}</div>`
       : st === "running" ? "" : `<div class="row" style="margin-top:12px"><button class="btn primary" data-act="crawl-start">Kör nu</button></div>`}
-    <p class="dim" style="font-size:12px;margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:25; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 25) ? "i dag" : "i morgon"} 06:25. Missar den morgonen för att datorn är avstängd eller sover, körs den så snart datorn är igång igen.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:25.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
+    <p class="dim" style="font-size:var(--fs-small);margin:10px 0 0">${CRAWL.scheduled ? `Körs varje morgon 06:25; nästa körning ${new Date().getHours() < 6 || (new Date().getHours() === 6 && new Date().getMinutes() < 25) ? "i dag" : "i morgon"} 06:25. Missar den morgonen för att datorn är avstängd eller sover, körs den så snart datorn är igång igen.` : `Inte schemalagd än, så den körs bara när du trycker på Kör nu. Kör <span class="mono">scripts/install-mac.sh</span> en gång för att köra den varje morgon 06:25.`} Den följer varje sajts robots.txt och slutar läsa en sajt som blockerar den.</p>
   </section>`;
 }
 function filterPanel() {
   const f = S.show.f;
-  const chk = (k, label) => `<label class="dim" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" data-check="show.f.${k}" ${f[k] ? "checked" : ""}> ${label}</label>`;
+  const chk = (k, label) => `<label class="dim" style="display:flex;gap:8px;align-items:center;font-size:var(--fs-meta);margin-top:8px"><input type="checkbox" data-check="show.f.${k}" ${f[k] ? "checked" : ""}> ${label}</label>`;
   return `<section class="panel">
     <h3>Sökfilter</h3>
     ${numField("show.f.minPrice", "Minpris", "kr", "Utgångspriset att söka från. Lägenheter utan pris än är alltid med.")}
@@ -2034,7 +2036,7 @@ function filterPanel() {
     ${chk("notGround", "Inte på bottenvåningen")}
     ${chk("includeSoon", "Ta med lägenheter som snart är till salu")}
     ${chk("skipPricey", "Dölj lägenheter utan pris som uppskattas mer än 10 % över maxpriset")}
-    <small class="dim" style="display:block;font-size:12px;margin-top:4px">Uppskattningen är stadsdelens senaste kvadratmeterpris gånger lägenhetens storlek (Områdespriser).</small>
+    <small class="dim" style="display:block;font-size:var(--fs-small);margin-top:4px">Uppskattningen är stadsdelens senaste kvadratmeterpris gånger lägenhetens storlek (Områdespriser).</small>
   </section>`;
 }
 function areaGroups(list) {
@@ -2066,7 +2068,7 @@ function areasPanel(list) {
   const busy = (d) => [d, ...tree[d]].some((n) => (S.show.ratings[n] || {}).r || (S.show.ratings[n] || {}).note);
   return `<section class="panel">
     <h3>Områden</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">Betygsätt en hel stadsdel och sedan de delar av den som skiljer sig; en del du inte betygsatt får stadsdelens betyg. <strong>Aldrig här</strong> döljer alla lägenheter där.</p>
+    <p class="dim" style="font-size:var(--fs-meta);margin:0 0 4px">Betygsätt en hel stadsdel och sedan de delar av den som skiljer sig; en del du inte betygsatt får stadsdelens betyg. <strong>Aldrig här</strong> döljer alla lägenheter där.</p>
     ${Object.keys(tree).sort((a, b) => a.localeCompare(b, "sv")).map((d) => {
       const total = list.filter((p) => p.group === d).length;
       return `<details class="hood-group" ${busy(d) ? "open" : ""}><summary><span>${esc(d)}</span><span class="dim">${total || ""}</span>${rating(d) ? `<span class="chip ${rating(d) === "never" ? "bad" : +rating(d) >= 4 ? "good" : +rating(d) <= 2 ? "warn" : ""}">${ratingLabel(rating(d))}</span>` : ""}</summary>
@@ -2081,9 +2083,9 @@ function myAreasPanel() {
   const visits = Object.entries(S.show.visits);
   const all = new Set([...Object.keys(S.show.ratings).filter((n) => { const r = S.show.ratings[n]; return r && (r.r || r.note); }), ...visits.map(([, v]) => v.area).filter(Boolean)]);
   const names = new Set([...all].filter((n) => rating(n) !== "never")), nevers = all.size - names.size;
-  const left = nevers ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${nevers} ${nevers > 1 ? "områden" : "område"} med Aldrig här visas inte; ändra under Områden.</p>` : "";
-  if (!names.size && nevers) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:13px;margin:0">Inga betygsatta områden förutom Aldrig här.</p>${left}</section>`;
-  if (!names.size) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:13px;margin:0">Efter en visning trycker du på <strong>Jag var där</strong> på lägenheten. Ditt betyg och dina anteckningar om den och området samlas här.</p></section>`;
+  const left = nevers ? `<p class="dim" style="font-size:var(--fs-small);margin:8px 0 0">${nevers} ${nevers > 1 ? "områden" : "område"} med Aldrig här visas inte; ändra under Områden.</p>` : "";
+  if (!names.size && nevers) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:var(--fs-meta);margin:0">Inga betygsatta områden förutom Aldrig här.</p>${left}</section>`;
+  if (!names.size) return `<section class="panel"><h3>Dina områden</h3><p class="dim" style="font-size:var(--fs-meta);margin:0">Efter en visning trycker du på <strong>Jag var där</strong> på lägenheten. Ditt betyg och dina anteckningar om den och området samlas här.</p></section>`;
   const score = (n) => { const r = rating(n); return r === "never" ? -1 : r === "" ? 0 : +r; };
   return `<section class="panel"><h3>Dina områden</h3>${[...names].sort((a, b) => score(b) - score(a)).map((n) => {
     const r = S.show.ratings[n] || {}, vs = visits.filter(([, v]) => v.area === n);
@@ -2098,7 +2100,7 @@ function myAreasPanel() {
 function placesPanel() {
   const pl = S.show.places || [], known = TRAVEL.places || {};
   return `<section class="panel"><h3>Viktiga adresser</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">Varje lägenhet du sparar (♥) visar resan dit med SL, framme senast den tid du anger, en vardag.</p>
+    <p class="dim" style="font-size:var(--fs-meta);margin:0 0 4px">Varje lägenhet du sparar (♥) visar resan dit med SL, framme senast den tid du anger, en vardag.</p>
     ${pl.map((x) => {
       const k = known[(x.addr || "").trim().toLowerCase()];
       const found = !x.addr ? "" : k === undefined ? (TRAVEL.running ? "Letar…" : "Inte sökt än") : k === null ? "SL hittar inte adressen. Prova gata, nummer och ort." : "SL: " + esc(k.name);
@@ -2110,7 +2112,7 @@ function placesPanel() {
         <small class="dim">${found}</small>
       </div>`;
     }).join("")}
-    <div class="row" style="margin-top:8px"><button class="btn" data-act="add-place">Lägg till adress</button>${TRAVEL.running ? `<span class="dim" style="font-size:12px">Letar resor hos SL…</span>` : ""}</div>
+    <div class="row" style="margin-top:8px"><button class="btn" data-act="add-place">Lägg till adress</button>${TRAVEL.running ? `<span class="dim" style="font-size:var(--fs-small)">Letar resor hos SL…</span>` : ""}</div>
   </section>`;
 }
 // Red flags from the description, worst first, each with the sentence it comes from on hover.
@@ -2344,7 +2346,7 @@ function showView() {
       <div>
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
           <div class="seg">${[["week", "Nästa vecka"], ["8", "Närmaste 8 dagarna"], ["all", "Alla kommande"]].map(([k, l]) => `<button data-set="show.days" data-val="${k}" aria-pressed="${sh.days === k}">${l}</button>`).join("")}</div>
-          ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Dölj ${hidden} i Aldrig här-områden</label>` : ""}
+          ${hidden ? `<label class="dim" style="display:flex;gap:6px;align-items:center;font-size:var(--fs-meta)"><input type="checkbox" data-check="show.hideNever" ${sh.hideNever ? "checked" : ""}> Dölj ${hidden} i Aldrig här-områden</label>` : ""}
         </div>
         ${mapPanel()}
         ${body}
@@ -2445,7 +2447,7 @@ function contactPanel() {
   const c = S.contact || {}, f = (k, label, type, auto, ph) => `<div class="field"><label for="ct-${k}">${label}</label>
     <input id="ct-${k}" type="${type}" data-contact="${k}" value="${esc(c[k] || "")}" autocomplete="${auto}" placeholder="${ph}"></div>`;
   return `<section class="panel"><h3>Dina uppgifter för visningsanmälan</h3>
-    <p class="dim" style="font-size:13px;margin:0 0 4px">När du trycker <strong>Anmäl till visning</strong> fyller planeraren i dem i mäklarens formulär i ett Chrome-fönster på Macen. Du kontrollerar och skickar själv. De sparas i din plan, bara för dig.</p>
+    <p class="dim" style="font-size:var(--fs-meta);margin:0 0 4px">När du trycker <strong>Anmäl till visning</strong> fyller planeraren i dem i mäklarens formulär i ett Chrome-fönster på Macen. Du kontrollerar och skickar själv. De sparas i din plan, bara för dig.</p>
     ${f("name", "Namn", "text", "name", "För- och efternamn")}${f("email", "E-post", "email", "email", "namn@exempel.se")}${f("phone", "Telefon", "tel", "tel", "070-123 45 67")}
   </section>`;
 }
@@ -2562,12 +2564,12 @@ function rankView() {
     <p>Varje lägenhet i ditt filter med ett utgångspris får ett betyg från 0 till 100 utifrån det vi redan vet om den; lägenheter utan pris rankas när priset finns. Ställ in hur mycket varje sak väger; det som saknas för en lägenhet räknas inte alls, så den varken vinner eller förlorar på det. Områden du satt till <strong>Aldrig här</strong> är inte med.</p></div>
     <div class="bench show">
       <div class="stack"><section class="panel"><h3>Vad är viktigast för dig?</h3>
-        <p class="dim" style="font-size:13px;margin:0 0 4px">0 betyder att det inte räknas alls, 3 att det väger tyngst.</p>${weights}</section></div>
+        <p class="dim" style="font-size:var(--fs-meta);margin:0 0 4px">0 betyder att det inte räknas alls, 3 att det väger tyngst.</p>${weights}</section></div>
       <div>
         ${list.length ? `<ol class="rank">${rows}</ol>${list.length > rankLimit ? `<button class="btn more" data-act="rank-more">Visa ${Math.min(30, list.length - rankLimit)} till (${list.length - rankLimit} kvar)</button>` : ""}`
           : `<div class="note">Inga lägenheter med pris i ditt filter än.</div>`}
         ${waiting.length ? `<details class="undated rank-wait"><summary>${waiting.length} ${waiting.length > 1 ? "lägenheter väntar" : "lägenhet väntar"} på pris</summary>
-          <p class="dim" style="font-size:13px;margin:0 0 8px">De rankas när mäklaren har satt ett utgångspris.</p>
+          <p class="dim" style="font-size:var(--fs-meta);margin:0 0 8px">De rankas när mäklaren har satt ett utgångspris.</p>
           <ul>${waiting.map((p) => `<li><a href="${aptHref(p)}">${esc(p.addr)}</a> <span class="dim">${esc(p.area || p.group || "")}${p.kvm ? " · " + String(p.kvm).replace(".", ",") + " m²" : ""} · ${esc(p.agent)}${estimatePrice(p) ? " · uppskattat " + mkr(estimatePrice(p)) : ""}</span></li>`).join("")}</ul></details>` : ""}
       </div>
     </div>`;
@@ -2685,7 +2687,7 @@ function routeView() {
     </section>`;
   };
   return lead + `<div class="stack">${R.days.map(day).join("")}</div>
-    <p class="dim" style="font-size:12px;margin:12px 0 0">Rundan börjar vid första visningen. SL:s restid gäller en vardag, lördag eller söndag vid den tiden, inte på minuten. Gjord ${fmtShort(R.updated)} kl. ${R.updated.slice(11, 16)}.</p>`;
+    <p class="dim" style="font-size:var(--fs-small);margin:12px 0 0">Rundan börjar vid första visningen. SL:s restid gäller en vardag, lördag eller söndag vid den tiden, inte på minuten. Gjord ${fmtShort(R.updated)} kl. ${R.updated.slice(11, 16)}.</p>`;
 }
 VIEWS.route = routeView;
 
@@ -2822,13 +2824,13 @@ function aptPage() {
   const price = panel(1, "", `
       <span class="eyebrow">${head ? head[0] : "Pris"}</span>
       <div class="bigfig">${head ? nf.format(head[1]) + "<small> kr</small>" : "<small>Inte satt än</small>"}</div>
-      ${guess ? `<p class="dim" style="font-size:13px;margin:4px 0 0">Mäklaren har inte satt något pris än. Uppskattat från stadsdelens kvadratmeterpris gånger storleken.</p>` : ""}
+      ${guess ? `<p class="dim" style="font-size:var(--fs-meta);margin:4px 0 0">Mäklaren har inte satt något pris än. Uppskattat från stadsdelens kvadratmeterpris gånger storleken.</p>` : ""}
       <div class="row" style="gap:6px;margin:10px 0 12px">${fit}${marketChips(p).join("")}${mc && mc.cashShort ? `<span class="chip bad">Kontanterna räcker inte till 10 %</span>` : ""}</div>
       ${basis && a.max ? `<div class="ap-max ${basis > a.max ? "over" : ""}"><div class="bar"><b style="width:${Math.min(100, (basis / a.max) * 100).toFixed(1)}%"></b></div><span>${Math.round((basis / a.max) * 100)} % av ditt max på ${mkr(a.max)}${basis !== (head || [])[1] ? `, räknat på ${basisLabel} ${kr(basis)}` : ""}</span></div>` : ""}
       <dl class="kv">
         ${p.final && ask && ask !== p.final ? `<dt>Utgångspris</dt><dd>${kr(ask)}</dd><dt>Slutpris mot utgångspris</dt><dd>${p.final >= ask ? "+" : ""}${kr(p.final - ask)}</dd>` : ""}
         ${bidding && ask ? `<dt>Högsta bud</dt><dd>${kr(p.bid)}</dd>` : ""}
-        ${PRED[url] && !p.final ? `<dt>Väntat slutpris</dt><dd>${mkr(PRED[url].low)}–${mkr(PRED[url].high)}<br><span class="dim" style="font-size:12px">${esc(PRED[url].basis)}</span></dd>` : ""}
+        ${PRED[url] && !p.final ? `<dt>Väntat slutpris</dt><dd>${mkr(PRED[url].low)}–${mkr(PRED[url].high)}<br><span class="dim" style="font-size:var(--fs-small)">${esc(PRED[url].basis)}</span></dd>` : ""}
         ${dropped(p) ? `<dt>Sänkt ${fmtShort(p.drop.at)} från</dt><dd>${kr(p.drop.from)} (${kr(p.price - p.drop.from)})</dd>` : ""}
         ${p.relisted ? `<dt>Till salu tidigare</dt><dd>${relistText(p.relisted)}</dd>` : ""}
         ${head && p.kvm ? `<dt>Pris per m²</dt><dd>${kr(head[1] / p.kvm)}</dd>` : ""}
@@ -2846,7 +2848,7 @@ function aptPage() {
         <dt>Bolån (${pct(mc.ltv * 100, 0)} belåning)</dt><dd>${kr(mc.loan)}</dd>
         ${h.net ? `<dt>Kvar efter boende och levnadskostnader</dt><dd style="color:${left < 0 ? "var(--bad)" : "var(--good)"}">${kr(left)}</dd>` : ""}
       </dl>
-      <p class="dim" style="font-size:12px;margin:10px 0 0">Räknat på ${basisLabel} med ${esc(cr.label)}${S.example ? ", och exempelekonomin" : ""}. <a href="#" data-goto="money">Ändra din ekonomi</a></p>` : ""}`);
+      <p class="dim" style="font-size:var(--fs-small);margin:10px 0 0">Räknat på ${basisLabel} med ${esc(cr.label)}${S.example ? ", och exempelekonomin" : ""}. <a href="#" data-goto="money">Ändra din ekonomi</a></p>` : ""}`);
 
   // Rooms, size and the like, those the agent's page gave
   const of = /av\s+(\d+)/.exec(p.floorText || "");
@@ -2861,8 +2863,8 @@ function aptPage() {
   const lastPast = shows.filter((s) => s.start < now).pop();
   const showings = panel(3, "Visningar", `
       ${shows.length ? shows.map((s) => `<div class="ap-row ${s.start < now ? "past" : ""}"><span><strong>${fmtDay(s.start)}</strong></span><span>${s.start.slice(11)}${s.end ? "–" + s.end : ""}${s.start < now ? " · har varit" : ""}</span>${bookBox(p, s.start)}</div>`).join("")
-        : `<p class="dim" style="font-size:14px;margin:0">${p.state === "sold" ? "Lägenheten är såld." : p.soon ? "Ingen visning än; lägenheten är inte ute till salu." : "Ingen visning utlagd just nu."}</p>`}
-      ${v ? `<div class="visit" style="grid-template-columns:minmax(0,1fr)"><span class="dim" style="font-size:13px">Du var här${v.at ? " " + fmtShort(v.at) : ""}. Ditt betyg och dina anteckningar:</span>
+        : `<p class="dim" style="font-size:var(--fs-body);margin:0">${p.state === "sold" ? "Lägenheten är såld." : p.soon ? "Ingen visning än; lägenheten är inte ute till salu." : "Ingen visning utlagd just nu."}</p>`}
+      ${v ? `<div class="visit" style="grid-template-columns:minmax(0,1fr)"><span class="dim" style="font-size:var(--fs-meta)">Du var här${v.at ? " " + fmtShort(v.at) : ""}. Ditt betyg och dina anteckningar:</span>
           ${ratingSelect(`data-visit-r="${esc(url)}" aria-label="Ditt betyg för ${esc(p.addr)}"`, v.r ?? "")}
           <input type="text" data-visit-note="${esc(url)}" value="${esc(v.note || "")}" placeholder="Anteckningar från visningen">
           <button class="btn ghost" style="justify-self:start" data-act="unwent" data-key="${esc(url)}">Ångra besöket</button></div>`
@@ -2872,7 +2874,7 @@ function aptPage() {
   const watch = saved ? panel(4, "Din bevakning", `
       <div class="field"><label for="ap-status">Status</label><select id="ap-status" data-apt="${saved.id}" data-k="status">${Object.entries(STATUS_SV).map(([s, l]) => `<option value="${s}" ${saved.status === s ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="field"><label for="ap-bid">Väntat slutpris</label><span class="num">${numInput(`id="ap-bid" data-apt="${saved.id}" data-k="bid"`, saved.bid)}<span>kr</span></span><small>Månadskostnaden och budgeten här räknas på det.</small></div>
-      <p class="dim" style="font-size:12px;margin:8px 0 0">Fler fält och jämförelsen med dina andra finns under <a href="#" data-goto="search">Sparade</a>.</p>`) : "";
+      <p class="dim" style="font-size:var(--fs-small);margin:8px 0 0">Fler fält och jämförelsen med dina andra finns under <a href="#" data-goto="search">Sparade</a>.</p>`) : "";
 
   // Bidding and the final price
   // The daily readings of a saved apartment, with whichever bid list is longer: the one read today or the one followed
@@ -2881,8 +2883,8 @@ function aptPage() {
   const chart = bidChart({ price: (saved && +saved.price) || ask, link: "" }, f);
   const sold = p.state === "sold" || f.state === "sold", final = p.final || f.final;
   const bids = bidding || sold || chart ? panel(5, sold ? "Såld" : "Budgivning", `
-      ${sold ? `<p style="margin:0 0 ${chart ? 12 : 0}px;font-size:14px">${final ? `Slutpris <strong>${kr(final)}</strong>${ask && ask !== final ? `, ${final >= ask ? "+" : ""}${kr(final - ask)} mot utgångspriset` : ""}.` : "Slutpriset är inte känt än; bostadsletaren letar efter det varje morgon."}</p>`
-        : !chart && bidding ? `<p style="margin:0;font-size:14px">Högsta bud <strong>${kr(p.bid)}</strong>${p.bids ? `, ${p.bids} bud` : ""}${p.bidders ? ` från ${p.bidders} budgivare` : ""}${ask ? `, ${p.bid >= ask ? "+" : ""}${kr(p.bid - ask)} mot utgångspriset` : ""}. ${saved ? "Buden följs dag för dag från och med nu." : "Spara lägenheten (♥) så följs buden dag för dag."}</p>` : ""}
+      ${sold ? `<p style="margin:0 0 ${chart ? 12 : 0}px;font-size:var(--fs-body)">${final ? `Slutpris <strong>${kr(final)}</strong>${ask && ask !== final ? `, ${final >= ask ? "+" : ""}${kr(final - ask)} mot utgångspriset` : ""}.` : "Slutpriset är inte känt än; bostadsletaren letar efter det varje morgon."}</p>`
+        : !chart && bidding ? `<p style="margin:0;font-size:var(--fs-body)">Högsta bud <strong>${kr(p.bid)}</strong>${p.bids ? `, ${p.bids} bud` : ""}${p.bidders ? ` från ${p.bidders} budgivare` : ""}${ask ? `, ${p.bid >= ask ? "+" : ""}${kr(p.bid - ask)} mot utgångspriset` : ""}. ${saved ? "Buden följs dag för dag från och med nu." : "Spara lägenheten (♥) så följs buden dag för dag."}</p>` : ""}
       ${chart}`) : "";
 
   // The finder's daily readings: how long it has been out and how the asking price moved
@@ -2903,14 +2905,14 @@ function aptPage() {
   // The score, part by part
   const rk = rankOf(p, a), w = S.show.w || {}, thin = Object.keys(rk.parts).length < 3; // too little known for a score to mean anything
   const score = panel(8, "Betyg", `
-      ${thin ? `<p class="dim" style="font-size:14px;margin:0 0 12px">För lite är känt om lägenheten för ett betyg än.</p>` : `<div class="ap-score"><b>${rk.score}</b><div class="bar"><b style="width:${rk.score}%"></b></div></div>`}
+      ${thin ? `<p class="dim" style="font-size:var(--fs-body);margin:0 0 12px">För lite är känt om lägenheten för ett betyg än.</p>` : `<div class="ap-score"><b>${rk.score}</b><div class="bar"><b style="width:${rk.score}%"></b></div></div>`}
       ${RANK.map(([k, l]) => {
         const part = rk.parts[k], off = !(+w[k] > 0);
         const none = { drop: "Priset är inte sänkt", relisted: "Inte till salu tidigare" }[k] || "Ingen uppgift";
         if (!part) return `<div class="ap-part off"><span>${l}</span><small>${none}, räknas inte</small></div>`;
         return `<div class="ap-part ${off ? "off" : part[0] <= 0.3 ? "low" : ""}"><span>${l}</span><small>${esc(part[1].replace(/^./, (c) => c.toUpperCase()))}${off ? " · väger 0" : ""}</small><div class="bar"><b style="width:${Math.round(part[0] * 100)}%"></b></div></div>`;
       }).join("")}
-      <p class="dim" style="font-size:12px;margin:10px 0 0">${p.price ? "" : "Utan utgångspris är lägenheten inte med i Rangordning än. "}<a href="#" data-goto="rank">Ändra vad som väger tyngst</a></p>`);
+      <p class="dim" style="font-size:var(--fs-small);margin:10px 0 0">${p.price ? "" : "Utan utgångspris är lägenheten inte med i Rangordning än. "}<a href="#" data-goto="rank">Ändra vad som väger tyngst</a></p>`);
 
   // The förening: Bolagsverket's register, the annual report's key figures, flags with the sentence behind each
   const b = p.bv || {}, rep = p.report, figs = reportFigs(rep), repUrl = (rep && rep.url) || p.reportUrl;
@@ -2919,15 +2921,15 @@ function aptPage() {
   const kvRows = [b.registered && ["Registrerad", b.registered.slice(0, 4)], b.manager && ["Förvaltare", esc(b.manager)],
     p.orgnr && ["Organisationsnummer", p.orgnr.slice(0, 6) + "-" + p.orgnr.slice(6)], ...figs.map(([l, val]) => [l + (rep.reportYear ? " " + rep.reportYear : ""), val])].filter(Boolean);
   const forening = panel(9, "Föreningen", b.name || kvRows.length || flags.length || p.facts || repUrl ? `
-      ${b.name ? `<p style="margin:0 0 10px;font-size:15px;font-weight:500">${esc(b.name)}</p>` : ""}
+      ${b.name ? `<p style="margin:0 0 10px;font-size:var(--fs-lead);font-weight:500">${esc(b.name)}</p>` : ""}
       ${b.winding || b.deregistered || b.isBrf === false ? `<div class="row" style="gap:6px;margin:0 0 10px">${b.winding ? `<span class="chip bad">⚠ Under avveckling</span>` : ""}${b.deregistered ? `<span class="chip bad">⚠ Avregistrerad</span>` : ""}${b.isBrf === false ? `<span class="chip warn">Inte registrerad som bostadsrättsförening</span>` : ""}</div>` : ""}
       ${kvRows.length ? `<dl class="kv">${kvRows.map(([l, val]) => `<dt>${l}</dt><dd>${val}</dd>`).join("")}</dl>` : ""}
-      ${repUrl ? `<p style="margin:10px 0 0;font-size:14px"><a href="${esc(repUrl)}" target="_blank" rel="noopener">Årsredovisning${rep && rep.reportYear ? " " + esc(rep.reportYear) : ""} ↗</a></p>` : ""}
+      ${repUrl ? `<p style="margin:10px 0 0;font-size:var(--fs-body)"><a href="${esc(repUrl)}" target="_blank" rel="noopener">Årsredovisning${rep && rep.reportYear ? " " + esc(rep.reportYear) : ""} ↗</a></p>` : ""}
       ${flags.length ? `<h4 class="ap-sub">Flaggor</h4><ul class="ap-flags">${flags.map((x) => `<li><span class="chip ${x.kind === "ask" ? "info" : x.kind}">${x.kind === "bad" ? "⚠ " : x.kind === "ask" ? "? " : ""}${esc(x.label)}</span>${x.quote ? `<span>”${esc(x.quote)}”</span>` : ""}</li>`).join("")}</ul>` : ""}
       ${p.facts ? `<details class="ap-facts"><summary>Allt mäklaren skriver om föreningen${p.factsFrom ? ` (från ${esc(p.factsFrom)}s annons i samma förening)` : ""}</summary>${p.facts.split("\n").map((t) => `<p>${esc(t)}</p>`).join("")}</details>` : ""}
       ${same.length ? `<h4 class="ap-sub">Fler lägenheter i föreningen</h4><ul class="ap-others">${same.slice(0, 8).map((q) => `<li><a href="${aptHref(q)}">${esc(q.addr)}</a><span class="dim">${[q.rooms && num(q.rooms) + " rum", q.kvm && num(q.kvm) + " m²",
-        q.final ? "såld för " + kr(q.final) : q.state === "sold" ? "såld" : q.state === "bidding" && q.bid ? "bud " + kr(q.bid) : q.price ? kr(q.price) : q.soon ? "snart till salu" : ""].filter(Boolean).join(" · ")}</span></li>`).join("")}</ul>${same.length > 8 ? `<p class="dim" style="font-size:12px;margin:6px 0 0">och ${same.length - 8} till</p>` : ""}` : ""}`
-    : `<p class="dim" style="font-size:14px;margin:0">Inga uppgifter om föreningen än.</p>`);
+        q.final ? "såld för " + kr(q.final) : q.state === "sold" ? "såld" : q.state === "bidding" && q.bid ? "bud " + kr(q.bid) : q.price ? kr(q.price) : q.soon ? "snart till salu" : ""].filter(Boolean).join(" · ")}</span></li>`).join("")}</ul>${same.length > 8 ? `<p class="dim" style="font-size:var(--fs-small);margin:6px 0 0">och ${same.length - 8} till</p>` : ""}` : ""}`
+    : `<p class="dim" style="font-size:var(--fs-body);margin:0">Inga uppgifter om föreningen än.</p>`);
 
   // Trips to your addresses (saved apartments only) and the nearest shop, gym and bar
   const t = (TRAVEL.trips || {})[url] || {}, n = (TRAVEL.near || {})[url] || {}, places = (S.show.places || []).filter((x) => x.addr);
@@ -2936,8 +2938,8 @@ function aptPage() {
   const near = [["grocery", "Mataffär"], ["gym", "Gym"], ["bar", "Bar"]].filter(([k]) => n[k]).map(([k, l]) =>
     `<div class="ap-row"><span>${l}<small class="dim" style="display:block">${esc(n[k].name)} · ${n[k].m} m</small></span><strong>${n[k].walk} min promenad</strong></div>`);
   const travel = panel(10, "Restider och närområde", `${trips.join("")}${near.join("")}
-      ${!trips.length && !near.length ? `<p class="dim" style="font-size:14px;margin:0">Inga restider än.</p>` : ""}
-      ${!trips.length && places.length ? `<p class="dim" style="font-size:12px;margin:8px 0 0">${saved ? (TRAVEL.running ? "Letar resor hos SL…" : "Resorna till dina viktiga adresser är inte uträknade än.") : "Spara lägenheten (♥) så räknas resorna till dina viktiga adresser ut."}</p>` : ""}`);
+      ${!trips.length && !near.length ? `<p class="dim" style="font-size:var(--fs-body);margin:0">Inga restider än.</p>` : ""}
+      ${!trips.length && places.length ? `<p class="dim" style="font-size:var(--fs-small);margin:8px 0 0">${saved ? (TRAVEL.running ? "Letar resor hos SL…" : "Resorna till dina viktiga adresser är inte uträknade än.") : "Spara lägenheten (♥) så räknas resorna till dina viktiga adresser ut."}</p>` : ""}`);
 
   const map = p.lat ? `<section class="panel map-panel" style="--o:11;margin:0"><div id="aptmap" data-at="${p.lat},${p.lon}" role="img" aria-label="Karta som visar var ${esc(p.addr)} ligger"></div>
       <div class="legend"><span>${esc([p.addr, p.area, p.group !== p.area && p.group].filter(Boolean).join(", "))}</span></div></section>` : "";
@@ -2954,7 +2956,7 @@ function aptPage() {
       <div class="stack">${gallery}${facts}${bids}${hist}${desc}${plan}${forening}</div>
       <div class="stack">${price}${showings}${watch}${score}${travel}${map}</div>
     </div>
-    <p class="dim" style="font-size:12px;margin:16px 0 0">${p.read ? `Läst från ${esc(p.agent || "mäklaren")}s sida ${fmtShort(p.read)}.` : ""}</p></div>`;
+    <p class="dim" style="font-size:var(--fs-small);margin:16px 0 0">${p.read ? `Läst från ${esc(p.agent || "mäklaren")}s sida ${fmtShort(p.read)}.` : ""}</p></div>`;
 }
 
 /* ---------- Events ---------- */
