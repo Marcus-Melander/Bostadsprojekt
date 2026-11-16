@@ -602,6 +602,12 @@ def run(args):
         predict.update(DATA, log)
     except Exception as e:
         log(f"Predictions: stopped ({e})")
+    try:  # and from the apartment itself, used where there's no asking price (scraper/model.py)
+        import model
+        model.update(DATA, log)
+        model.use_for_unpriced(DATA, log)
+    except Exception as e:
+        log(f"Model: stopped ({e})")
     try:  # the coming week's showing-day routes (scraper/route.py)
         import route
         route.update(DATA, log)

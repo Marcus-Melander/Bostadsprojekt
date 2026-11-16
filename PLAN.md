@@ -89,11 +89,15 @@ Started 2026-11-11; the Supabase project is made (`razkgnubpubxhspngtma`, Stockh
 
 Needs months of final prices, which the daily runs collect meanwhile.
 
-- **Predict the final price, two ways, side by side.** The first, from price history, is in the planner since 2026-11-12 (see Done); still to do: the second way below, and putting both side by side.
+- **Predict the final price, two ways, side by side.** Both ways run every morning since 2026-11-16 (see Done). Still to do: show both side by side on the apartment's page, and try the floor plan images themselves in the second model once there are a few hundred sales.
   - **From price history:** for each neighbourhood and agent, how far final prices land above asking and how many bids it usually takes, from our own history (data/history.sqlite). A guessed final price on each showing and saved apartment, with a range and how many sales it's based on.
   - **From the apartment itself, without prices:** a model trained on features other than prices: the floor plan (data/floorplans/), rooms and size, floor, neighbourhood and district, your area ratings, the förening's economy (avgift per m², debt per m², stambyte, tomträtt), build year, features from the description, and travel times. It learns from final prices in the history, so it gives a second opinion that doesn't lean on the asking price. Show both, and where they disagree.
 
 ## Done
+
+- **Price history on the apartment page, and a second price model (2026-11-16).**
+  - **Prishistorik:** each apartment's own page has a chart of its asking price day by day, the highest bid and the final price, with a line like "Ute i 14 dagar, samma utgångspris hela tiden, högsta bud 4 250 000 kr" (on the Mac from `GET /api/history`, online from Supabase's public `readings`).
+  - **A model from the apartment itself (`scraper/model.py`, scikit-learn):** size, floor, neighbourhood, distance to the city, the förening's economy, the description's features and the nearest shops, trained on the sales (125 on 16 November) without looking at prices. Left out in turn, it's off by 8.8 % (median) against 11.3 % for an estimate from the size alone, so it now gives the expected price where there's no asking price (976 apartments on 16 November); with an asking price, `predict.py` stays better (3.6 % against 3.8 %).
 
 - **Booli's count with two browsers (2026-11-15).** Since the switch to Scrapling, Booli's count failed ("Sync API inside the asyncio loop"): its Chrome window was opened while the run's first browser was still open in the same thread, which Scrapling's browser refuses. It's now opened after the first one is closed. Also: the floor plan backfill of 12 November hung once the Mac went to sleep under it (it doesn't run under `caffeinate` like the morning run), so it found no plans; it's to be run again with `caffeinate -is` after a morning run.
 
