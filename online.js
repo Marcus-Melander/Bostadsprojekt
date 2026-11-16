@@ -81,6 +81,7 @@
     "/api/travel": "private/travel.json", "/api/digest": "private/digest.json", "/api/routes": "private/routes.json" };
   async function get(path) {
     if (path === "/api/floorplans") return floorplans();
+    if (path.startsWith("/api/history?")) return history(new URLSearchParams(path.split("?")[1]).get("url"));
     // The owner gets the full listings (with the agents' descriptions); anyone else the public ones
     // The owner gets the full listings (with the agents' descriptions) and travel times; anyone else the public ones,
     // and of the travel file only the nearest shops
@@ -102,6 +103,18 @@
       for (const x of data || []) if (x.signedUrl) URLS[x.path.slice("private/floorplans/".length)] = x.signedUrl;
     }
     return by;
+  }
+
+  // One apartment's daily readings from the public readings table, as the local server's /api/history
+  let since = null;
+  async function history(url) {
+    if (!url || !(await ready)) return null;
+    const cols = "day,at,price,state,bid,bids,final,on_list";
+    const [r, s] = await Promise.all([sb.from("readings").select(cols).eq("url", url).order("day"),
+      since ? null : sb.from("readings").select("day").order("day").limit(1)]);
+    if (r.error) return null;
+    if (s && !s.error && s.data.length) since = s.data[0].day;
+    return { since, readings: r.data || [] };
   }
 
   async function loadPlan() {

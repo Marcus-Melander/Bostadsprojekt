@@ -294,6 +294,21 @@ details.undated { margin-top: 22px; }
 .bidchart .lastv { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .bid-facts { margin: 0; font-size: 13px; color: var(--muted); }
 .bid-facts strong { color: var(--negative); }
+.bid-facts strong.plain { color: var(--text); }
+.pricehist .askline { fill: none; stroke: var(--data); stroke-width: 2; stroke-linejoin: round; }
+.pricehist .bidline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.pricehist .dot.ask { fill: var(--data); }
+.pricehist .dot.bid { fill: var(--muted); }
+.pricehist .dot.fin { fill: var(--text); }
+.pricehist .hl { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+.pricehist .hd:hover .hl { opacity: .5; }
+.pricehist .hd:hover .dot { r: 5; }
+.pricehist .end { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.pricehist .end.ask { fill: var(--data); font-weight: 600; }
+.pricehist .end.fin { fill: var(--text); font-weight: 600; }
+.bid-legend .h-ask { background: var(--data); }
+.bid-legend .h-bid { background: var(--muted); }
+.bid-legend .h-fin { background: var(--text); }
 .bid-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
 .bid-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .bid-table { font-size: 12px; }
@@ -1637,6 +1652,89 @@ function bidChart(p, f) {
     }).join("")}</tbody></table></details>`;
   return `<div class="bidchart"><p class="bid-facts">${facts.join(" · ")}</p>${svg}${legend}${table}</div>`;
 }
+// An apartment's days on the market from the finder's daily readings (history.sqlite): the asking price as a step line,
+// the highest bid where the agent shows one, and the final price once sold
+const HIST = {}; // by apartment URL; null while it loads
+function loadHistory(url) {
+  if (url in HIST || (!LOCAL && !ONLINE)) return;
+  HIST[url] = null;
+  getJSON("/api/history?url=" + encodeURIComponent(url)).catch(() => null).then((d) => {
+    HIST[url] = d && d.readings ? d : { since: null, readings: [] };
+    if (ROUTE) refresh();
+  });
+}
+const STATE_SV = { "for sale": "Till salu", bidding: "Budgivning", sold: "Såld", gone: "Borta" };
+const times = (n) => (["", "en gång", "två gånger", "tre gånger", "fyra gånger", "fem gånger"][n] || n + " gånger");
+const dayNo = (d) => Math.round(+new Date(d.slice(0, 10) + "T12:00") / 864e5);
+function historyFacts(rows, since, live) {
+  const first = rows[0], soldAt = rows.find((r) => r.state === "sold" || r.final), goneAt = rows.find((r) => r.state === "gone");
+  const end = soldAt ? soldAt.day : goneAt ? goneAt.day : live ? isoLocal(new Date()).slice(0, 10) : rows[rows.length - 1].day;
+  const n = dayNo(end) - dayNo(first.day), atLeast = first.day === since ? "minst " : "", dagar = n === 1 ? "1 dag" : n + " dagar";
+  const out = [soldAt === first ? "Såld när bostadsletaren först såg den" : soldAt ? `Såld efter ${atLeast}${dagar}` : goneAt ? `Borta från listan efter ${atLeast}${dagar}`
+    : n ? `Ute i ${atLeast}${dagar}` : "Ute sedan i dag"];
+  // Each change of the asking price from one reading to the next
+  const asks = rows.map((r) => r.ask).filter(Boolean), steps = asks.slice(1).map((v, i) => v - asks[i]).filter(Boolean);
+  const down = steps.filter((d) => d < 0), up = steps.filter((d) => d > 0), sum = (a) => Math.abs(a.reduce((s, d) => s + d, 0));
+  if (down.length) out.push(`sänkt ${times(down.length)} med ${down.length > 1 ? "totalt " : ""}${kr(sum(down))}`);
+  if (up.length) out.push(`höjt ${times(up.length)} med ${up.length > 1 ? "totalt " : ""}${kr(sum(up))}`);
+  if (!steps.length && asks.length > 1) out.push("samma utgångspris hela tiden");
+  const bid = rows.filter((r) => r.bid).pop();
+  if (bid && !soldAt) out.push(`högsta bud ${kr(bid.bid)} ${fmtShort(bid.day)}`);
+  return out.join(", ");
+}
+function historyChart(p, h) {
+  if (!h || !h.readings.length) return "";
+  // Some agents show the highest bid as the price while bidding, or the final price once sold; then that day has no asking price of its own
+  const rows = h.readings.map((r) => ({ ...r, ask: r.price && r.price !== r.final && !(r.state === "bidding" && r.price === r.bid) ? r.price : null }));
+  const facts = historyFacts(rows, h.since, !!LIST.items[p.url] && p.state !== "sold");
+  const final = rows.find((r) => r.final), lastAsk = rows.map((r) => r.ask).filter(Boolean).pop();
+  const stop = (t) => t.replace(/\.$/, "") + "."; // a sentence may end on a short date ("15 nov.")
+  const lead = `<p class="bid-facts">${stop(facts)}${final ? ` Slutpris <strong class="plain">${kr(final.final)}</strong>${lastAsk && lastAsk !== final.final ? ` (${final.final >= lastAsk ? "+" : ""}${kr(final.final - lastAsk)} mot utgångspriset)` : ""}.` : ""}</p>`;
+  const table = `<details class="bid-table"><summary>Varje dag</summary><table><thead><tr><th>Dag</th><th>Utgångspris</th><th>Högsta bud</th><th>Läge</th></tr></thead><tbody>${rows.slice().reverse().map((r) =>
+    `<tr><td>${fmtShort(r.day)}</td><td>${r.ask ? kr(r.ask) : "–"}</td><td>${r.bid ? kr(r.bid) : "–"}</td><td>${r.final ? "Slutpris " + kr(r.final) : STATE_SV[r.state] || "–"}</td></tr>`).join("")}</tbody></table></details>`;
+  const d0 = dayNo(rows[0].day), span = dayNo(rows[rows.length - 1].day) - d0;
+  const vals = rows.flatMap((r) => [r.ask, r.bid, r.final]).filter(Boolean);
+  // A line needs prices from at least two days
+  if (!span || rows.filter((r) => r.ask || r.bid || r.final).length < 2) return `<div class="bidchart pricehist">${lead}${rows.length > 1 ? table : ""}</div>`;
+  const narrow = innerWidth < 600, W = narrow ? 420 : 760, H = narrow ? 210 : 200, L = 48, R = narrow ? 8 : 112, T = 16, B = 28;
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.12 || hi * 0.03; lo -= pad; hi += pad;
+  const x = (day) => L + ((dayNo(day) - d0) / span) * (W - L - R), y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
+  const step = 10 ** Math.floor(Math.log10((hi - lo) / 3)), tick = [1, 2, 2.5, 5, 10].map((m) => m * step).find((s) => (hi - lo) / s <= 4);
+  const ticks = []; for (let v = Math.ceil(lo / tick) * tick; v <= hi; v += tick) ticks.push(v);
+  // A step line holds each price until the next reading that has one
+  const line = (k) => rows.filter((r) => r[k]).map((r, i) => `${i ? "H" + x(r.day).toFixed(1) + "V" : "M" + x(r.day).toFixed(1) + " "}${y(r[k]).toFixed(1)}`).join("");
+  const askRows = rows.filter((r) => r.ask), bidRows = rows.filter((r) => r.bid);
+  // The value at the right edge, named; on a phone the names go in the legend under the chart instead
+  const ends = [askRows.length && ["Utgångspris", askRows[askRows.length - 1].ask, "ask"], bidRows.length && ["Högsta bud", bidRows[bidRows.length - 1].bid, "bid"],
+    final && ["Slutpris", final.final, "fin"]].filter(Boolean).sort((a, b) => b[1] - a[1]);
+  let prevY = -99;
+  const labels = narrow ? "" : ends.map(([l, v, c]) => { const ly = Math.max(y(v) + 4, prevY + 14); prevY = ly;
+    return `<text class="end ${c}" x="${W - R + 8}" y="${ly}">${l} ${mn(v)}</text>`; }).join("");
+  let lastX = -99;
+  const dates = rows.map((r, i) => {
+    const at = x(r.day), endRow = i === rows.length - 1;
+    if (!endRow && (at - lastX < 64 || W - R - at < 56)) return "";
+    lastX = at;
+    return `<text class="ax" x="${at}" y="${H - 8}" text-anchor="${!i ? "start" : endRow ? "end" : "middle"}">${fmtShort(r.day)}</text>`;
+  }).join("");
+  // Hovering a day shows what was read that day; each day's band reaches halfway to its neighbours
+  const mid = (i) => (i < 0 ? L : i >= rows.length - 1 ? W - R : (x(rows[i].day) + x(rows[i + 1].day)) / 2);
+  const days = rows.map((r, i) => `<g class="hd"><rect class="hit" x="${mid(i - 1)}" y="${T}" width="${Math.max(1, mid(i) - mid(i - 1))}" height="${H - T - B}"/>
+      <line class="hl" x1="${x(r.day)}" x2="${x(r.day)}" y1="${T}" y2="${H - B}"/>
+      ${r.ask ? `<circle class="dot ask" cx="${x(r.day)}" cy="${y(r.ask)}" r="3"/>` : ""}${r.bid ? `<circle class="dot bid" cx="${x(r.day)}" cy="${y(r.bid)}" r="3.5"/>` : ""}
+      <title>${fmtShort(r.day)}: ${[r.ask && "utgångspris " + kr(r.ask), r.bid && "högsta bud " + kr(r.bid) + (r.bids ? `, ${r.bids} bud` : ""), r.final && "slutpris " + kr(r.final), (STATE_SV[r.state] || "").toLowerCase()].filter(Boolean).join(", ")}</title></g>`).join("");
+  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Utgångspriset dag för dag från ${fmtShort(rows[0].day)} till ${fmtShort(rows[rows.length - 1].day)}">
+    ${ticks.map((v) => `<g><line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${mn(v)}</text></g>`).join("")}
+    ${askRows.length ? `<path class="askline" d="${line("ask")}"/>` : ""}${bidRows.length ? `<path class="bidline" d="${line("bid")}"/>` : ""}
+    ${days}
+    ${final ? `<circle class="dot fin" cx="${x(final.day)}" cy="${y(final.final)}" r="5"/>` : ""}
+    ${labels}${dates}
+  </svg>`;
+  const legend = ends.length > 1 || narrow ? `<div class="bid-legend">${ends.slice().sort((a, b) => ["ask", "bid", "fin"].indexOf(a[2]) - ["ask", "bid", "fin"].indexOf(b[2]))
+    .map(([l, v, c]) => `<span><i class="h-${c}"></i>${l}${narrow ? " " + mn(v) : ""}</span>`).join("")}</div>` : "";
+  return `<div class="bidchart pricehist">${lead}${svg}${legend}${table}</div>`;
+}
 function aptOut(p) {
   const a = affordability(), cr = chosenRate();
   const price = +p.bid || +p.price || 0;
@@ -2787,6 +2885,11 @@ function aptPage() {
         : !chart && bidding ? `<p style="margin:0;font-size:14px">Högsta bud <strong>${kr(p.bid)}</strong>${p.bids ? `, ${p.bids} bud` : ""}${p.bidders ? ` från ${p.bidders} budgivare` : ""}${ask ? `, ${p.bid >= ask ? "+" : ""}${kr(p.bid - ask)} mot utgångspriset` : ""}. ${saved ? "Buden följs dag för dag från och med nu." : "Spara lägenheten (♥) så följs buden dag för dag."}</p>` : ""}
       ${chart}`) : "";
 
+  // The finder's daily readings: how long it has been out and how the asking price moved
+  loadHistory(url);
+  const histChart = historyChart(p, HIST[url]);
+  const hist = histChart ? panel(5, "Prishistorik", histChart) : "";
+
   // Description, with what it names as chips
   const feats = (p.extra || []).map((x) => `<span class="chip">${esc(FEATURE_SV[x] || x)}</span>`).join("");
   const desc = p.desc || feats ? panel(6, `Beskrivning${p.desc ? `<small>från ${esc(p.agent)}</small>` : ""}`, `
@@ -2848,7 +2951,7 @@ function aptPage() {
       <div class="acts">${LIST.items[url] || saved ? heartBtn(p, !!saved) : ""}<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Öppna hos ${esc(p.agent || "mäklaren")} ↗</a></div>
     </div>
     <div class="aptp">
-      <div class="stack">${gallery}${facts}${bids}${desc}${plan}${forening}</div>
+      <div class="stack">${gallery}${facts}${bids}${hist}${desc}${plan}${forening}</div>
       <div class="stack">${price}${showings}${watch}${score}${travel}${map}</div>
     </div>
     <p class="dim" style="font-size:12px;margin:16px 0 0">${p.read ? `Läst från ${esc(p.agent || "mäklaren")}s sida ${fmtShort(p.read)}.` : ""}</p></div>`;
