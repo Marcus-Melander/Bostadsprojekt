@@ -7,6 +7,11 @@ name: Morning run
 on:
   schedule:
     - cron: "10 4 * * *"  # 05:10 in Stockholm in winter, 06:10 in summer; GitHub often starts it some minutes late
+    # Retries, since GitHub can start a scheduled run hours late or drop it (17 November: 14:16). A retry after the
+    # day's run has finished stops at once (finder.py --daily); one that comes while it's going waits for it
+    # (the concurrency group below) and then stops
+    - cron: "40 6 * * *"
+    - cron: "40 9 * * *"
   workflow_dispatch:
     inputs:
       mode:

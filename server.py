@@ -146,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             s = json.loads(read(DATA / "status.json", b"{}") or b"{}")
             s["running"] = scraper_running()
-            s["scheduled"] = (Path.home() / "Library/LaunchAgents/se.bostadsplan.scrape.plist").exists()
+            s["scheduled"] = True  # every morning on GitHub's servers (.github/workflows/morning.yml)
             if s.get("state") == "running" and not s["running"]:
                 s["state"] = "error"
                 s["msg"] = "Den senaste körningen avbröts innan den var klar. Se data/scraper.log."

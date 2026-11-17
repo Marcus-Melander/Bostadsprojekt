@@ -552,8 +552,7 @@ def read_agent(ag, sh):
     progress(sh, ag["name"], None)
 
 
-# The job starts at 06:24, at login and every hour (scripts/install-mac.sh), so a morning the Mac was off or asleep
-# is caught up as soon as it's on again; a run that finished since 04:00 counts as today's
+# The morning run and its retries (.github/workflows/morning.yml): a run that finished since 04:00 counts as today's
 DAY_STARTS = 4
 
 
@@ -582,31 +581,16 @@ def finder_running(pid):
     return any(n in cmd for n in ("finder.py", "bolagsverket.py")) and int(pid) != os.getpid()
 
 
-# The morning run happens on GitHub's servers (.github/workflows/morning.yml). The Mac's hourly job (--fallback)
-# fetches what that run saved, and runs the finder itself only when the cloud hasn't finished today's by this hour
-FALLBACK_HOUR = 9
-
-
 def run(args):
     DATA.mkdir(exist_ok=True)
     lock = DATA / ".scrape.lock"
-    if args.fallback:
-        if lock.exists() and finder_running(lock.read_text()):
-            return 0  # the Mac's own run is going: its files aren't replaced under it
-        try:
-            import state
-            state.pull(log, if_newer=True)
-        except Exception as e:
-            log(f"State: couldn't fetch the cloud's ({e})")
     if args.daily and done_today():
         (DATA / ".no-run").touch()  # the workflow then doesn't save the state it fetched over a newer one
         return 0  # the catch-up start: today's run already finished
-    if args.fallback and dt.datetime.now().hour < FALLBACK_HOUR:
-        return 0  # the cloud's run may still be going
     if lock.exists() and finder_running(lock.read_text()):
         print("Another run is going.", file=sys.stderr)
         return 1  # also a run that's been asleep for hours: it carries on when the Mac wakes
-    if args.daily:  # the cloud and the Mac: only one of them runs today (scraper/state.py, claim)
+    if args.daily:  # only one daily run at a time, wherever it's started (scraper/state.py, claim)
         try:
             import state
             other = state.claim(day_start(), log)
@@ -788,8 +772,6 @@ if __name__ == "__main__":
     ap.add_argument("--no-count", action="store_true", help="don't read Booli's count")
     ap.add_argument("--show", action="store_true", help="show the browser window")
     ap.add_argument("--daily", action="store_true", help="do nothing if today's run already finished (the scheduled starts)")
-    ap.add_argument("--fallback", action="store_true", help="the Mac's hourly job: fetch the cloud's state, and run only if "
-                    f"the cloud hasn't finished today's run by {FALLBACK_HOUR}:00")
     code = run(ap.parse_args())
     # A hung agent's thread can't be stopped from Python; its work is already left out and everything is saved,
     # so the process ends here instead of waiting for it forever

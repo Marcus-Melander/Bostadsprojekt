@@ -7,7 +7,7 @@ A single-page planner for buying a bostadsrätt in Stockholm. It runs on your ow
 ```bash
 scripts/setup.sh                 # once: Python environment with Playwright
 .venv/bin/python server.py       # then open http://localhost:8765
-scripts/install-mac.sh           # optional: server at login, finder daily at 06:25
+scripts/install-mac.sh           # optional: the server at login (the finder runs on GitHub every morning)
 ```
 
 - `scraper/finder.py` drives your installed Google Chrome. It reads each estate agent's for-sale list (`scraper/agents.py`), opens the inner-city apartments that may fit your filter, and saves every showing time, price, size, avgift, floor, build year, description, features and photos.
@@ -16,7 +16,7 @@ scripts/install-mac.sh           # optional: server at login, finder daily at 06
 - **Booli is used only as an answer key.** Once a run, the finder opens one Booli search page, in a Chrome window of its own, to read how many apartments Booli shows for the same filter in Stockholms innerstad. The Showings tab compares that with what the finder found. If Booli refuses the page, the count is missing that day.
 - The finder follows each site's robots.txt, waits a few seconds between pages, and stops reading a site that blocks it. Nothing is retried.
 - Your plan, the scraped listings and the logs are kept in `data/`, which git ignores.
-- `scripts/install-mac.sh --remove` removes the schedule again.
+- The finder runs every morning at 05:10 on GitHub's servers (`.github/workflows/morning.yml`), not on the Mac; `scripts/install-mac.sh --remove` removes the Mac's old schedule.
 
 ## Tabs
 

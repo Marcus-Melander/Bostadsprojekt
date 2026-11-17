@@ -1,10 +1,9 @@
 #!/bin/bash
-# Starts the planner's server when you log in, and the finder's hourly job. The morning run itself happens on GitHub's
-# servers (.github/workflows/morning.yml); every hour (and at login) the Mac fetches what that run saved
-# (finder.py --daily --fallback, through scraper/state.py), so the planner here shows the morning's apartments. Only when
-# the cloud's run hasn't finished by 09:00 does the Mac run the finder itself, wrapped in caffeinate so it stays awake
-# until it's done, and then saves the state for the next run.
-# Remove both again with: scripts/install-mac.sh --remove
+# Starts the local planner's server when you log in. The finder no longer runs on the Mac: the morning run happens on
+# GitHub's servers (.github/workflows/morning.yml) and the planner is online. Running this again also removes the
+# finder's old hourly job (se.bostadsplan.scrape). To fetch the cloud's latest state for the local planner:
+# .venv/bin/python scraper/state.py --pull
+# Remove everything with: scripts/install-mac.sh --remove
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
@@ -35,21 +34,6 @@ cat > "$AGENTS/$SERVER.plist" <<PLIST
 </dict></plist>
 PLIST
 
-cat > "$AGENTS/$SCRAPE.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>$SCRAPE</string>
-  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-is</string><string>$ROOT/.venv/bin/python</string><string>$ROOT/scraper/finder.py</string><string>--daily</string><string>--fallback</string></array>
-  <key>WorkingDirectory</key><string>$ROOT</string>
-  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>24</integer></dict>
-  <key>StartInterval</key><integer>3600</integer>
-  <key>RunAtLoad</key><true/>
-  <key>StandardOutPath</key><string>$ROOT/data/scraper.out</string>
-  <key>StandardErrorPath</key><string>$ROOT/data/scraper.out</string>
-</dict></plist>
-PLIST
 
 launchctl bootstrap "gui/$(id -u)" "$AGENTS/$SERVER.plist"
-launchctl bootstrap "gui/$(id -u)" "$AGENTS/$SCRAPE.plist"
-echo "Installed. The planner is at http://localhost:8765. Every hour the Mac fetches what the morning run on GitHub saved, and runs the finder itself only if that run hasn't finished by 09:00."
+echo "Installed. The planner is at http://localhost:8765. The finder runs every morning on GitHub's servers, not on this Mac."
