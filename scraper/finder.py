@@ -557,11 +557,14 @@ def read_agent(ag, sh):
 DAY_STARTS = 4
 
 
-def done_today(now=None):
+def day_start(now=None):
     now = now or dt.datetime.now()
     start = now.replace(hour=DAY_STARTS, minute=0, second=0, microsecond=0)
-    if now < start:
-        start -= dt.timedelta(days=1)
+    return start - dt.timedelta(days=1) if now < start else start
+
+
+def done_today(now=None):
+    start = day_start(now)
     finished = read_json(DATA / "status.json", {}).get("finished")
     try:
         return dt.datetime.fromisoformat(finished) >= start
@@ -596,12 +599,24 @@ def run(args):
         except Exception as e:
             log(f"State: couldn't fetch the cloud's ({e})")
     if args.daily and done_today():
+        (DATA / ".no-run").touch()  # the workflow then doesn't save the state it fetched over a newer one
         return 0  # the catch-up start: today's run already finished
     if args.fallback and dt.datetime.now().hour < FALLBACK_HOUR:
         return 0  # the cloud's run may still be going
     if lock.exists() and finder_running(lock.read_text()):
         print("Another run is going.", file=sys.stderr)
         return 1  # also a run that's been asleep for hours: it carries on when the Mac wakes
+    if args.daily:  # the cloud and the Mac: only one of them runs today (scraper/state.py, claim)
+        try:
+            import state
+            other = state.claim(day_start(), log)
+        except Exception as e:
+            other = None
+            log(f"State: couldn't check today's claim ({e})")
+        if other:
+            log(f"Today's run is already going on {other}")
+            (DATA / ".no-run").touch()
+            return 0
     lock.write_text(str(os.getpid()))
     import online
     try:  # a filter changed in the planner online

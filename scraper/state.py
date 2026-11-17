@@ -111,6 +111,42 @@ def pull(log=print, if_newer=False, images=True, everything=False):
     return True
 
 
+# Who is doing today's run. GitHub's scheduled start can come hours late (17 November: 14:16 instead of 05:10), by
+# when the Mac's fallback may already be running, and the two would then save over each other's state. Each run
+# claims the day first and stands down when the other side's claim is still fresh. A claim older than CLAIM_HOURS
+# (a run that died, or a Mac that fell asleep mid-run) doesn't count: the workflow's own limit is 5½ hours.
+CLAIM = "state/claim.json"
+CLAIM_HOURS = 6
+
+
+def host():
+    if os.environ.get("GITHUB_ACTIONS"):
+        return "github"
+    import socket
+    return socket.gethostname()
+
+
+def claim(since, log=print):
+    """Claim today's run (the day starting at `since`, a naive local datetime). Returns who else holds a fresh
+    claim, in which case nothing is claimed and the caller stands down; None when this run may go ahead."""
+    import datetime as dt
+    c = online.config()
+    if not c:
+        return None
+    try:
+        held = json.loads(_download(c, CLAIM)[0])
+        at = dt.datetime.fromisoformat(held["at"])
+        if held.get("host") != host() and at >= since and dt.datetime.now() - at < dt.timedelta(hours=CLAIM_HOURS):
+            return f"{held['host']} since {at:%H:%M}"
+    except Exception:  # no claim yet, or one that can't be read: go ahead
+        pass
+    try:
+        online.upload(c, CLAIM, json.dumps({"host": host(), "at": time.strftime("%Y-%m-%dT%H:%M:%S")}).encode())
+    except Exception as e:
+        log(f"State: couldn't claim today's run ({e})")
+    return None
+
+
 if __name__ == "__main__":
     if "--push" in sys.argv:
         push()

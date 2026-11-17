@@ -73,5 +73,9 @@ jobs:
           exit $code
 
       - name: Save the state
+        # Not when the finder stood down (today's run already done, or going on the Mac): the state fetched at the
+        # start would replace a newer one
         if: always() && steps.fetch.outcome == 'success'
-        run: python scraper/state.py --push
+        run: |
+          if [ -f data/.no-run ]; then echo "No run today, the state stays as it is"; exit 0; fi
+          python scraper/state.py --push
