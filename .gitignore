@@ -5,3 +5,4 @@ __pycache__/
 site/
 .vercel
 .env*
+bostadsplan.html
