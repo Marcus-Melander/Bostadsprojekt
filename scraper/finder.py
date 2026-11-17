@@ -26,7 +26,8 @@ import subprocess
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+import faulthandler
+from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -46,6 +47,10 @@ PAUSE_S = (3, 6)                   # between pages on one agent's site
 READ_EVERY = dt.timedelta(hours=20)
 UNPLACED_EVERY = dt.timedelta(days=7)  # an apartment whose address OpenStreetMap didn't find
 AT_ONCE = 4                        # agents read side by side; each site still gets one page at a time
+# An agent still being read this long after the run started has hung (a page call in the browser that never
+# returned: Alicia Edelman on 16 November in the cloud, SkandiaMäklarna on the Mac). The run carries on without it,
+# and every thread's stack goes to the log first, to show which call it was.
+AGENTS_DEADLINE_S = 75 * 60
 FOLLOW_DAYS = 30                   # how long an apartment that left its agent's list is checked for a final price
 # A challenge page, not the notice under a contact form ("skyddas av reCAPTCHA", "skyddas mot missbruk av reCAPTCHA")
 BLOCKED = re.compile(r"(?<! av )(?<! by )\b(?:re)?captcha|verify you are human|är du en människa|"
@@ -673,8 +678,17 @@ def find(args):
               "robots": robots, "hist": hist, "report": report, "notes": notes, "started": started, "show": args.show,
               "lock": threading.Lock(), "busy": {}, "done": 0, "total": len(chosen)}
     try:
-        with ThreadPoolExecutor(max_workers=AT_ONCE) as pool:
-            list(pool.map(lambda ag: read_agent(ag, shared), chosen))
+        pool = ThreadPoolExecutor(max_workers=AT_ONCE)
+        futures = {pool.submit(read_agent, ag, shared): ag["name"] for ag in chosen}
+        _, hung = wait(futures, timeout=AGENTS_DEADLINE_S)
+        pool.shutdown(wait=False, cancel_futures=True)
+        if hung:
+            stuck = sorted({futures[f] for f in hung} | set(shared["busy"]))
+            log(f"Agents still being read after {AGENTS_DEADLINE_S // 60} min, left for today: {', '.join(stuck)}"
+                f" (now at {', '.join(f'{k} {v}' for k, v in shared['busy'].items()) or '?'})")
+            print("---- every thread's stack when the agents' deadline passed", file=sys.stderr, flush=True)
+            faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+            notes.append(f"Läsningen av {', '.join(stuck)} fastnade och avbröts; de läses igen i morgon.")
         with launch(args.show) as browser:
             page = browser.new_page()
             if saved:
@@ -761,4 +775,9 @@ if __name__ == "__main__":
     ap.add_argument("--daily", action="store_true", help="do nothing if today's run already finished (the scheduled starts)")
     ap.add_argument("--fallback", action="store_true", help="the Mac's hourly job: fetch the cloud's state, and run only if "
                     f"the cloud hasn't finished today's run by {FALLBACK_HOUR}:00")
-    sys.exit(run(ap.parse_args()))
+    code = run(ap.parse_args())
+    # A hung agent's thread can't be stopped from Python; its work is already left out and everything is saved,
+    # so the process ends here instead of waiting for it forever
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code or 0)
